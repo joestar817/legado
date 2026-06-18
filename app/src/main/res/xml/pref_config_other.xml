@@ -241,6 +241,19 @@
 
         <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="false"
+            android:key="recordNetworkLog"
+            android:summary="@string/record_network_log_summary"
+            android:title="@string/record_network_log"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="networkRequestLog"
+            android:summary="@string/network_request_log_summary"
+            android:title="@string/network_request_log"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
             android:key="recordHeapDump"
             android:summary="@string/record_heap_dump_s"
             android:title="@string/record_heap_dump_t"

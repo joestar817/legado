@@ -76,6 +76,10 @@
     <string name="theme_setting_s">与界面/颜色相关的一些设置</string>
     <string name="other_setting">其它设置</string>
     <string name="other_setting_s">与功能相关的一些设置</string>
+    <string name="record_network_log">记录网络请求</string>
+    <string name="record_network_log_summary">记录阅读自身发出的请求，用于书源和运行时调试</string>
+    <string name="network_request_log">网络请求日志</string>
+    <string name="network_request_log_summary">查看应用最近记录的请求</string>
     <string name="about">关于</string>
     <string name="donate">捐赠</string>
     <string name="exit">退出</string>

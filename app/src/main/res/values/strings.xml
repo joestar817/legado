@@ -77,6 +77,10 @@
     <string name="theme_setting_s">Some settings related to interface or color</string>
     <string name="other_setting">Other settings</string>
     <string name="other_setting_s">Some function-related settings</string>
+    <string name="record_network_log">Record network requests</string>
+    <string name="record_network_log_summary">Record requests sent by Reading for source and runtime debugging.</string>
+    <string name="network_request_log">Network requests</string>
+    <string name="network_request_log_summary">View recent requests recorded by the app.</string>
     <string name="about">About</string>
     <string name="donate">Donations</string>
     <string name="exit">Exit</string>

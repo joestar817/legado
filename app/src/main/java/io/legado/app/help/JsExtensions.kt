@@ -17,6 +17,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.BackstageWebView
 import io.legado.app.help.http.CookieManager.cookieJarHeader
 import io.legado.app.help.http.CookieStore
+import io.legado.app.help.http.NetworkLog
 import io.legado.app.help.http.SSLHelper
 import io.legado.app.help.http.StrResponse
 import io.legado.app.help.source.SourceHelp
@@ -489,17 +490,42 @@ interface JsExtensions : JsEncodeUtils {
             headers.toMutableMap().apply { put(cookieJarHeader, "1") }
         } else headers
         val rateLimiter = ConcurrentRateLimiter(getSource())
-        val response = rateLimiter.withLimitBlocking {
-            rhinoContextOrNull?.ensureActive()
-            Jsoup.connect(urlStr)
-                .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
-                .timeout(timeout ?: 30000)
-                .ignoreContentType(true)
-                .followRedirects(false)
-                .headers(requestHeaders)
-                .method(Connection.Method.GET)
-                .execute()
+        val start = System.nanoTime()
+        val response = try {
+            rateLimiter.withLimitBlocking {
+                rhinoContextOrNull?.ensureActive()
+                Jsoup.connect(urlStr)
+                    .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
+                    .timeout(timeout ?: 30000)
+                    .ignoreContentType(true)
+                    .followRedirects(false)
+                    .headers(requestHeaders)
+                    .method(Connection.Method.GET)
+                    .execute()
+            }
+        } catch (e: Throwable) {
+            NetworkLog.recordEvent(
+                type = "JS",
+                method = "GET",
+                url = urlStr,
+                requestHeaders = requestHeaders.formatNetworkHeaders(),
+                tookMs = networkElapsedMs(start),
+                error = e,
+                source = getTag()
+            )
+            throw e
         }
+        NetworkLog.recordEvent(
+            type = "JS",
+            method = "GET",
+            url = urlStr,
+            requestHeaders = requestHeaders.formatNetworkHeaders(),
+            statusCode = response.statusCode(),
+            tookMs = networkElapsedMs(start),
+            responseHeaders = response.headers().formatNetworkHeaders(),
+            responseBody = response.body(),
+            source = getTag()
+        )
         return response
     }
 
@@ -515,17 +541,41 @@ interface JsExtensions : JsEncodeUtils {
             headers.toMutableMap().apply { put(cookieJarHeader, "1") }
         } else headers
         val rateLimiter = ConcurrentRateLimiter(getSource())
-        val response = rateLimiter.withLimitBlocking {
-            rhinoContextOrNull?.ensureActive()
-            Jsoup.connect(urlStr)
-                .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
-                .timeout(timeout ?: 30000)
-                .ignoreContentType(true)
-                .followRedirects(false)
-                .headers(requestHeaders)
-                .method(Connection.Method.HEAD)
-                .execute()
+        val start = System.nanoTime()
+        val response = try {
+            rateLimiter.withLimitBlocking {
+                rhinoContextOrNull?.ensureActive()
+                Jsoup.connect(urlStr)
+                    .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
+                    .timeout(timeout ?: 30000)
+                    .ignoreContentType(true)
+                    .followRedirects(false)
+                    .headers(requestHeaders)
+                    .method(Connection.Method.HEAD)
+                    .execute()
+            }
+        } catch (e: Throwable) {
+            NetworkLog.recordEvent(
+                type = "JS",
+                method = "HEAD",
+                url = urlStr,
+                requestHeaders = requestHeaders.formatNetworkHeaders(),
+                tookMs = networkElapsedMs(start),
+                error = e,
+                source = getTag()
+            )
+            throw e
         }
+        NetworkLog.recordEvent(
+            type = "JS",
+            method = "HEAD",
+            url = urlStr,
+            requestHeaders = requestHeaders.formatNetworkHeaders(),
+            statusCode = response.statusCode(),
+            tookMs = networkElapsedMs(start),
+            responseHeaders = response.headers().formatNetworkHeaders(),
+            source = getTag()
+        )
         return response
     }
 
@@ -541,19 +591,54 @@ interface JsExtensions : JsEncodeUtils {
             headers.toMutableMap().apply { put(cookieJarHeader, "1") }
         } else headers
         val rateLimiter = ConcurrentRateLimiter(getSource())
-        val response = rateLimiter.withLimitBlocking {
-            rhinoContextOrNull?.ensureActive()
-            Jsoup.connect(urlStr)
-                .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
-                .timeout(timeout ?: 30000)
-                .ignoreContentType(true)
-                .followRedirects(false)
-                .requestBody(body)
-                .headers(requestHeaders)
-                .method(Connection.Method.POST)
-                .execute()
+        val start = System.nanoTime()
+        val response = try {
+            rateLimiter.withLimitBlocking {
+                rhinoContextOrNull?.ensureActive()
+                Jsoup.connect(urlStr)
+                    .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
+                    .timeout(timeout ?: 30000)
+                    .ignoreContentType(true)
+                    .followRedirects(false)
+                    .requestBody(body)
+                    .headers(requestHeaders)
+                    .method(Connection.Method.POST)
+                    .execute()
+            }
+        } catch (e: Throwable) {
+            NetworkLog.recordEvent(
+                type = "JS",
+                method = "POST",
+                url = urlStr,
+                requestHeaders = requestHeaders.formatNetworkHeaders(),
+                requestBody = body,
+                tookMs = networkElapsedMs(start),
+                error = e,
+                source = getTag()
+            )
+            throw e
         }
+        NetworkLog.recordEvent(
+            type = "JS",
+            method = "POST",
+            url = urlStr,
+            requestHeaders = requestHeaders.formatNetworkHeaders(),
+            requestBody = body,
+            statusCode = response.statusCode(),
+            tookMs = networkElapsedMs(start),
+            responseHeaders = response.headers().formatNetworkHeaders(),
+            responseBody = response.body(),
+            source = getTag()
+        )
         return response
+    }
+
+    private fun Map<String, String>.formatNetworkHeaders(): String {
+        return entries.joinToString("\n") { "${it.key}: ${it.value}" }
+    }
+
+    private fun networkElapsedMs(start: Long): Long {
+        return (System.nanoTime() - start) / 1_000_000L
     }
 
     /* Str转ByteArray */
