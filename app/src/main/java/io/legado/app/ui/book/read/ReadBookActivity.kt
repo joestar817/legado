@@ -358,6 +358,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         }
         upSystemUiVisibility()
+        viewModel.resetReplaceRuleStateAfterResume()
         registerReceiver(timeBatteryReceiver, timeBatteryReceiver.filter)
         binding.readView.upTime()
         screenOffTimerStart()

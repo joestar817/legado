@@ -106,7 +106,9 @@ object ReadBook : CoroutineScope by MainScope() {
         } else {
             chapterSize
         }
-        contentProcessor = ContentProcessor.get(book)
+        contentProcessor = ContentProcessor.get(book).apply {
+            upReplaceRules()
+        }
         durChapterIndex = book.durChapterIndex
         durChapterPos = book.durChapterPos
         isLocalBook = book.isLocal
@@ -147,6 +149,9 @@ object ReadBook : CoroutineScope by MainScope() {
         }
         if (prevTextChapter?.isCompleted == false) {
             prevTextChapter = null
+        }
+        contentProcessor = ContentProcessor.get(book).apply {
+            upReplaceRules()
         }
         callBack?.upMenuView()
         upWebBook(book)
@@ -226,6 +231,42 @@ object ReadBook : CoroutineScope by MainScope() {
         prevTextChapter = null
         curTextChapter = null
         nextTextChapter = null
+    }
+
+    fun reloadContentForReplaceRuleChanged(resetPageOffset: Boolean = false) {
+        clearExpiredChapterLoadingJob(true)
+        prevTextChapter?.cancelLayout()
+        curTextChapter?.cancelLayout()
+        nextTextChapter?.cancelLayout()
+        prevTextChapter = null
+        curTextChapter = null
+        nextTextChapter = null
+        synchronized(this) {
+            loadingChapters.removeAll {
+                it in durChapterIndex - 1..durChapterIndex + 1
+            }
+        }
+        callBack?.upContent()
+        loadContent(resetPageOffset = resetPageOffset)
+    }
+
+    suspend fun reloadContentForReplaceRuleChangedAwait(resetPageOffset: Boolean = false) {
+        clearExpiredChapterLoadingJob(true)
+        prevTextChapter?.cancelLayout()
+        curTextChapter?.cancelLayout()
+        nextTextChapter?.cancelLayout()
+        prevTextChapter = null
+        curTextChapter = null
+        nextTextChapter = null
+        synchronized(this) {
+            loadingChapters.removeAll {
+                it in durChapterIndex - 1..durChapterIndex + 1
+            }
+        }
+        callBack?.upContentAwait()
+        loadContentAwait(durChapterIndex, resetPageOffset = resetPageOffset)
+        loadContent(durChapterIndex + 1, resetPageOffset = resetPageOffset)
+        loadContent(durChapterIndex - 1, resetPageOffset = resetPageOffset)
     }
 
     fun clearSearchResult() {
