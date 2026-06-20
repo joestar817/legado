@@ -48,6 +48,11 @@ import java.io.FileOutputStream
 object ThemeConfig {
     const val configFileName = "themeConfig.json"
     private const val ASSET_BACKGROUND_PREFIX = "asset://"
+    private val readingNgBuiltInThemeNames = mapOf(
+        "4" to "暖色渐变",
+        "5" to "竹影之韵",
+        "6" to "灰色雾霭"
+    )
     val configFilePath = FileUtils.getPath(appCtx.filesDir, configFileName)
 
     val configList: ArrayList<Config> by lazy {
@@ -65,6 +70,41 @@ object ThemeConfig {
         AppConfig.isEInkMode -> Theme.EInk
         AppConfig.isNightTheme -> Theme.Dark
         else -> Theme.Light
+    }
+
+    fun isReadingNgBackgroundTheme(themeMode: String = AppConfig.themeMode): Boolean {
+        return readingNgBuiltInThemeNames.containsKey(themeMode)
+    }
+
+    private fun getReadingNgBuiltInTheme(): Config? {
+        val themeName = readingNgBuiltInThemeNames[AppConfig.themeMode] ?: return null
+        return configList.firstOrNull { it.themeName == themeName && !it.isNightTheme }
+    }
+
+    private fun ensureReadingNgBuiltInTheme(context: Context) {
+        val config = getReadingNgBuiltInTheme() ?: return
+        val backgroundPath = config.backgroundImgPath
+        val savedBackgroundPath = when {
+            backgroundPath?.startsWith(ASSET_BACKGROUND_PREFIX) == true -> {
+                copyAssetBackgroundIfNeed(context, PreferKey.bgImage, backgroundPath)
+            }
+
+            else -> backgroundPath
+        }
+        val needsApply = context.getPrefString(PreferKey.dThemeName) != config.themeName ||
+                context.getPrefString(PreferKey.bgImage).isNullOrBlank() ||
+                context.getPrefBoolean(PreferKey.tNavBar, false) != config.transparentNavBar
+        if (!needsApply) {
+            return
+        }
+        context.putPrefString(PreferKey.dThemeName, config.themeName)
+        context.putPrefInt(PreferKey.cPrimary, config.primaryColor.toColorInt())
+        context.putPrefInt(PreferKey.cAccent, config.accentColor.toColorInt())
+        context.putPrefInt(PreferKey.cBackground, config.backgroundColor.toColorInt())
+        context.putPrefInt(PreferKey.cBBackground, config.bottomBackground.toColorInt())
+        context.putPrefBoolean(PreferKey.tNavBar, config.transparentNavBar)
+        context.putPrefString(PreferKey.bgImage, savedBackgroundPath)
+        context.putPrefInt(PreferKey.bgImageBlurring, config.backgroundImgBlur)
     }
 
     fun isDarkTheme(): Boolean {
@@ -156,7 +196,10 @@ object ThemeConfig {
     }
 
     private fun addBuiltInAssetThemes(configs: MutableList<Config>) {
-        configs.removeAll { it.themeName == "阅读NG·背景一" || it.themeName == "阅读NG·背景二" }
+        configs.removeAll {
+            it.themeName == "阅读NG·背景一" ||
+                    it.themeName == "阅读NG·背景二"
+        }
         DefaultData.themeConfigs
             .filter { it.backgroundImgPath?.startsWith(ASSET_BACKGROUND_PREFIX) == true }
             .forEach { builtInConfig ->
@@ -464,6 +507,7 @@ object ThemeConfig {
      * 更新主题
      */
     fun applyTheme(context: Context) = with(context) {
+        ensureReadingNgBuiltInTheme(this)
         when {
             AppConfig.isEInkMode -> {
                 ThemeStore.editTheme(this)

@@ -1,17 +1,19 @@
 package io.legado.app.ui.main.my
 
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import androidx.preference.PreferenceCategory
+import androidx.preference.PreferenceGroup
 import androidx.preference.Preference
 import io.legado.app.R
 import io.legado.app.base.BaseFragment
 import io.legado.app.constant.PreferKey
 import io.legado.app.constant.Theme
 import io.legado.app.databinding.FragmentMyConfigBinding
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.lib.prefs.NameListPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
@@ -77,16 +79,8 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
     private fun applyTransparentModeUi() {
         if (requireContext().transparentNavBar) {
             binding.titleBar.setTitleTextColor(requireContext().getCompatColor(R.color.primaryText))
-            binding.preFragment.setBackgroundResource(
-                if (AppConfig.isNightTheme) {
-                    R.drawable.bg_main_content_panel_night
-                } else {
-                    R.drawable.bg_main_content_panel
-                }
-            )
-        } else {
-            binding.preFragment.setBackgroundResource(R.color.transparent)
         }
+        binding.preFragment.setBackgroundResource(R.color.transparent)
     }
 
     /**
@@ -97,14 +91,16 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             addPreferencesFromResource(R.xml.pref_main)
+            preferenceScreen?.let(::applyMyMenuLayout)
             findPreference<NameListPreference>(PreferKey.themeMode)?.let {
                 it.setOnPreferenceChangeListener { _, newValue ->
                     view?.post {
                         val themeMode = newValue as? String
                         when (themeMode) {
                             "4" -> applyBuiltInTheme("暖色渐变")
-                            "5" -> applyBuiltInTheme("绿色渐变")
-                            else -> applyStandardTheme(themeMode)
+                            "5" -> applyBuiltInTheme("竹影之韵")
+                            "6" -> applyBuiltInTheme("灰色雾霭")
+                            else -> applyStandardTheme()
                         }
                     }
                     true
@@ -112,16 +108,27 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
             }
         }
 
-        private fun applyStandardTheme(themeMode: String?) {
+        private fun applyMyMenuLayout(group: PreferenceGroup) {
+            for (index in 0 until group.preferenceCount) {
+                val preference = group.getPreference(index)
+                preference.layoutResource = if (preference is PreferenceCategory) {
+                    R.layout.view_my_preference_category
+                } else {
+                    R.layout.view_my_preference
+                }
+                if (preference is PreferenceGroup) {
+                    applyMyMenuLayout(preference)
+                }
+            }
+        }
+
+        private fun applyStandardTheme() {
             requireContext().putPrefBoolean(PreferKey.tNavBar, false)
             requireContext().putPrefBoolean(PreferKey.tNavBarN, false)
             requireContext().removePref(PreferKey.bgImage)
             requireContext().removePref(PreferKey.bgImageN)
             requireContext().putPrefInt(PreferKey.bgImageBlurring, 0)
             requireContext().putPrefInt(PreferKey.bgImageNBlurring, 0)
-            if (themeMode == "1") {
-                requireContext().putPrefInt(PreferKey.cPrimary, 0xFF795548.toInt())
-            }
             ThemeConfig.applyDayNight(requireContext())
         }
 
@@ -134,6 +141,14 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
 
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
             super.onViewCreated(view, savedInstanceState)
+            view.setBackgroundColor(Color.TRANSPARENT)
+            listView.setBackgroundColor(Color.TRANSPARENT)
+            listView.setPadding(
+                0,
+                resources.getDimensionPixelSize(R.dimen.ng_space_l),
+                0,
+                listView.paddingBottom
+            )
             listView.setEdgeEffectColor(primaryColor)
         }
 
@@ -177,6 +192,9 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
 
                 "fileManage" -> startActivity<FileManageActivity>()
                 "readRecord" -> startActivity<ReadRecordActivity>()
+                "aiConfig" -> startActivity<ConfigActivity> {
+                    putExtra("configTag", ConfigTag.AI_CONFIG)
+                }
                 "serviceManage" -> startActivity<ConfigActivity> {
                     putExtra("configTag", ConfigTag.SERVICE_CONFIG)
                 }

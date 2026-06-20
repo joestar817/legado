@@ -81,6 +81,7 @@ class ThemeConfigFragment : PreferenceFragment(),
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.pref_config_theme)
+        ConfigPreferenceStyle.applyTo(preferenceScreen)
         clearNonReadingNgBackgroundTheme()
         if (Build.VERSION.SDK_INT < 26) {
             preferenceScreen.removePreferenceRecursively(PreferKey.launcherIcon)
@@ -115,6 +116,7 @@ class ThemeConfigFragment : PreferenceFragment(),
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         activity?.setTitle(R.string.theme_setting)
+        ConfigPreferenceStyle.applyListStyle(this)
         listView.setEdgeEffectColor(primaryColor)
         activity?.addMenuProvider(this, viewLifecycleOwner)
     }
@@ -351,7 +353,7 @@ class ThemeConfigFragment : PreferenceFragment(),
     }
 
     private fun clearNonReadingNgBackgroundTheme() {
-        if (AppConfig.themeMode == "4" || AppConfig.themeMode == "5") {
+        if (ThemeConfig.isReadingNgBackgroundTheme()) {
             return
         }
         val hasBackground = !getPrefString(PreferKey.bgImage).isNullOrEmpty()

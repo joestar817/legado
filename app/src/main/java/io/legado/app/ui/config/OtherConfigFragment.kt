@@ -67,6 +67,7 @@ class OtherConfigFragment : PreferenceFragment(),
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         putPrefBoolean(PreferKey.processText, isProcessTextEnabled())
         addPreferencesFromResource(R.xml.pref_config_other)
+        ConfigPreferenceStyle.applyTo(preferenceScreen)
         upPreferenceSummary(PreferKey.userAgent, AppConfig.userAgent)
         upPreferenceSummary(PreferKey.preDownloadNum, AppConfig.preDownloadNum.toString())
         upPreferenceSummary(PreferKey.threadCount, AppConfig.threadCount.toString())
@@ -87,6 +88,7 @@ class OtherConfigFragment : PreferenceFragment(),
         super.onViewCreated(view, savedInstanceState)
         activity?.setTitle(R.string.other_setting)
         preferenceManager.sharedPreferences?.registerOnSharedPreferenceChangeListener(this)
+        ConfigPreferenceStyle.applyListStyle(this)
         listView.setEdgeEffectColor(primaryColor)
     }
 

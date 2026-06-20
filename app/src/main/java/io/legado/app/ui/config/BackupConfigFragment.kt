@@ -108,6 +108,7 @@ class BackupConfigFragment : PreferenceFragment(),
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.pref_config_backup)
+        ConfigPreferenceStyle.applyTo(preferenceScreen)
         findPreference<EditTextPreference>(PreferKey.webDavPassword)?.let {
             it.setOnBindEditTextListener { editText ->
                 editText.inputType =
@@ -144,6 +145,7 @@ class BackupConfigFragment : PreferenceFragment(),
         super.onViewCreated(view, savedInstanceState)
         activity?.setTitle(R.string.backup_restore)
         preferenceManager.sharedPreferences?.registerOnSharedPreferenceChangeListener(this)
+        ConfigPreferenceStyle.applyListStyle(this)
         listView.setEdgeEffectColor(primaryColor)
         activity?.addMenuProvider(this, viewLifecycleOwner)
         if (!LocalConfig.backupHelpVersionIsLast) {

@@ -29,6 +29,7 @@ class ServiceConfigFragment : PreferenceFragment(),
         putPrefBoolean(PreferKey.webService, WebService.isRun)
         putPrefBoolean(PreferKey.mcpService, McpService.isRun)
         addPreferencesFromResource(R.xml.pref_config_service)
+        ConfigPreferenceStyle.applyTo(preferenceScreen)
         updateWebPreference()
         updateMcpPreference()
         upPortSummary(PreferKey.webPort, AppConfig.webPort)
@@ -55,6 +56,7 @@ class ServiceConfigFragment : PreferenceFragment(),
         super.onViewCreated(view, savedInstanceState)
         activity?.setTitle(R.string.service_manage)
         preferenceManager.sharedPreferences?.registerOnSharedPreferenceChangeListener(this)
+        ConfigPreferenceStyle.applyListStyle(this)
         listView.setEdgeEffectColor(primaryColor)
     }
 

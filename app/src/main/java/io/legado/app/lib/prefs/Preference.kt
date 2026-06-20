@@ -71,6 +71,8 @@ open class Preference(context: Context, attrs: AttributeSet) :
                 iconView.setImageDrawable(icon)
                 iconView.setColorFilter(context.accentColor)
             }
+            val arrowView = viewHolder.findViewById(R.id.preference_arrow)
+            arrowView?.isVisible = weightLayoutRes == null
 
             if (weightLayoutRes != null && weightLayoutRes != 0 && viewId != null && viewId != 0) {
                 val lay = viewHolder.findViewById(R.id.preference_widget)

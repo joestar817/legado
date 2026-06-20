@@ -1265,7 +1265,7 @@ interface JsExtensions : JsEncodeUtils {
      */
     @JavascriptInterface
     fun getThemeMode(): String {
-        return AppConfig.themeMode ?: "0"
+        return AppConfig.themeMode
     }
 
     /**

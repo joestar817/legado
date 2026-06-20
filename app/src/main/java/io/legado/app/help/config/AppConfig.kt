@@ -34,7 +34,17 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var editTheme = appCtx.getPrefInt(PreferKey.editTheme, 0)
     var editThemeDark = appCtx.getPrefInt(PreferKey.editThemeDark, 0)
     var editTemeAuto = appCtx.getPrefBoolean(PreferKey.editTemeAuto)
-    var isEInkMode = appCtx.getPrefString(PreferKey.themeMode) == "3"
+    private fun getThemeModePref(): String {
+        val mode = appCtx.getPrefString(PreferKey.themeMode, "4") ?: "4"
+        return if (mode == "1") {
+            appCtx.putPrefString(PreferKey.themeMode, "4")
+            "4"
+        } else {
+            mode
+        }
+    }
+
+    var isEInkMode = getThemeModePref() == "3"
     var clickActionTL = appCtx.getPrefInt(PreferKey.clickActionTL, 2)
     var clickActionTC = appCtx.getPrefInt(PreferKey.clickActionTC, 2)
     var clickActionTR = appCtx.getPrefInt(PreferKey.clickActionTR, 1)
@@ -44,7 +54,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var clickActionBL = appCtx.getPrefInt(PreferKey.clickActionBL, 2)
     var clickActionBC = appCtx.getPrefInt(PreferKey.clickActionBC, 1)
     var clickActionBR = appCtx.getPrefInt(PreferKey.clickActionBR, 1)
-    var themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
+    var themeMode = getThemeModePref()
     var useDefaultCover = appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
     var optimizeRender = CanvasRecorderFactory.isSupport
             && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
@@ -67,7 +77,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             PreferKey.adaptSpecialStyle -> adaptSpecialStyle = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
 
             PreferKey.themeMode -> {
-                themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
+                themeMode = getThemeModePref()
                 isEInkMode = themeMode == "3"
             }
 
@@ -164,11 +174,11 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     var isNightTheme: Boolean
         get() = when (themeMode) {
-            "1" -> false
             "2" -> true
             "3" -> false
             "4" -> false
             "5" -> false
+            "6" -> false
             else -> sysConfiguration.isNightMode
         }
         set(value) {
@@ -176,7 +186,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
                 if (value) {
                     appCtx.putPrefString(PreferKey.themeMode, "2")
                 } else {
-                    appCtx.putPrefString(PreferKey.themeMode, "1")
+                    appCtx.putPrefString(PreferKey.themeMode, "4")
                 }
             }
         }
@@ -834,4 +844,3 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val autoUpdateVariant get() = appCtx.getPrefBoolean("autoUpdateVariant", true)
 }
-
