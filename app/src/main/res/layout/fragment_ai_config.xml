@@ -14,6 +14,7 @@
         android:paddingEnd="@dimen/ng_page_padding">
 
         <TextView
+            android:id="@+id/text_main_section_label"
             style="@style/Ng.SettingsSectionLabel"
             android:text="@string/ai_settings_section_features" />
 
@@ -104,14 +105,83 @@
             <View style="@style/Ng.SettingsItemGap" />
 
             <LinearLayout
+                android:id="@+id/layout_purify_entry"
+                style="@style/Ng.SettingsItem">
+
+                <ImageView
+                    android:id="@+id/image_purify_entry_icon"
+                    style="@style/Ng.SettingsIconImage"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="@string/ai_purify_settings"
+                    android:src="@drawable/ic_ai_purify" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/Ng.SettingsTitle"
+                        android:text="@string/ai_purify_settings" />
+
+                    <TextView
+                        android:id="@+id/text_purify_entry_summary"
+                        style="@style/Ng.SettingsSummary"
+                        android:layout_marginTop="4dp"
+                        android:maxLines="1" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="@color/ng_settings_arrow"
+                    android:textSize="30sp" />
+
+            </LinearLayout>
+
+            <View style="@style/Ng.SettingsGroupEdgeSpace" />
+
+        </io.legado.app.ui.widget.NgGlassLayout>
+
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/layout_purify_settings"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/ng_page_padding"
+            android:paddingTop="8dp"
+            android:paddingEnd="@dimen/ng_page_padding"
+            android:paddingBottom="20dp">
+
+            <TextView
+                android:id="@+id/text_purify_section_label"
+                style="@style/Ng.SettingsSectionLabel"
+                android:text="@string/ai_purify_paragraph_section" />
+
+        <io.legado.app.ui.widget.NgGlassLayout style="@style/Ng.SettingsGroup">
+
+            <View style="@style/Ng.SettingsGroupEdgeSpace" />
+
+            <LinearLayout
                 android:id="@+id/layout_ai_purify_auto"
                 style="@style/Ng.SettingsItem"
-                android:layout_height="76dp"
                 android:clickable="false"
                 android:focusable="false">
 
                 <ImageView
-                    android:id="@+id/image_purify_entry_icon"
+                    android:id="@+id/image_purify_auto_icon"
                     style="@style/Ng.SettingsIconImage"
                     android:layout_gravity="center_vertical"
                     android:contentDescription="@string/ai_purify_auto_apply"
@@ -129,10 +199,11 @@
                         android:text="@string/ai_purify_auto_apply" />
 
                     <TextView
+                        android:id="@+id/text_ai_purify_auto_summary"
                         style="@style/Ng.SettingsSummary"
                         android:layout_marginTop="4dp"
-                        android:text="@string/ai_purify_auto_apply_summary"
-                        android:maxLines="2" />
+                        android:maxLines="2"
+                        android:text="@string/ai_purify_auto_apply_summary" />
 
                 </LinearLayout>
 
@@ -143,11 +214,237 @@
 
             </LinearLayout>
 
+            <View style="@style/Ng.SettingsItemGap" />
+
+            <LinearLayout
+                android:id="@+id/layout_ai_purify_intercept"
+                style="@style/Ng.SettingsItem"
+                android:clickable="false"
+                android:focusable="false">
+
+                <ImageView
+                    android:id="@+id/image_purify_intercept_icon"
+                    style="@style/Ng.SettingsIconImage"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="@string/ai_purify_exception_intercept"
+                    android:src="@drawable/ic_ai_provider" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/Ng.SettingsTitle"
+                        android:text="@string/ai_purify_exception_intercept" />
+
+                    <TextView
+                        style="@style/Ng.SettingsSummary"
+                        android:layout_marginTop="4dp"
+                        android:maxLines="2"
+                        android:text="@string/ai_purify_exception_intercept_summary" />
+
+                </LinearLayout>
+
+                <Switch
+                    android:id="@+id/switch_ai_purify_intercept"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+            </LinearLayout>
+
+            <View style="@style/Ng.SettingsItemGap" />
+
+            <LinearLayout
+                style="@style/Ng.SettingsItem"
+                android:clickable="false"
+                android:focusable="false">
+
+                <ImageView
+                    android:id="@+id/image_purify_limit_icon"
+                    style="@style/Ng.SettingsIconImage"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="@string/ai_purify_paragraph_limit"
+                    android:src="@drawable/ic_ai_prompt" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/Ng.SettingsTitle"
+                        android:text="@string/ai_purify_paragraph_limit" />
+
+                    <TextView
+                        style="@style/Ng.SettingsSummary"
+                        android:layout_marginTop="4dp"
+                        android:maxLines="1"
+                        android:text="@string/ai_purify_paragraph_limit_summary" />
+
+                </LinearLayout>
+
+                <EditText
+                    android:id="@+id/edit_purify_paragraph_limit"
+                    style="@style/Ng.OutlinedField.Compact"
+                    android:layout_width="92dp"
+                    android:layout_marginStart="12dp"
+                    android:gravity="center"
+                    android:inputType="number"
+                    android:singleLine="true" />
+
+            </LinearLayout>
+
             <View style="@style/Ng.SettingsGroupEdgeSpace" />
 
-        </io.legado.app.ui.widget.NgGlassLayout>
+            </io.legado.app.ui.widget.NgGlassLayout>
 
-    </LinearLayout>
+            <TextView
+                android:id="@+id/text_purify_chapter_section_label"
+                style="@style/Ng.SettingsSectionLabel"
+                android:layout_marginTop="18dp"
+                android:text="@string/ai_purify_chapter_section" />
+
+            <io.legado.app.ui.widget.NgGlassLayout style="@style/Ng.SettingsGroup">
+
+                <View style="@style/Ng.SettingsGroupEdgeSpace" />
+
+                <LinearLayout
+                    android:id="@+id/layout_ai_purify_chapter_auto"
+                    style="@style/Ng.SettingsItem"
+                    android:clickable="false"
+                    android:focusable="false">
+
+                    <ImageView
+                        android:id="@+id/image_purify_chapter_auto_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_purify_auto_apply"
+                        android:src="@drawable/ic_ai_purify" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_purify_auto_apply" />
+
+                        <TextView
+                            android:id="@+id/text_ai_purify_chapter_auto_summary"
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="2"
+                            android:text="@string/ai_purify_auto_apply_summary" />
+
+                    </LinearLayout>
+
+                    <Switch
+                        android:id="@+id/switch_ai_purify_chapter_auto"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+
+                <View style="@style/Ng.SettingsItemGap" />
+
+                <LinearLayout
+                    android:id="@+id/layout_ai_purify_chapter_intercept"
+                    style="@style/Ng.SettingsItem"
+                    android:clickable="false"
+                    android:focusable="false">
+
+                    <ImageView
+                        android:id="@+id/image_purify_chapter_intercept_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_purify_exception_intercept"
+                        android:src="@drawable/ic_ai_provider" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_purify_exception_intercept" />
+
+                        <TextView
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="2"
+                            android:text="@string/ai_purify_chapter_exception_intercept_summary" />
+
+                    </LinearLayout>
+
+                    <Switch
+                        android:id="@+id/switch_ai_purify_chapter_intercept"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+
+                <View style="@style/Ng.SettingsItemGap" />
+
+                <LinearLayout
+                    style="@style/Ng.SettingsItem"
+                    android:clickable="false"
+                    android:focusable="false">
+
+                    <ImageView
+                        android:id="@+id/image_purify_chapter_limit_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_purify_chapter_segment_limit"
+                        android:src="@drawable/ic_ai_prompt" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_purify_chapter_segment_limit" />
+
+                        <TextView
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="1"
+                            android:text="@string/ai_purify_chapter_segment_limit_summary" />
+
+                    </LinearLayout>
+
+                    <EditText
+                        android:id="@+id/edit_purify_chapter_segment_limit"
+                        style="@style/Ng.OutlinedField.Compact"
+                        android:layout_width="92dp"
+                        android:layout_marginStart="12dp"
+                        android:gravity="center"
+                        android:inputType="number"
+                        android:singleLine="true" />
+
+                </LinearLayout>
+
+                <View style="@style/Ng.SettingsGroupEdgeSpace" />
+
+            </io.legado.app.ui.widget.NgGlassLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
 
     <LinearLayout
         android:id="@+id/layout_prompt_list"

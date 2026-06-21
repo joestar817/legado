@@ -242,7 +242,7 @@ class ReadMenu @JvmOverloads constructor(
         fabAiPurifyChapter.setTextColor(textColor)
         fabAiPurifyChapter.background = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = 14.dpToPx().toFloat()
+            cornerRadius = 6.dpToPx().toFloat()
             setColor(bgColor)
         }
         tvPre.setTextColor(textColor)

@@ -46,7 +46,7 @@ import java.text.DecimalFormat
 
 class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
 
-    private enum class Page { MAIN, PROVIDERS, DETAIL, PROMPTS, PROMPT_DETAIL }
+    private enum class Page { MAIN, PROVIDERS, DETAIL, PROMPTS, PROMPT_DETAIL, PURIFY_SETTINGS }
 
     private val binding by viewBinding(FragmentAiConfigBinding::bind)
     private val waitDialog by lazy { WaitDialog(requireContext()) }
@@ -61,6 +61,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
     private var modelOptions: List<String> = emptyList()
     private var ignoreModelSelection = false
     private var ignoreProviderFormChanges = false
+    private var ignorePurifyFormChanges = false
     private var apiKeyVisible = false
     private val balanceNumberFormat by lazy { DecimalFormat("0.####") }
 
@@ -70,6 +71,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         initDetail()
         initPromptList()
         initPromptDetail()
+        initPurifySettings()
         initBack()
         showMain()
     }
@@ -93,11 +95,79 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         binding.layoutPromptEntry.setOnClickListener {
             showPromptList()
         }
+        binding.layoutPurifyEntry.setOnClickListener {
+            showPurifySettings()
+        }
+    }
+
+    private fun initPurifySettings() {
         binding.layoutAiPurifyAuto.setOnClickListener {
             binding.switchAiPurifyAuto.isChecked = !binding.switchAiPurifyAuto.isChecked
         }
+        binding.layoutAiPurifyIntercept.setOnClickListener {
+            binding.switchAiPurifyIntercept.isChecked = !binding.switchAiPurifyIntercept.isChecked
+        }
+        binding.layoutAiPurifyChapterAuto.setOnClickListener {
+            binding.switchAiPurifyChapterAuto.isChecked =
+                !binding.switchAiPurifyChapterAuto.isChecked
+        }
+        binding.layoutAiPurifyChapterIntercept.setOnClickListener {
+            binding.switchAiPurifyChapterIntercept.isChecked =
+                !binding.switchAiPurifyChapterIntercept.isChecked
+        }
         binding.switchAiPurifyAuto.setOnCheckedChangeListener { _, isChecked ->
-            AiConfig.purifyAutoApply = isChecked
+            if (!ignorePurifyFormChanges) {
+                AiConfig.purifyAutoApply = isChecked
+                refreshPurifyAutoSummary()
+                refreshMain()
+            }
+        }
+        binding.switchAiPurifyIntercept.setOnCheckedChangeListener { _, isChecked ->
+            if (!ignorePurifyFormChanges) {
+                AiConfig.purifyExceptionIntercept = isChecked
+                refreshMain()
+            }
+        }
+        binding.switchAiPurifyChapterAuto.setOnCheckedChangeListener { _, isChecked ->
+            if (!ignorePurifyFormChanges) {
+                AiConfig.purifyChapterAutoApply = isChecked
+                refreshPurifyAutoSummary()
+                refreshMain()
+            }
+        }
+        binding.switchAiPurifyChapterIntercept.setOnCheckedChangeListener { _, isChecked ->
+            if (!ignorePurifyFormChanges) {
+                AiConfig.purifyChapterExceptionIntercept = isChecked
+                refreshMain()
+            }
+        }
+        binding.editPurifyParagraphLimit.doOnTextChanged { text, _, _, _ ->
+            if (ignorePurifyFormChanges) {
+                return@doOnTextChanged
+            }
+            text?.toString()?.toIntOrNull()?.let {
+                AiConfig.purifyParagraphLimit = it
+                refreshMain()
+            }
+        }
+        binding.editPurifyParagraphLimit.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                refreshPurifySettings()
+            }
+        }
+        binding.editPurifyChapterSegmentLimit.doOnTextChanged { text, _, _, _ ->
+            if (ignorePurifyFormChanges) {
+                return@doOnTextChanged
+            }
+            text?.toString()?.toIntOrNull()?.let {
+                AiConfig.purifyChapterSegmentLimit = it
+                refreshMain()
+            }
+        }
+        binding.editPurifyChapterSegmentLimit.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                refreshPurifySettings()
+            }
         }
     }
 
@@ -238,6 +308,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
             Page.PROMPT_DETAIL -> showPromptList()
             Page.PROVIDERS -> showMain()
             Page.PROMPTS -> showMain()
+            Page.PURIFY_SETTINGS -> showMain()
             Page.MAIN -> requireActivity().finish()
         }
     }
@@ -261,6 +332,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         binding.layoutProviderDetail.isVisible = false
         binding.layoutPromptList.isVisible = false
         binding.layoutPromptDetail.isVisible = false
+        binding.layoutPurifySettings.isVisible = false
         bindTitleBarBack()
         refreshMain()
     }
@@ -275,6 +347,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         binding.layoutProviderDetail.isVisible = false
         binding.layoutPromptList.isVisible = false
         binding.layoutPromptDetail.isVisible = false
+        binding.layoutPurifySettings.isVisible = false
         bindTitleBarBack()
         refreshProviders()
     }
@@ -288,6 +361,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         binding.layoutProviderDetail.isVisible = true
         binding.layoutPromptList.isVisible = false
         binding.layoutPromptDetail.isVisible = false
+        binding.layoutPurifySettings.isVisible = false
         bindTitleBarBack()
         refreshCurrentDetail()
     }
@@ -302,6 +376,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         binding.layoutProviderDetail.isVisible = false
         binding.layoutPromptList.isVisible = true
         binding.layoutPromptDetail.isVisible = false
+        binding.layoutPurifySettings.isVisible = false
         bindTitleBarBack()
         refreshPrompts()
     }
@@ -316,8 +391,24 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         binding.layoutProviderDetail.isVisible = false
         binding.layoutPromptList.isVisible = false
         binding.layoutPromptDetail.isVisible = true
+        binding.layoutPurifySettings.isVisible = false
         bindTitleBarBack()
         refreshPromptDetail()
+    }
+
+    private fun showPurifySettings() {
+        currentPage = Page.PURIFY_SETTINGS
+        currentProviderId = null
+        currentPrompt = null
+        setPageTitle(R.string.ai_purify_settings)
+        binding.layoutMainMenu.isVisible = false
+        binding.layoutProviderList.isVisible = false
+        binding.layoutProviderDetail.isVisible = false
+        binding.layoutPromptList.isVisible = false
+        binding.layoutPromptDetail.isVisible = false
+        binding.layoutPurifySettings.isVisible = true
+        bindTitleBarBack()
+        refreshPurifySettings()
     }
 
     private fun refreshCurrentPage() {
@@ -327,17 +418,19 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
             Page.DETAIL -> refreshCurrentDetail()
             Page.PROMPTS -> refreshPrompts()
             Page.PROMPT_DETAIL -> refreshPromptDetail()
+            Page.PURIFY_SETTINGS -> refreshPurifySettings()
         }
     }
 
     private fun refreshMain() {
         val providers = AiProviderStore.providers()
         val activeProvider = AiProviderStore.activeProvider()
-        val entryIconTint = ColorStateList.valueOf(accentColor)
+        val color = accentColor
+        val entryIconTint = ColorStateList.valueOf(color)
+        binding.textMainSectionLabel.setTextColor(color)
         binding.imageProviderEntryIcon.imageTintList = entryIconTint
         binding.imagePromptEntryIcon.imageTintList = entryIconTint
         binding.imagePurifyEntryIcon.imageTintList = entryIconTint
-        binding.switchAiPurifyAuto.isChecked = AiConfig.purifyAutoApply
         binding.textProviderEntrySummary.text = getString(
             R.string.ai_provider_menu_summary,
             providers.size.toString(),
@@ -346,6 +439,13 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         binding.textPromptEntrySummary.text = getString(
             R.string.ai_prompt_menu_summary,
             AiPromptStore.Prompt.entries.size.toString()
+        )
+        binding.textPurifyEntrySummary.text = getString(
+            R.string.ai_purify_settings_summary,
+            getString(if (AiConfig.purifyAutoApply) R.string.enabled else R.string.disabled),
+            getString(if (AiConfig.purifyChapterAutoApply) R.string.enabled else R.string.disabled),
+            AiConfig.purifyParagraphLimit.toString(),
+            AiConfig.purifyChapterSegmentLimit.toString()
         )
     }
 
@@ -395,6 +495,57 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         binding.textPromptDetailTitle.text = prompt.displayName()
         binding.textPromptDetailSummary.text = prompt.summary()
         binding.editPrompt.setText(AiPromptStore.prompt(prompt))
+    }
+
+    private fun refreshPurifySettings() {
+        ignorePurifyFormChanges = true
+        try {
+            val color = accentColor
+            val entryIconTint = ColorStateList.valueOf(color)
+            binding.textPurifySectionLabel.setTextColor(color)
+            binding.textPurifyChapterSectionLabel.setTextColor(color)
+            binding.imagePurifyAutoIcon.imageTintList = entryIconTint
+            binding.imagePurifyInterceptIcon.imageTintList = entryIconTint
+            binding.imagePurifyLimitIcon.imageTintList = entryIconTint
+            binding.imagePurifyChapterAutoIcon.imageTintList = entryIconTint
+            binding.imagePurifyChapterInterceptIcon.imageTintList = entryIconTint
+            binding.imagePurifyChapterLimitIcon.imageTintList = entryIconTint
+            binding.switchAiPurifyAuto.isChecked = AiConfig.purifyAutoApply
+            binding.switchAiPurifyIntercept.isChecked = AiConfig.purifyExceptionIntercept
+            binding.switchAiPurifyChapterAuto.isChecked = AiConfig.purifyChapterAutoApply
+            binding.switchAiPurifyChapterIntercept.isChecked =
+                AiConfig.purifyChapterExceptionIntercept
+            val limit = AiConfig.purifyParagraphLimit.toString()
+            if (binding.editPurifyParagraphLimit.text?.toString() != limit) {
+                binding.editPurifyParagraphLimit.setText(limit)
+                binding.editPurifyParagraphLimit.setSelection(limit.length)
+            }
+            val chapterLimit = AiConfig.purifyChapterSegmentLimit.toString()
+            if (binding.editPurifyChapterSegmentLimit.text?.toString() != chapterLimit) {
+                binding.editPurifyChapterSegmentLimit.setText(chapterLimit)
+                binding.editPurifyChapterSegmentLimit.setSelection(chapterLimit.length)
+            }
+        } finally {
+            ignorePurifyFormChanges = false
+        }
+        refreshPurifyAutoSummary()
+    }
+
+    private fun refreshPurifyAutoSummary() {
+        binding.textAiPurifyAutoSummary.text = getString(
+            if (AiConfig.purifyAutoApply) {
+                R.string.ai_purify_auto_apply_summary_on
+            } else {
+                R.string.ai_purify_auto_apply_summary_off
+            }
+        )
+        binding.textAiPurifyChapterAutoSummary.text = getString(
+            if (AiConfig.purifyChapterAutoApply) {
+                R.string.ai_purify_auto_apply_summary_on
+            } else {
+                R.string.ai_purify_auto_apply_summary_off
+            }
+        )
     }
 
     private fun readProviderFromForm(): AiProviderSetting? {

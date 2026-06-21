@@ -5,14 +5,29 @@ import io.legado.app.utils.GSON
 
 object AiPurifyHelper {
 
-    private const val MAX_INPUT_LENGTH = 4000
-    private const val MAX_BATCH_INPUT_LENGTH = 8000
-    private const val MAX_AUTO_DELETE_RATIO = 0.18f
-
     suspend fun purify(text: String): AiPurifyResult {
+        return purifyText(
+            text = text,
+            prompt = AiPromptStore.Prompt.PARAGRAPH_PURIFY,
+            maxInputLength = AiConfig.purifyParagraphLimit,
+            lengthError = "选中文本过长，当前上限 ${AiConfig.purifyParagraphLimit} 字，请分段选择后再净化"
+        )
+    }
+
+    private suspend fun purifyText(
+        text: String,
+        prompt: AiPromptStore.Prompt,
+        maxInputLength: Int? = null,
+        lengthError: String? = null,
+        paragraphIndex: Int? = null
+    ): AiPurifyResult {
         val source = normalizeSelectedText(text)
         check(source.isNotBlank()) { "选中文本为空" }
-        check(source.length <= MAX_INPUT_LENGTH) { "选中文本过长，请分段选择后再净化" }
+        if (maxInputLength != null) {
+            check(source.length <= maxInputLength) {
+                lengthError ?: "文本过长，当前上限 ${maxInputLength} 字"
+            }
+        }
         val result = AiManager.generateText(
             messages = listOf(
                 AiMessage(
@@ -23,7 +38,7 @@ object AiPurifyHelper {
                     2. 不要解释，不要输出 JSON，不要使用 Markdown。
 
                     任务说明：
-                    ${AiPromptStore.prompt(AiPromptStore.Prompt.PARAGRAPH_PURIFY)}
+                    ${AiPromptStore.prompt(prompt)}
                     """.trimIndent()
                 ),
                 AiMessage(AiMessage.Role.USER, source)
@@ -43,19 +58,23 @@ object AiPurifyHelper {
             deletedPreview = validation.deletedPreview,
             canAutoApply = validation.canAutoApply,
             riskReason = validation.riskReason,
-            model = result.model
+            model = result.model,
+            paragraphIndex = paragraphIndex
         )
     }
 
-    suspend fun purifyParagraphs(paragraphs: List<String>): List<AiPurifyResult> {
+    suspend fun purifyParagraphs(
+        paragraphs: List<String>,
+        chapterTitle: String? = null
+    ): List<AiPurifyResult> {
+        val normalizedChapterTitle = chapterTitle?.let { normalizeSelectedText(it) }
         val inputs = paragraphs
             .mapIndexedNotNull { index, text ->
                 val source = normalizeSelectedText(text)
-                if (source.isBlank()) {
-                    null
-                } else {
-                    check(source.length <= MAX_INPUT_LENGTH) { "第 ${index + 1} 段过长，请先分段净化" }
-                    BatchInput(index + 1, source)
+                when {
+                    source.isBlank() -> null
+                    index == 0 && source.isChapterTitleForPurify(normalizedChapterTitle) -> null
+                    else -> BatchInput(index + 1, source)
                 }
             }
         check(inputs.isNotEmpty()) { "当前章节正文为空" }
@@ -63,7 +82,13 @@ object AiPurifyHelper {
         return batchResults.mapIndexed { index, result ->
             val input = inputs[index]
             if (result.deletedPreview.isBlank() && input.needsSingleReviewAfterBatchMiss()) {
-                runCatching { purify(input.text) }.getOrElse { result }
+                runCatching {
+                    purifyText(
+                        text = input.text,
+                        prompt = AiPromptStore.Prompt.CHAPTER_OPTIMIZE,
+                        paragraphIndex = input.id
+                    )
+                }.getOrElse { result }
             } else {
                 result
             }
@@ -98,9 +123,13 @@ object AiPurifyHelper {
                     AiMessage.Role.SYSTEM,
                     """
                     固定协议：
-                    用户会给你一个 JSON 数组，每项包含 id 和 text。只返回需要净化的段落，每项只包含 id 和 cleaned。
-                    未污染或不确定的段落不要返回，客户端会按原文保留。
-                    只输出 JSON 数组，不要解释，不要使用 Markdown。
+                    用户会给你一个 JSON 数组，每项包含 id 和 text。
+                    你只能返回 JSON 数组，不要解释，不要使用 Markdown。
+                    数组中只允许返回发生删除的段落，每项必须只包含 id 和 cleaned 两个字段。
+                    cleaned 必须是删除污染内容后的结果，不得返回原文，不得使用 text 或 content 字段。
+                    如果整段都是广告、群号、版权声明、站点宣传或无关提示，cleaned 必须返回空字符串 ""。
+                    如果某段不需要删除任何内容，或你不确定是否应删除，必须完全省略该段。
+                    严禁返回 cleaned 与原文完全相同的段落。
 
                     任务说明：
                     ${AiPromptStore.prompt(AiPromptStore.Prompt.CHAPTER_OPTIMIZE)}
@@ -117,11 +146,12 @@ object AiPurifyHelper {
         val outputs = parseBatchOutput(result.content)
         val outputMap = outputs.associateBy { it.id }
         return inputs.map { input ->
-            val cleaned = normalizeModelOutput(
-                outputMap[input.id]?.cleanedText
-                    ?: input.text
-            )
-            check(cleaned.isNotBlank()) { "AI 返回第 ${input.id} 段为空" }
+            val output = outputMap[input.id]
+            val cleaned = if (output == null) {
+                input.text
+            } else {
+                normalizeModelOutput(output.cleanedText.orEmpty())
+            }
             val validation = validate(input.text, cleaned)
             AiPurifyResult(
                 original = input.text,
@@ -129,7 +159,8 @@ object AiPurifyHelper {
                 deletedPreview = validation.deletedPreview,
                 canAutoApply = validation.canAutoApply,
                 riskReason = validation.riskReason,
-                model = result.model
+                model = result.model,
+                paragraphIndex = input.id
             )
         }
     }
@@ -146,11 +177,12 @@ object AiPurifyHelper {
     }
 
     private fun List<BatchInput>.chunkForBatch(): List<List<BatchInput>> {
+        val maxBatchInputLength = AiConfig.purifyChapterSegmentLimit
         val chunks = arrayListOf<List<BatchInput>>()
         val current = arrayListOf<BatchInput>()
         var currentLength = 0
         for (input in this) {
-            if (current.isNotEmpty() && currentLength + input.text.length > MAX_BATCH_INPUT_LENGTH) {
+            if (current.isNotEmpty() && currentLength + input.text.length > maxBatchInputLength) {
                 chunks.add(current.toList())
                 current.clear()
                 currentLength = 0
@@ -164,7 +196,10 @@ object AiPurifyHelper {
         return chunks
     }
 
-    private fun validate(original: String, cleaned: String): ValidationResult {
+    private fun validate(
+        original: String,
+        cleaned: String
+    ): ValidationResult {
         if (cleaned == original) {
             return ValidationResult(
                 deletedPreview = "",
@@ -190,33 +225,17 @@ object AiPurifyHelper {
         }
         if (cleanedIndex != cleaned.length) {
             return ValidationResult(
-                deletedPreview = "",
+                deletedPreview = original.bestEffortDeletedPreview(cleaned),
                 canAutoApply = false,
                 riskReason = "AI 输出不是原文删除后的结果，可能发生改写"
             )
         }
         val deleted = deletedChars.joinToString("")
-        val deleteRatio = deleted.length.toFloat() / original.length.coerceAtLeast(1)
-        val riskyChar = deletedChars.firstOrNull { it.isRiskyDeletedChar() }
-        val riskReason = when {
-            deleteRatio > MAX_AUTO_DELETE_RATIO -> "删除比例偏高，需要确认"
-            riskyChar != null -> "删除了普通正文字符「$riskyChar」，需要确认"
-            else -> null
-        }
         return ValidationResult(
             deletedPreview = deleted.compactPreview(),
-            canAutoApply = riskReason == null,
-            riskReason = riskReason
+            canAutoApply = true,
+            riskReason = null
         )
-    }
-
-    private fun Char.isRiskyDeletedChar(): Boolean {
-        if (isWhitespace()) return false
-        val block = Character.UnicodeBlock.of(this)
-        return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
-            || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
-            || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B
-            || this in "，。！？；：“”‘’、（）《》——……"
     }
 
     private fun BatchInput.needsSingleReviewAfterBatchMiss(): Boolean {
@@ -224,6 +243,10 @@ object AiPurifyHelper {
             return false
         }
         return text.hasSuspiciousNoiseMarker()
+    }
+
+    private fun String.isChapterTitleForPurify(chapterTitle: String?): Boolean {
+        return this == chapterTitle || isLikelyChapterTitle()
     }
 
     private fun String.isLikelyChapterTitle(): Boolean {
@@ -247,6 +270,68 @@ object AiPurifyHelper {
         } else {
             compact.take(maxLength) + "..."
         }
+    }
+
+    private fun String.bestEffortDeletedPreview(cleaned: String): String {
+        return deletedByLcs(cleaned)
+            .ifBlank { deletedByCommonWindow(cleaned) }
+            .compactPreview()
+    }
+
+    private fun String.deletedByLcs(cleaned: String): String {
+        val original = this
+        if (original.isEmpty()) return ""
+        if (cleaned.isEmpty()) return original
+        val cellCount = original.length.toLong() * cleaned.length.toLong()
+        if (cellCount > 4_000_000L) return ""
+        val cols = cleaned.length + 1
+        val table = IntArray((original.length + 1) * cols)
+        for (i in 1..original.length) {
+            val originalChar = original[i - 1]
+            for (j in 1..cleaned.length) {
+                val index = i * cols + j
+                table[index] = if (originalChar == cleaned[j - 1]) {
+                    table[(i - 1) * cols + j - 1] + 1
+                } else {
+                    maxOf(table[(i - 1) * cols + j], table[i * cols + j - 1])
+                }
+            }
+        }
+        val deleted = StringBuilder()
+        var i = original.length
+        var j = cleaned.length
+        while (i > 0) {
+            if (j > 0 && original[i - 1] == cleaned[j - 1]) {
+                i--
+                j--
+            } else if (j > 0 && table[i * cols + j - 1] >= table[(i - 1) * cols + j]) {
+                j--
+            } else {
+                deleted.append(original[i - 1])
+                i--
+            }
+        }
+        return deleted.reverse().toString()
+    }
+
+    private fun String.deletedByCommonWindow(cleaned: String): String {
+        val original = this
+        var prefix = 0
+        val maxPrefix = minOf(original.length, cleaned.length)
+        while (prefix < maxPrefix && original[prefix] == cleaned[prefix]) {
+            prefix++
+        }
+        var originalSuffix = original.length
+        var cleanedSuffix = cleaned.length
+        while (
+            originalSuffix > prefix &&
+            cleanedSuffix > prefix &&
+            original[originalSuffix - 1] == cleaned[cleanedSuffix - 1]
+        ) {
+            originalSuffix--
+            cleanedSuffix--
+        }
+        return original.substring(prefix, originalSuffix)
     }
 
     private data class ValidationResult(
@@ -277,5 +362,6 @@ data class AiPurifyResult(
     val deletedPreview: String,
     val canAutoApply: Boolean,
     val riskReason: String?,
-    val model: String?
+    val model: String?,
+    val paragraphIndex: Int? = null
 )
