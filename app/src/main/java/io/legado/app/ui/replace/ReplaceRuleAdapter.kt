@@ -1,11 +1,13 @@
 package io.legado.app.ui.replace
 
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
 import androidx.core.os.bundleOf
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
@@ -20,64 +22,74 @@ import io.legado.app.utils.ColorUtils
 
 
 class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
-    RecyclerAdapter<ReplaceRule, ItemReplaceRuleBinding>(context),
+    RecyclerAdapter<ReplaceRuleListItem, ItemReplaceRuleBinding>(context),
     ItemTouchCallback.Callback {
 
     private val selected = linkedSetOf<ReplaceRule>()
 
     val selection: List<ReplaceRule>
-        get() {
-            return getItems().filter {
-                selected.contains(it)
-            }
+        get() = selectableRules().filter { selected.contains(it) }
+
+    val ruleCount: Int
+        get() = selectableRules().size
+
+    val diffItemCallBack = object : DiffUtil.ItemCallback<ReplaceRuleListItem>() {
+
+        override fun areItemsTheSame(
+            oldItem: ReplaceRuleListItem,
+            newItem: ReplaceRuleListItem
+        ): Boolean {
+            return oldItem.sameItemKey == newItem.sameItemKey
         }
 
-    val diffItemCallBack = object : DiffUtil.ItemCallback<ReplaceRule>() {
-
-        override fun areItemsTheSame(oldItem: ReplaceRule, newItem: ReplaceRule): Boolean {
-            return oldItem.id == newItem.id
+        override fun areContentsTheSame(
+            oldItem: ReplaceRuleListItem,
+            newItem: ReplaceRuleListItem
+        ): Boolean {
+            return oldItem == newItem && sectionSelectionSame(oldItem, newItem)
         }
 
-        override fun areContentsTheSame(oldItem: ReplaceRule, newItem: ReplaceRule): Boolean {
-            if (oldItem.name != newItem.name) {
-                return false
+        override fun getChangePayload(
+            oldItem: ReplaceRuleListItem,
+            newItem: ReplaceRuleListItem
+        ): Any? {
+            if (oldItem is ReplaceRuleListItem.Section && newItem is ReplaceRuleListItem.Section) {
+                val payload = Bundle()
+                if (oldItem.title != newItem.title || oldItem.rules.size != newItem.rules.size) {
+                    payload.putBoolean("upSection", true)
+                }
+                if (oldItem.expanded != newItem.expanded) {
+                    payload.putBoolean("expanded", true)
+                }
+                return if (payload.isEmpty) null else payload
             }
-            if (oldItem.group != newItem.group) {
-                return false
+            if (oldItem !is ReplaceRuleListItem.Rule || newItem !is ReplaceRuleListItem.Rule) {
+                return null
             }
-            if (oldItem.isEnabled != newItem.isEnabled) {
-                return false
-            }
-            return true
-        }
-
-        override fun getChangePayload(oldItem: ReplaceRule, newItem: ReplaceRule): Any? {
             val payload = Bundle()
-            if (oldItem.name != newItem.name
-                || oldItem.group != newItem.group
+            if (oldItem.rule.name != newItem.rule.name
+                || oldItem.rule.group != newItem.rule.group
+                || oldItem.meta != newItem.meta
+                || oldItem.showMeta != newItem.showMeta
+                || oldItem.inPanel != newItem.inPanel
             ) {
                 payload.putBoolean("upName", true)
             }
-            if (oldItem.isEnabled != newItem.isEnabled) {
-                payload.putBoolean("enabled", newItem.isEnabled)
+            if (oldItem.rule.isEnabled != newItem.rule.isEnabled) {
+                payload.putBoolean("enabled", true)
             }
-            if (payload.isEmpty) {
-                return null
-            }
-            return payload
+            return if (payload.isEmpty) null else payload
         }
     }
 
     fun selectAll() {
-        getItems().forEach {
-            selected.add(it)
-        }
+        selectableRules().forEach { selected.add(it) }
         notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
         callBack.upCountView()
     }
 
     fun revertSelection() {
-        getItems().forEach {
+        selectableRules().forEach {
             if (selected.contains(it)) {
                 selected.remove(it)
             } else {
@@ -93,71 +105,134 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
     }
 
     override fun onCurrentListChanged() {
+        selected.retainAll(selectableRules().toSet())
         callBack.upCountView()
     }
 
     override fun convert(
         holder: ItemViewHolder,
         binding: ItemReplaceRuleBinding,
-        item: ReplaceRule,
+        item: ReplaceRuleListItem,
         payloads: MutableList<Any>
     ) {
         binding.run {
-            if (payloads.isEmpty()) {
-                root.setBackgroundColor(ColorUtils.withAlpha(context.backgroundColor, 0.5f))
-                cbName.text = item.getDisplayNameGroup()
-                swtEnabled.isChecked = item.isEnabled
-                cbName.isChecked = selected.contains(item)
-            } else {
-                for (i in payloads.indices) {
-                    val bundle = payloads[i] as Bundle
-                    bundle.keySet().forEach {
-                        when (it) {
-                            "selected" -> cbName.isChecked = selected.contains(item)
-                            "upName" -> cbName.text = item.getDisplayNameGroup()
-                            "enabled" -> swtEnabled.isChecked = item.isEnabled
-                        }
-                    }
+            sectionContainer.isVisible = item is ReplaceRuleListItem.Section
+            ruleContainer.isVisible = item is ReplaceRuleListItem.Rule
+            if (item is ReplaceRuleListItem.Section) {
+                bindSection(item, payloads)
+                return
+            }
+            bindRule(item as ReplaceRuleListItem.Rule, payloads)
+        }
+    }
+
+    private fun ItemReplaceRuleBinding.bindSection(
+        item: ReplaceRuleListItem.Section,
+        payloads: MutableList<Any>
+    ) {
+        root.setBackgroundColor(ColorUtils.withAlpha(context.backgroundColor, 0.5f))
+        if (payloads.isEmpty()) {
+            tvSectionTitle.text = item.title
+            tvSectionCount.text = item.rules.size.toString()
+        } else {
+            payloads.filterIsInstance<Bundle>().forEach { bundle ->
+                if (bundle.containsKey("upSection")) {
+                    tvSectionTitle.text = item.title
+                    tvSectionCount.text = item.rules.size.toString()
                 }
             }
         }
+        ivSectionExpand.rotation = if (item.expanded) 0f else -90f
+        cbSection.isChecked = item.rules.isNotEmpty() && item.rules.all { selected.contains(it) }
+        viewSectionStatus.background = statusDotDrawable(
+            item.rules.isNotEmpty() && item.rules.all { it.isEnabled }
+        )
+    }
+
+    private fun ItemReplaceRuleBinding.bindRule(
+        item: ReplaceRuleListItem.Rule,
+        payloads: MutableList<Any>
+    ) {
+        root.setBackgroundColor(ColorUtils.withAlpha(context.backgroundColor, 0.5f))
+        ruleContainer.minHeight = 52
+        ruleContainer.setPadding(
+            dp(if (item.inPanel) 28 else 16),
+            dp(6),
+            dp(16),
+            dp(6)
+        )
+        if (payloads.isEmpty()) {
+            cbName.text = item.rule.getDisplayNameGroup()
+            tvRuleMeta.text = item.meta
+        } else {
+            payloads.filterIsInstance<Bundle>().forEach { bundle ->
+                if (bundle.containsKey("upName")) {
+                    cbName.text = item.rule.getDisplayNameGroup()
+                    tvRuleMeta.text = item.meta
+                }
+            }
+        }
+        tvRuleMeta.isVisible = false
+        cbName.isChecked = selected.contains(item.rule)
+        viewRuleStatus.background = statusDotDrawable(item.rule.isEnabled)
     }
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemReplaceRuleBinding) {
         binding.apply {
-            swtEnabled.setOnUserCheckedChangeListener { isChecked ->
-                getItem(holder.layoutPosition)?.let {
-                    it.isEnabled = isChecked
-                    callBack.update(it)
+            sectionContainer.setOnClickListener {
+                (getItem(holder.layoutPosition) as? ReplaceRuleListItem.Section)?.let {
+                    callBack.toggleSection(it.key)
                 }
             }
-            ivEdit.setOnClickListener {
-                getItem(holder.layoutPosition)?.let {
-                    callBack.edit(it)
+            cbSection.setOnClickListener {
+                (getItem(holder.layoutPosition) as? ReplaceRuleListItem.Section)?.let {
+                    if (cbSection.isChecked) {
+                        selected.addAll(it.rules)
+                    } else {
+                        selected.removeAll(it.rules.toSet())
+                    }
+                    notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+                    callBack.upCountView()
+                }
+            }
+            ivSectionMore.setOnClickListener {
+                (getItem(holder.layoutPosition) as? ReplaceRuleListItem.Section)?.let {
+                    showSectionMenu(ivSectionMore, it)
+                }
+            }
+            ivSectionExpand.setOnClickListener {
+                (getItem(holder.layoutPosition) as? ReplaceRuleListItem.Section)?.let {
+                    callBack.toggleSection(it.key)
                 }
             }
             cbName.setOnClickListener {
-                getItem(holder.layoutPosition)?.let {
+                (getItem(holder.layoutPosition) as? ReplaceRuleListItem.Rule)?.let {
                     if (cbName.isChecked) {
-                        selected.add(it)
+                        selected.add(it.rule)
                     } else {
-                        selected.remove(it)
+                        selected.remove(it.rule)
                     }
                 }
+                notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
                 callBack.upCountView()
             }
             ivMenuMore.setOnClickListener {
-                showMenu(ivMenuMore, holder.layoutPosition)
+                showRuleMenu(ivMenuMore, holder.layoutPosition)
             }
         }
     }
 
-    private fun showMenu(view: View, position: Int) {
-        val item = getItem(position) ?: return
+    private fun showRuleMenu(view: View, position: Int) {
+        val item = (getItem(position) as? ReplaceRuleListItem.Rule)?.rule ?: return
         val popupMenu = PopupMenu(context, view)
         popupMenu.inflate(R.menu.replace_rule_item)
+        popupMenu.menu.findItem(R.id.menu_enable)?.isVisible = !item.isEnabled
+        popupMenu.menu.findItem(R.id.menu_disable)?.isVisible = item.isEnabled
         popupMenu.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
+                R.id.menu_enable -> callBack.update(item.copy(isEnabled = true))
+                R.id.menu_disable -> callBack.update(item.copy(isEnabled = false))
+                R.id.menu_edit -> callBack.edit(item)
                 R.id.menu_top -> callBack.toTop(item)
                 R.id.menu_bottom -> callBack.toBottom(item)
                 R.id.menu_del -> {
@@ -170,9 +245,31 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
         popupMenu.show()
     }
 
+    private fun showSectionMenu(view: View, item: ReplaceRuleListItem.Section) {
+        val popupMenu = PopupMenu(context, view)
+        val hasDisabled = item.rules.any { !it.isEnabled }
+        val hasEnabled = item.rules.any { it.isEnabled }
+        if (hasDisabled) {
+            popupMenu.menu.add(0, R.id.menu_enable, 0, R.string.enable)
+        }
+        if (hasEnabled) {
+            popupMenu.menu.add(0, R.id.menu_disable, 1, R.string.replace_rule_disable)
+        }
+        popupMenu.menu.add(0, R.id.menu_del, 2, R.string.delete)
+        popupMenu.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.menu_enable -> callBack.updateSectionEnabled(item.title, item.rules, true)
+                R.id.menu_disable -> callBack.updateSectionEnabled(item.title, item.rules, false)
+                R.id.menu_del -> callBack.deleteSection(item.title, item.rules)
+            }
+            true
+        }
+        popupMenu.show()
+    }
+
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {
-        val srcItem = getItem(srcPosition)
-        val targetItem = getItem(targetPosition)
+        val srcItem = (getItem(srcPosition) as? ReplaceRuleListItem.Rule)?.rule
+        val targetItem = (getItem(targetPosition) as? ReplaceRuleListItem.Rule)?.rule
         if (srcItem != null && targetItem != null) {
             if (srcItem.order == targetItem.order) {
                 callBack.upOrder()
@@ -204,23 +301,58 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
             }
 
             override fun getItemId(position: Int): ReplaceRule {
-                return getItem(position)!!
+                return (getItem(position) as? ReplaceRuleListItem.Rule)?.rule
+                    ?: ReplaceRule(id = Long.MIN_VALUE + position)
             }
 
             override fun updateSelectState(position: Int, isSelected: Boolean): Boolean {
-                getItem(position)?.let {
+                (getItem(position) as? ReplaceRuleListItem.Rule)?.let {
                     if (isSelected) {
-                        selected.add(it)
+                        selected.add(it.rule)
                     } else {
-                        selected.remove(it)
+                        selected.remove(it.rule)
                     }
-                    notifyItemChanged(position, bundleOf(Pair("selected", null)))
+                    notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
                     callBack.upCountView()
                     return true
                 }
                 return false
             }
         }
+
+    private fun sectionSelectionSame(
+        oldItem: ReplaceRuleListItem,
+        newItem: ReplaceRuleListItem
+    ): Boolean {
+        if (oldItem !is ReplaceRuleListItem.Section || newItem !is ReplaceRuleListItem.Section) {
+            return true
+        }
+        val oldSelected = oldItem.rules.isNotEmpty() && oldItem.rules.all { selected.contains(it) }
+        val newSelected = newItem.rules.isNotEmpty() && newItem.rules.all { selected.contains(it) }
+        return oldSelected == newSelected
+    }
+
+    private fun selectableRules(): List<ReplaceRule> {
+        return getItems()
+            .flatMap {
+                when (it) {
+                    is ReplaceRuleListItem.Section -> it.rules
+                    is ReplaceRuleListItem.Rule -> listOf(it.rule)
+                }
+            }
+            .distinctBy { it.id }
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * context.resources.displayMetrics.density).toInt()
+    }
+
+    private fun statusDotDrawable(enabled: Boolean): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(context.getColor(if (enabled) R.color.success else R.color.error))
+        }
+    }
 
     interface CallBack {
         fun update(vararg rule: ReplaceRule)
@@ -230,5 +362,32 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
         fun toBottom(rule: ReplaceRule)
         fun upOrder()
         fun upCountView()
+        fun toggleSection(key: String)
+        fun updateSectionEnabled(title: String, rules: List<ReplaceRule>, isEnabled: Boolean)
+        fun deleteSection(title: String, rules: List<ReplaceRule>)
+    }
+}
+
+sealed class ReplaceRuleListItem {
+
+    abstract val sameItemKey: String
+
+    data class Section(
+        val key: String,
+        val title: String,
+        val rules: List<ReplaceRule>,
+        val expanded: Boolean
+    ) : ReplaceRuleListItem() {
+        override val sameItemKey: String = "section:$key"
+    }
+
+    data class Rule(
+        val sectionKey: String?,
+        val rule: ReplaceRule,
+        val meta: String,
+        val showMeta: Boolean,
+        val inPanel: Boolean
+    ) : ReplaceRuleListItem() {
+        override val sameItemKey: String = "rule:${sectionKey.orEmpty()}:${rule.id}"
     }
 }

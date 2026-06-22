@@ -16,6 +16,15 @@ object AiConfig {
     const val DEFAULT_PURIFY_CHAPTER_SEGMENT_LIMIT = 10000
     const val MIN_PURIFY_CHAPTER_SEGMENT_LIMIT = 1000
     const val MAX_PURIFY_CHAPTER_SEGMENT_LIMIT = 50000
+    const val DEFAULT_PURIFY_CHAPTER_SAMPLE_LIMIT = 10
+    const val MIN_PURIFY_CHAPTER_SAMPLE_LIMIT = 1
+    const val MAX_PURIFY_CHAPTER_SAMPLE_LIMIT = 200
+    const val DEFAULT_PURIFY_CHAPTER_CONCURRENCY_LIMIT = 10
+    const val MIN_PURIFY_CHAPTER_CONCURRENCY_LIMIT = 1
+    const val MAX_PURIFY_CHAPTER_CONCURRENCY_LIMIT = 64
+    const val DEFAULT_PURIFY_CHAPTER_RETRY_COUNT = 3
+    const val MIN_PURIFY_CHAPTER_RETRY_COUNT = 0
+    const val MAX_PURIFY_CHAPTER_RETRY_COUNT = 10
 
     val temperature: Float?
         get() = appCtx.getPrefString(PreferKey.aiTemperature, "0.2")
@@ -67,6 +76,45 @@ object AiConfig {
             appCtx.putPrefInt(
                 PreferKey.aiPurifyChapterSegmentLimit,
                 value.coerceIn(MIN_PURIFY_CHAPTER_SEGMENT_LIMIT, MAX_PURIFY_CHAPTER_SEGMENT_LIMIT)
+            )
+        }
+
+    var purifyChapterSampleLimit: Int
+        get() = appCtx.getPrefInt(
+            PreferKey.aiPurifyChapterSampleLimit,
+            DEFAULT_PURIFY_CHAPTER_SAMPLE_LIMIT
+        ).coerceIn(MIN_PURIFY_CHAPTER_SAMPLE_LIMIT, MAX_PURIFY_CHAPTER_SAMPLE_LIMIT)
+        set(value) {
+            appCtx.putPrefInt(
+                PreferKey.aiPurifyChapterSampleLimit,
+                value.coerceIn(MIN_PURIFY_CHAPTER_SAMPLE_LIMIT, MAX_PURIFY_CHAPTER_SAMPLE_LIMIT)
+            )
+        }
+
+    var purifyChapterConcurrencyLimit: Int
+        get() = appCtx.getPrefInt(
+            PreferKey.aiPurifyChapterConcurrencyLimit,
+            DEFAULT_PURIFY_CHAPTER_CONCURRENCY_LIMIT
+        ).coerceIn(MIN_PURIFY_CHAPTER_CONCURRENCY_LIMIT, MAX_PURIFY_CHAPTER_CONCURRENCY_LIMIT)
+        set(value) {
+            appCtx.putPrefInt(
+                PreferKey.aiPurifyChapterConcurrencyLimit,
+                value.coerceIn(
+                    MIN_PURIFY_CHAPTER_CONCURRENCY_LIMIT,
+                    MAX_PURIFY_CHAPTER_CONCURRENCY_LIMIT
+                )
+            )
+        }
+
+    var purifyChapterRetryCount: Int
+        get() = appCtx.getPrefInt(
+            PreferKey.aiPurifyChapterRetryCount,
+            DEFAULT_PURIFY_CHAPTER_RETRY_COUNT
+        ).coerceIn(MIN_PURIFY_CHAPTER_RETRY_COUNT, MAX_PURIFY_CHAPTER_RETRY_COUNT)
+        set(value) {
+            appCtx.putPrefInt(
+                PreferKey.aiPurifyChapterRetryCount,
+                value.coerceIn(MIN_PURIFY_CHAPTER_RETRY_COUNT, MAX_PURIFY_CHAPTER_RETRY_COUNT)
             )
         }
 

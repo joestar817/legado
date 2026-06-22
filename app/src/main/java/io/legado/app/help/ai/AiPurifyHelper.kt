@@ -1,7 +1,7 @@
 package io.legado.app.help.ai
 
-import com.google.gson.reflect.TypeToken
 import io.legado.app.utils.GSON
+import kotlinx.coroutines.delay
 
 object AiPurifyHelper {
 
@@ -55,7 +55,10 @@ object AiPurifyHelper {
         return AiPurifyResult(
             original = source,
             cleaned = cleaned,
+            deletedCount = validation.deletedCount,
+            replacementCount = validation.replacementCount,
             deletedPreview = validation.deletedPreview,
+            replacementPreview = validation.replacementPreview,
             canAutoApply = validation.canAutoApply,
             riskReason = validation.riskReason,
             model = result.model,
@@ -63,10 +66,10 @@ object AiPurifyHelper {
         )
     }
 
-    suspend fun purifyParagraphs(
+    suspend fun generateRuleCandidates(
         paragraphs: List<String>,
         chapterTitle: String? = null
-    ): List<AiPurifyResult> {
+    ): AiPurifyRuleGenerateResult {
         val normalizedChapterTitle = chapterTitle?.let { normalizeSelectedText(it) }
         val inputs = paragraphs
             .mapIndexedNotNull { index, text ->
@@ -76,23 +79,22 @@ object AiPurifyHelper {
                     index == 0 && source.isChapterTitleForPurify(normalizedChapterTitle) -> null
                     else -> BatchInput(index + 1, source)
                 }
-            }
-        check(inputs.isNotEmpty()) { "当前章节正文为空" }
-        val batchResults = inputs.chunkForBatch().flatMap { purifyBatch(it) }
-        return batchResults.mapIndexed { index, result ->
-            val input = inputs[index]
-            if (result.deletedPreview.isBlank() && input.needsSingleReviewAfterBatchMiss()) {
-                runCatching {
-                    purifyText(
-                        text = input.text,
-                        prompt = AiPromptStore.Prompt.CHAPTER_OPTIMIZE,
-                        paragraphIndex = input.id
-                    )
-                }.getOrElse { result }
-            } else {
-                result
-            }
         }
+        check(inputs.isNotEmpty()) { "当前章节正文为空" }
+        val chunkResults = inputs.chunkForBatch().map { generateRuleBatchWithRetry(it) }
+        val rules = chunkResults
+            .flatMap { it.rules }
+            .distinctBy { "${it.type}\u0000${it.old}\u0000${it.new}" }
+        val model = chunkResults
+            .mapNotNull { it.model?.takeIf { value -> value.isNotBlank() } }
+            .distinct()
+            .joinToString(" + ")
+            .ifBlank { null }
+        return AiPurifyRuleGenerateResult(
+            rules = rules,
+            model = model,
+            originalCharCount = inputs.sumOf { it.input.length }
+        )
     }
 
     fun normalizeSelectedText(text: String): String {
@@ -114,66 +116,181 @@ object AiPurifyHelper {
         return output
     }
 
-    private suspend fun purifyBatch(inputs: List<BatchInput>): List<AiPurifyResult> {
+    private suspend fun generateRuleBatch(inputs: List<BatchInput>): AiPurifyRuleGenerateResult {
         val payload = GSON.toJson(inputs)
-        val sourceLength = inputs.sumOf { it.text.length }
+        val sourceLength = inputs.sumOf { it.input.length }
         val result = AiManager.generateText(
             messages = listOf(
                 AiMessage(
                     AiMessage.Role.SYSTEM,
                     """
                     固定协议：
-                    用户会给你一个 JSON 数组，每项包含 id 和 text。
-                    你只能返回 JSON 数组，不要解释，不要使用 Markdown。
-                    数组中只允许返回发生删除的段落，每项必须只包含 id 和 cleaned 两个字段。
-                    cleaned 必须是删除污染内容后的结果，不得返回原文，不得使用 text 或 content 字段。
-                    如果整段都是广告、群号、版权声明、站点宣传或无关提示，cleaned 必须返回空字符串 ""。
-                    如果某段不需要删除任何内容，或你不确定是否应删除，必须完全省略该段。
-                    严禁返回 cleaned 与原文完全相同的段落。
+                    用户会给你一个 JSON 数组，每项只包含 id 和 input。
+                    你只能返回一个 JSON 对象，不要解释，不要使用 Markdown。
+                    JSON 对象只允许包含 rules 字段。
+                    rules 是数组；没有候选规则时返回 {"rules":[]}。
+                    rules 中每一项必须只包含 id、type、old、new 四个字段。
+                    最终输出必须是完整合法 JSON，最后一个字符必须是 }。
+                    如果候选很多，只返回最明确的候选；宁可少返回，也不要输出超长列表导致 JSON 不完整。
+                    id 必须来自输入段落 id。
+                    type 只能是 typo、noise、ad。
+                    old 必须是输入原文中真实存在的连续文本。
+                    new 是替换后的文本；删除时必须是空字符串。
+                    严禁返回 cleaned、output、text、content、confidence、reason、evidenceIds 或其它字段。
 
                     任务说明：
-                    ${AiPromptStore.prompt(AiPromptStore.Prompt.CHAPTER_OPTIMIZE)}
+                    ${AiPromptStore.prompt(AiPromptStore.Prompt.RULE_GENERATE)}
                     """.trimIndent()
                 ),
                 AiMessage(AiMessage.Role.USER, payload)
             ),
             params = AiTextParams(
                 temperature = 0f,
-                maxTokens = (sourceLength * 2 + inputs.size * 48 + 128).coerceIn(512, 8192),
+                maxTokens = (sourceLength + inputs.size * 64 + 512).coerceIn(1024, 8192),
                 disableThinking = true
             )
         )
-        val outputs = parseBatchOutput(result.content)
-        val outputMap = outputs.associateBy { it.id }
-        return inputs.map { input ->
-            val output = outputMap[input.id]
-            val cleaned = if (output == null) {
-                input.text
-            } else {
-                normalizeModelOutput(output.cleanedText.orEmpty())
-            }
-            val validation = validate(input.text, cleaned)
-            AiPurifyResult(
-                original = input.text,
-                cleaned = cleaned,
-                deletedPreview = validation.deletedPreview,
-                canAutoApply = validation.canAutoApply,
-                riskReason = validation.riskReason,
-                model = result.model,
-                paragraphIndex = input.id
-            )
-        }
+        val parsedRules = parseRuleOutput(result.content).rules
+        val inputMap = inputs.associateBy { it.id }
+        val validRules = parsedRules
+            .mapNotNull { it.validated(inputMap) }
+            .distinctBy { "${it.type}\u0000${it.old}\u0000${it.new}" }
+        return AiPurifyRuleGenerateResult(
+            rules = validRules,
+            model = result.model,
+            originalCharCount = sourceLength
+        )
     }
 
-    private fun parseBatchOutput(text: String): List<BatchOutput> {
-        var output = normalizeModelOutput(text)
-        val start = output.indexOf('[')
-        val end = output.lastIndexOf(']')
-        check(start >= 0 && end > start) { "AI 未返回 JSON 数组" }
-        output = output.substring(start, end + 1)
-        val type = object : TypeToken<List<BatchOutput>>() {}.type
-        return GSON.fromJson<List<BatchOutput>>(output, type)
+    private suspend fun generateRuleBatchWithRetry(inputs: List<BatchInput>): AiPurifyRuleGenerateResult {
+        val maxAttempts = AiConfig.purifyChapterRetryCount + 1
+        var lastError: Throwable? = null
+        repeat(maxAttempts) { attemptIndex ->
+            try {
+                return generateRuleBatch(inputs)
+            } catch (e: Throwable) {
+                lastError = e
+                if (attemptIndex < maxAttempts - 1) {
+                    delay(300L * (attemptIndex + 1))
+                }
+            }
+        }
+        throw lastError ?: IllegalStateException("AI 规则生成失败")
+    }
+
+    private fun parseRuleOutput(text: String): RuleOutput {
+        val output = normalizeModelOutput(text)
+        val candidate = output.extractJsonObjectCandidate()
+        check(candidate.isNotBlank()) { "AI 未返回 JSON 对象" }
+        return parseRuleOutputJson(candidate)
+            ?: parseRuleOutputJson(candidate.closeJsonStructures())
             ?: error("AI 返回 JSON 解析失败")
+    }
+
+    private fun parseRuleOutputJson(output: String): RuleOutput? {
+        return runCatching {
+            GSON.fromJson(output, RuleOutput::class.java)
+        }.getOrNull()
+    }
+
+    private fun String.extractJsonObjectCandidate(): String {
+        val start = indexOf('{')
+        if (start < 0) {
+            return ""
+        }
+        val source = substring(start).trim()
+        var inString = false
+        var escaped = false
+        var depth = 0
+        source.forEachIndexed { index, char ->
+            if (escaped) {
+                escaped = false
+                return@forEachIndexed
+            }
+            when {
+                char == '\\' && inString -> escaped = true
+                char == '"' -> inString = !inString
+                inString -> Unit
+                char == '{' -> depth++
+                char == '}' -> {
+                    depth--
+                    if (depth == 0) {
+                        return source.substring(0, index + 1)
+                    }
+                }
+            }
+        }
+        return source
+    }
+
+    private fun String.closeJsonStructures(): String {
+        val stack = arrayListOf<Char>()
+        var inString = false
+        var escaped = false
+        forEach { char ->
+            if (escaped) {
+                escaped = false
+                return@forEach
+            }
+            when {
+                char == '\\' && inString -> escaped = true
+                char == '"' -> inString = !inString
+                inString -> Unit
+                char == '{' -> stack.add('}')
+                char == '[' -> stack.add(']')
+                char == '}' || char == ']' -> {
+                    if (stack.isNotEmpty() && stack.last() == char) {
+                        stack.removeAt(stack.lastIndex)
+                    }
+                }
+            }
+        }
+        if (inString || stack.isEmpty()) {
+            return this
+        }
+        return this + stack.asReversed().joinToString("")
+    }
+
+    private fun AiPurifyRuleCandidate.validated(
+        inputMap: Map<Int, BatchInput>
+    ): AiPurifyRuleCandidate? {
+        val source = inputMap[id]?.input ?: return null
+        val ruleType = type.trim().lowercase()
+        if (ruleType !in setOf("typo", "noise", "ad")) {
+            return null
+        }
+        val normalizedOld = normalizeSelectedText(old)
+        val normalizedNew = normalizeSelectedText(new)
+        if (
+            normalizedOld.isBlank() ||
+            normalizedOld.isNormalizedSameAs(normalizedNew) ||
+            !source.contains(normalizedOld)
+        ) {
+            return null
+        }
+        if (normalizedOld.length == 1) {
+            return null
+        }
+        if (ruleType == "typo") {
+            if (normalizedNew.isBlank() || normalizedNew.length < 2) {
+                return null
+            }
+            if (normalizedOld.contains('幺') && normalizedNew.contains('吗')) {
+                return null
+            }
+        }
+        if (ruleType == "ad" && (normalizedNew.isNotBlank() || normalizedOld != source)) {
+            return null
+        }
+        if (ruleType == "noise" && normalizedNew.isBlank() && normalizedOld.length < 4) {
+            return null
+        }
+        return AiPurifyRuleCandidate(
+            id = id,
+            type = ruleType,
+            old = normalizedOld,
+            new = normalizedNew
+        )
     }
 
     private fun List<BatchInput>.chunkForBatch(): List<List<BatchInput>> {
@@ -182,13 +299,13 @@ object AiPurifyHelper {
         val current = arrayListOf<BatchInput>()
         var currentLength = 0
         for (input in this) {
-            if (current.isNotEmpty() && currentLength + input.text.length > maxBatchInputLength) {
+            if (current.isNotEmpty() && currentLength + input.input.length > maxBatchInputLength) {
                 chunks.add(current.toList())
                 current.clear()
                 currentLength = 0
             }
             current.add(input)
-            currentLength += input.text.length
+            currentLength += input.input.length
         }
         if (current.isNotEmpty()) {
             chunks.add(current.toList())
@@ -202,65 +319,48 @@ object AiPurifyHelper {
     ): ValidationResult {
         if (cleaned == original) {
             return ValidationResult(
+                deletedCount = 0,
+                replacementCount = 0,
                 deletedPreview = "",
+                replacementPreview = "",
                 canAutoApply = false,
-                riskReason = "AI 未删除任何内容"
+                riskReason = "AI 未修改任何内容"
             )
         }
-        if (cleaned.length > original.length) {
+        val summary = summarizeChange(original, cleaned)
+        if (summary.insertedCount > 0) {
             return ValidationResult(
-                deletedPreview = "",
+                deletedCount = summary.deletedCount,
+                replacementCount = summary.replacementCount,
+                deletedPreview = summary.deletedPreview,
+                replacementPreview = summary.replacementPreview,
                 canAutoApply = false,
-                riskReason = "AI 输出比原文更长，可能发生改写"
+                riskReason = "AI 输出包含新增内容，可能发生改写"
             )
         }
-        val deletedChars = ArrayList<Char>()
-        var cleanedIndex = 0
-        for (char in original) {
-            if (cleanedIndex < cleaned.length && char == cleaned[cleanedIndex]) {
-                cleanedIndex++
-            } else {
-                deletedChars.add(char)
-            }
-        }
-        if (cleanedIndex != cleaned.length) {
-            return ValidationResult(
-                deletedPreview = original.bestEffortDeletedPreview(cleaned),
-                canAutoApply = false,
-                riskReason = "AI 输出不是原文删除后的结果，可能发生改写"
-            )
-        }
-        val deleted = deletedChars.joinToString("")
         return ValidationResult(
-            deletedPreview = deleted.compactPreview(),
+            deletedCount = summary.deletedCount,
+            replacementCount = summary.replacementCount,
+            deletedPreview = summary.deletedPreview,
+            replacementPreview = summary.replacementPreview,
             canAutoApply = true,
             riskReason = null
         )
-    }
-
-    private fun BatchInput.needsSingleReviewAfterBatchMiss(): Boolean {
-        if (id == 1 && text.isLikelyChapterTitle()) {
-            return false
-        }
-        return text.hasSuspiciousNoiseMarker()
     }
 
     private fun String.isChapterTitleForPurify(chapterTitle: String?): Boolean {
         return this == chapterTitle || isLikelyChapterTitle()
     }
 
+    private fun String.isNormalizedSameAs(other: String): Boolean {
+        return this == other ||
+                java.text.Normalizer.normalize(this, java.text.Normalizer.Form.NFKC) ==
+                java.text.Normalizer.normalize(other, java.text.Normalizer.Form.NFKC)
+    }
+
     private fun String.isLikelyChapterTitle(): Boolean {
         if (length > 40) return false
         return Regex("""^第.{1,12}[章节卷集回部].*""").containsMatchIn(this)
-    }
-
-    private fun String.hasSuspiciousNoiseMarker(): Boolean {
-        return any { char ->
-            val block = Character.UnicodeBlock.of(char)
-            block == Character.UnicodeBlock.ENCLOSED_ALPHANUMERICS
-                || block == Character.UnicodeBlock.ENCLOSED_CJK_LETTERS_AND_MONTHS
-                || char in "∴∵∷∞≧≦≥≤♂♀※☆★○●◎◇◆□■△▲▽▼→←↔↕↖↗↘↙"
-        }
     }
 
     private fun String.compactPreview(maxLength: Int = 160): String {
@@ -272,49 +372,91 @@ object AiPurifyHelper {
         }
     }
 
-    private fun String.bestEffortDeletedPreview(cleaned: String): String {
-        return deletedByLcs(cleaned)
-            .ifBlank { deletedByCommonWindow(cleaned) }
-            .compactPreview()
-    }
-
-    private fun String.deletedByLcs(cleaned: String): String {
-        val original = this
-        if (original.isEmpty()) return ""
-        if (cleaned.isEmpty()) return original
-        val cellCount = original.length.toLong() * cleaned.length.toLong()
-        if (cellCount > 4_000_000L) return ""
-        val cols = cleaned.length + 1
-        val table = IntArray((original.length + 1) * cols)
+    private fun summarizeChange(original: String, cleaned: String): ChangeSummary {
+        val cellCount = (original.length + 1L) * (cleaned.length + 1L)
+        if (cellCount > 4_000_000L) {
+            return original.summarizeChangeByCommonWindow(cleaned)
+        }
+        val width = cleaned.length + 1
+        val cost = IntArray((original.length + 1) * width)
+        for (i in 0..original.length) {
+            cost[i * width] = i
+        }
+        for (j in 0..cleaned.length) {
+            cost[j] = j
+        }
         for (i in 1..original.length) {
-            val originalChar = original[i - 1]
+            val row = i * width
+            val prevRow = (i - 1) * width
             for (j in 1..cleaned.length) {
-                val index = i * cols + j
-                table[index] = if (originalChar == cleaned[j - 1]) {
-                    table[(i - 1) * cols + j - 1] + 1
-                } else {
-                    maxOf(table[(i - 1) * cols + j], table[i * cols + j - 1])
-                }
+                val replaceCost = cost[prevRow + j - 1] +
+                    if (original[i - 1] == cleaned[j - 1]) 0 else 1
+                val deleteCost = cost[prevRow + j] + 1
+                val insertCost = cost[row + j - 1] + 1
+                cost[row + j] = minOf(replaceCost, deleteCost, insertCost)
             }
         }
-        val deleted = StringBuilder()
+        val deletedChars = ArrayList<Char>()
+        val replacements = ArrayList<String>()
+        var insertedCount = 0
         var i = original.length
         var j = cleaned.length
-        while (i > 0) {
-            if (j > 0 && original[i - 1] == cleaned[j - 1]) {
+        while (i > 0 || j > 0) {
+            val current = cost[i * width + j]
+            if (
+                i > 0 &&
+                j > 0 &&
+                original[i - 1] == cleaned[j - 1] &&
+                current == cost[(i - 1) * width + j - 1]
+            ) {
                 i--
                 j--
-            } else if (j > 0 && table[i * cols + j - 1] >= table[(i - 1) * cols + j]) {
+            } else if (
+                i > 0 &&
+                j > 0 &&
+                current == cost[(i - 1) * width + j - 1] + 1
+            ) {
+                replacements.add("${original[i - 1]} -> ${cleaned[j - 1]}")
+                i--
                 j--
+            } else if (i > 0 && current == cost[(i - 1) * width + j] + 1) {
+                deletedChars.add(original[i - 1])
+                i--
             } else {
-                deleted.append(original[i - 1])
-                i--
+                insertedCount++
+                j--
             }
         }
-        return deleted.reverse().toString()
+        deletedChars.reverse()
+        replacements.reverse()
+        return ChangeSummary(
+            deletedCount = deletedChars.size,
+            replacementCount = replacements.size,
+            insertedCount = insertedCount,
+            deletedPreview = deletedChars.joinToString("").compactPreview(),
+            replacementPreview = replacements.compactReplacementPreview()
+        )
     }
 
-    private fun String.deletedByCommonWindow(cleaned: String): String {
+    private fun String.summarizeChangeByCommonWindow(cleaned: String): ChangeSummary {
+        val originalWindow = changedByCommonWindow(cleaned)
+        val cleanedWindow = cleaned.changedByCommonWindow(this)
+        val replacementCount = minOf(originalWindow.length, cleanedWindow.length)
+        val deletedCount = (originalWindow.length - cleanedWindow.length).coerceAtLeast(0)
+        val insertedCount = (cleanedWindow.length - originalWindow.length).coerceAtLeast(0)
+        return ChangeSummary(
+            deletedCount = deletedCount,
+            replacementCount = replacementCount,
+            insertedCount = insertedCount,
+            deletedPreview = originalWindow.drop(replacementCount).compactPreview(),
+            replacementPreview = originalWindow
+                .zip(cleanedWindow)
+                .map { "${it.first} -> ${it.second}" }
+                .compactReplacementPreview()
+        )
+    }
+
+    private fun String.changedByCommonWindow(cleaned: String): String {
         val original = this
         var prefix = 0
         val maxPrefix = minOf(original.length, cleaned.length)
@@ -334,34 +476,71 @@ object AiPurifyHelper {
         return original.substring(prefix, originalSuffix)
     }
 
-    private data class ValidationResult(
+    private fun List<String>.compactReplacementPreview(maxItems: Int = 8): String {
+        if (isEmpty()) return ""
+        val counts = linkedMapOf<String, Int>()
+        for (item in this) {
+            counts[item] = (counts[item] ?: 0) + 1
+        }
+        val preview = counts.entries
+            .take(maxItems)
+            .joinToString("、") { (item, count) ->
+                if (count > 1) "$item×$count" else item
+            }
+        return if (counts.size > maxItems) "$preview..." else preview
+    }
+
+    private data class ChangeSummary(
+        val deletedCount: Int,
+        val replacementCount: Int,
+        val insertedCount: Int,
         val deletedPreview: String,
+        val replacementPreview: String
+    )
+
+    private data class ValidationResult(
+        val deletedCount: Int,
+        val replacementCount: Int,
+        val deletedPreview: String,
+        val replacementPreview: String,
         val canAutoApply: Boolean,
         val riskReason: String?
     )
 
     private data class BatchInput(
         val id: Int,
-        val text: String
+        val input: String
     )
 
-    private data class BatchOutput(
-        val id: Int,
-        val cleaned: String? = null,
-        val text: String? = null,
-        val content: String? = null
-    ) {
-        val cleanedText: String?
-            get() = cleaned ?: text ?: content
-    }
+    private data class RuleOutput(
+        val rules: List<AiPurifyRuleCandidate> = emptyList()
+    )
 }
 
 data class AiPurifyResult(
     val original: String,
     val cleaned: String,
+    val deletedCount: Int,
+    val replacementCount: Int,
     val deletedPreview: String,
+    val replacementPreview: String,
     val canAutoApply: Boolean,
     val riskReason: String?,
     val model: String?,
-    val paragraphIndex: Int? = null
+    val paragraphIndex: Int? = null,
+    val chapterIndex: Int? = null,
+    val chapterTitle: String? = null
+)
+
+data class AiPurifyRuleGenerateResult(
+    val rules: List<AiPurifyRuleCandidate>,
+    val model: String?,
+    val originalCharCount: Int
+)
+
+data class AiPurifyRuleCandidate(
+    val id: Int,
+    val type: String,
+    val old: String,
+    val new: String
 )

@@ -160,6 +160,7 @@ object ChapterProvider {
             bookChapter.index, displayTitle,
             chapterSize,
             bookContent.sameTitleRemoved,
+            bookContent.textList,
             bookChapter.isVip,
             bookChapter.isPay,
             bookContent.effectiveReplaceRules

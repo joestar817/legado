@@ -1,10 +1,14 @@
 package io.legado.app.ui.replace
 
 import android.annotation.SuppressLint
+import android.content.Intent
+import android.graphics.Typeface
 import android.os.Bundle
+import android.view.View
 import android.view.Menu
 import android.view.MenuItem
 import android.view.SubMenu
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.widget.PopupMenu
@@ -25,6 +29,7 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
+import io.legado.app.lib.theme.secondaryTextColor
 import io.legado.app.ui.association.ImportReplaceRuleDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.qrcode.QrCodeResult
@@ -72,6 +77,15 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
     private var groupMenu: SubMenu? = null
     private var replaceRuleFlowJob: Job? = null
     private var dataInit = false
+    private lateinit var itemTouchCallback: ItemTouchCallback
+    private var allRules: List<ReplaceRule> = emptyList()
+    private var currentSearchKey: String? = null
+    private var viewMode = ReplaceRuleViewMode.LIST
+    private var sectionStateKey: String? = null
+    private val expandedSections = linkedSetOf<String>()
+    private val currentBookName by lazy { intent.getStringExtra(EXTRA_BOOK_NAME).orEmpty() }
+    private val currentSourceName by lazy { intent.getStringExtra(EXTRA_SOURCE_NAME).orEmpty() }
+    private val currentSourceUrl by lazy { intent.getStringExtra(EXTRA_SOURCE_URL).orEmpty() }
     private val qrCodeResult = registerForActivityResult(QrCodeResult()) {
         it ?: return@registerForActivityResult
         showDialogFragment(ImportReplaceRuleDialog(it))
@@ -108,6 +122,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         initRecyclerView()
         initSearchView()
+        initViewModes()
         initSelectActionView()
         observeReplaceRuleData()
         observeGroupData()
@@ -129,7 +144,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
         binding.recyclerView.addItemDecoration(VerticalDivider(this))
-        val itemTouchCallback = ItemTouchCallback(adapter)
+        itemTouchCallback = ItemTouchCallback(adapter)
         itemTouchCallback.isCanDrag = true
         val dragSelectTouchHelper: DragSelectTouchHelper =
             DragSelectTouchHelper(adapter.dragSelectCallback).setSlideArea(16, 50)
@@ -145,6 +160,18 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
         searchView.applyTint(primaryTextColor)
         searchView.queryHint = getString(R.string.replace_purify_search)
         searchView.setOnQueryTextListener(this)
+    }
+
+    private fun initViewModes() {
+        viewModeViews().forEach { (mode, view) ->
+            view.setOnClickListener {
+                viewMode = mode
+                itemTouchCallback.isCanDrag = viewMode == ReplaceRuleViewMode.LIST
+                upViewModeViews()
+                submitReplaceRules()
+            }
+        }
+        upViewModeViews()
     }
 
     override fun selectAll(selectAll: Boolean) {
@@ -174,6 +201,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
     }
 
     private fun observeReplaceRuleData(searchKey: String? = null) {
+        currentSearchKey = searchKey
         dataInit = false
         replaceRuleFlowJob?.cancel()
         replaceRuleFlowJob = lifecycleScope.launch {
@@ -208,11 +236,16 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 if (dataInit) {
                     setResult(RESULT_OK)
                 }
-                adapter.setItems(it, adapter.diffItemCallBack)
+                allRules = it
+                submitReplaceRules()
                 dataInit = true
                 delay(100)
             }
         }
+    }
+
+    private fun submitReplaceRules() {
+        adapter.setItems(buildReplaceRuleItems(allRules), adapter.diffItemCallBack)
     }
 
     override fun onResume() {
@@ -343,7 +376,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
     override fun upCountView() {
         binding.selectActionBar.upCountView(
             adapter.selection.size,
-            adapter.itemCount
+            adapter.ruleCount
         )
     }
 
@@ -381,5 +414,217 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
     override fun upOrder() {
         setResult(RESULT_OK)
         viewModel.upOrder()
+    }
+
+    override fun updateSectionEnabled(
+        title: String,
+        rules: List<ReplaceRule>,
+        isEnabled: Boolean
+    ) {
+        setResult(RESULT_OK)
+        if (isEnabled) {
+            viewModel.enableSelection(rules)
+        } else {
+            viewModel.disableSelection(rules)
+        }
+    }
+
+    override fun deleteSection(title: String, rules: List<ReplaceRule>) {
+        alert(R.string.draw) {
+            setMessage(getString(R.string.sure_del) + "\n" + title)
+            noButton()
+            yesButton {
+                setResult(RESULT_OK)
+                viewModel.delSelection(rules)
+            }
+        }
+    }
+
+    override fun toggleSection(key: String) {
+        if (!expandedSections.add(key)) {
+            expandedSections.remove(key)
+        }
+        submitReplaceRules()
+    }
+
+    private fun buildReplaceRuleItems(rules: List<ReplaceRule>): List<ReplaceRuleListItem> {
+        if (viewMode == ReplaceRuleViewMode.LIST) {
+            return rules.map { rule ->
+                ReplaceRuleListItem.Rule(
+                    sectionKey = null,
+                    rule = rule,
+                    meta = ruleMeta(rule),
+                    showMeta = false,
+                    inPanel = false
+                )
+            }
+        }
+        val sections = when (viewMode) {
+            ReplaceRuleViewMode.GROUP -> groupSections(rules)
+            ReplaceRuleViewMode.SCOPE -> scopeSections(rules)
+            ReplaceRuleViewMode.LIST -> emptyMap()
+        }
+        if (sections.isEmpty()) return emptyList()
+        val newSectionStateKey = "${viewMode.name}:${currentSearchKey.orEmpty()}"
+        if (sectionStateKey != newSectionStateKey) {
+            sectionStateKey = newSectionStateKey
+            expandedSections.clear()
+            if (currentSearchKey?.isNotBlank() == true) {
+                expandedSections.addAll(sections.keys.map { it.key })
+            }
+        }
+        return buildList {
+            sections.forEach { (section, sectionRules) ->
+                val expanded = expandedSections.contains(section.key)
+                add(
+                    ReplaceRuleListItem.Section(
+                        key = section.key,
+                        title = section.title,
+                        rules = sectionRules.distinctBy { it.id },
+                        expanded = expanded
+                    )
+                )
+                if (expanded) {
+                    sectionRules.distinctBy { it.id }.forEach { rule ->
+                        add(
+                            ReplaceRuleListItem.Rule(
+                                sectionKey = section.key,
+                                rule = rule,
+                                meta = ruleMeta(rule),
+                                showMeta = false,
+                                inPanel = true
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun groupSections(rules: List<ReplaceRule>): Map<ReplaceRuleSection, List<ReplaceRule>> {
+        return rules
+            .flatMap { rule ->
+                val groups = rule.group?.splitNotBlank(",").orEmpty()
+                if (groups.isEmpty()) {
+                    listOf(ReplaceRuleSection("group:", getString(R.string.no_group), 0) to rule)
+                } else {
+                    groups.map {
+                        ReplaceRuleSection("group:$it", it, 1) to rule
+                    }
+                }
+            }
+            .groupBy({ it.first }, { it.second })
+            .toSortedMap(compareBy<ReplaceRuleSection> { it.rank }.thenBy { it.title })
+    }
+
+    private fun scopeSections(rules: List<ReplaceRule>): Map<ReplaceRuleSection, List<ReplaceRule>> {
+        return rules
+            .map { rule -> scopeSectionFor(rule) to rule }
+            .groupBy({ it.first }, { it.second })
+            .toSortedMap(compareBy<ReplaceRuleSection> { it.rank }.thenBy { it.title })
+    }
+
+    private fun scopeSectionFor(rule: ReplaceRule): ReplaceRuleSection {
+        val scope = rule.scope.orEmpty().trim()
+        val tokens = scopeTokens(scope)
+        if (scope.isBlank()) {
+            return ReplaceRuleSection(
+                key = "global",
+                title = getString(R.string.replace_scope_global_rules),
+                rank = 30
+            )
+        }
+        val title = scopeSectionTitle(tokens.ifEmpty { listOf(scope) })
+        val rank = when {
+            currentBookName.isNotBlank() && tokens.any {
+                it == currentBookName || it.contains(currentBookName)
+            } -> 0
+
+            tokens.any { it.contains("://") } -> 10
+            else -> 20
+        }
+        return ReplaceRuleSection(
+            key = "scope:${tokens.joinToString("|").ifBlank { scope }}",
+            title = title,
+            rank = rank
+        )
+    }
+
+    private fun scopeSectionTitle(tokens: List<String>): String {
+        return tokens.joinToString(" | ") { token ->
+            token.replace("\n", " ").trim()
+        }.ifBlank {
+            getString(R.string.replace_scope_global_rules)
+        }
+    }
+
+    private fun scopeTokens(scope: String): List<String> {
+        return scope.split(";", ",", "\n")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .ifEmpty { if (scope.isBlank()) emptyList() else listOf(scope) }
+    }
+
+    private fun ruleMeta(rule: ReplaceRule): String {
+        val scopeText = when {
+            rule.scopeTitle && rule.scopeContent -> getString(R.string.replace_scope_title_content)
+            rule.scopeTitle -> getString(R.string.scope_title)
+            else -> getString(R.string.scope_content)
+        }
+        val modeText = if (rule.isRegex) {
+            getString(R.string.replace_rule_regex)
+        } else {
+            getString(R.string.replace_rule_plain)
+        }
+        val stateText = if (rule.isEnabled) getString(R.string.enabled) else getString(R.string.disabled)
+        return "$scopeText · $modeText · $stateText"
+    }
+
+    private fun viewModeViews(): Map<ReplaceRuleViewMode, TextView> {
+        return mapOf(
+            ReplaceRuleViewMode.LIST to binding.viewModeList,
+            ReplaceRuleViewMode.GROUP to binding.viewModeGroup,
+            ReplaceRuleViewMode.SCOPE to binding.viewModeScope
+        )
+    }
+
+    private fun upViewModeViews() {
+        viewModeViews().forEach { (mode, view) ->
+            val selected = mode == viewMode
+            view.background = null
+            view.typeface = if (selected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            view.setTextColor(if (selected) primaryTextColor else secondaryTextColor)
+        }
+    }
+
+    enum class ReplaceRuleViewMode {
+        LIST,
+        GROUP,
+        SCOPE
+    }
+
+    data class ReplaceRuleSection(
+        val key: String,
+        val title: String,
+        val rank: Int
+    )
+
+    companion object {
+        private const val EXTRA_BOOK_NAME = "bookName"
+        private const val EXTRA_SOURCE_NAME = "sourceName"
+        private const val EXTRA_SOURCE_URL = "sourceUrl"
+
+        fun startIntent(
+            context: android.content.Context,
+            bookName: String? = null,
+            sourceName: String? = null,
+            sourceUrl: String? = null
+        ): Intent {
+            return Intent(context, ReplaceRuleActivity::class.java).apply {
+                putExtra(EXTRA_BOOK_NAME, bookName)
+                putExtra(EXTRA_SOURCE_NAME, sourceName)
+                putExtra(EXTRA_SOURCE_URL, sourceUrl)
+            }
+        }
     }
 }

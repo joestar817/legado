@@ -2,9 +2,15 @@ package io.legado.app.ui.config
 
 import android.annotation.SuppressLint
 import android.content.res.ColorStateList
+import android.graphics.Typeface
 import android.graphics.Rect
 import android.os.Bundle
+import android.text.Editable
 import android.text.InputType
+import android.text.Spanned
+import android.text.style.BackgroundColorSpan
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -62,6 +68,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
     private var ignoreModelSelection = false
     private var ignoreProviderFormChanges = false
     private var ignorePurifyFormChanges = false
+    private var ignorePromptHighlight = false
     private var apiKeyVisible = false
     private val balanceNumberFormat by lazy { DecimalFormat("0.####") }
 
@@ -169,6 +176,48 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
                 refreshPurifySettings()
             }
         }
+        binding.editPurifyChapterSampleLimit.doOnTextChanged { text, _, _, _ ->
+            if (ignorePurifyFormChanges) {
+                return@doOnTextChanged
+            }
+            text?.toString()?.toIntOrNull()?.let {
+                AiConfig.purifyChapterSampleLimit = it
+                refreshMain()
+            }
+        }
+        binding.editPurifyChapterSampleLimit.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                refreshPurifySettings()
+            }
+        }
+        binding.editPurifyChapterConcurrencyLimit.doOnTextChanged { text, _, _, _ ->
+            if (ignorePurifyFormChanges) {
+                return@doOnTextChanged
+            }
+            text?.toString()?.toIntOrNull()?.let {
+                AiConfig.purifyChapterConcurrencyLimit = it
+                refreshMain()
+            }
+        }
+        binding.editPurifyChapterConcurrencyLimit.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                refreshPurifySettings()
+            }
+        }
+        binding.editPurifyChapterRetryCount.doOnTextChanged { text, _, _, _ ->
+            if (ignorePurifyFormChanges) {
+                return@doOnTextChanged
+            }
+            text?.toString()?.toIntOrNull()?.let {
+                AiConfig.purifyChapterRetryCount = it
+                refreshMain()
+            }
+        }
+        binding.editPurifyChapterRetryCount.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                refreshPurifySettings()
+            }
+        }
     }
 
     private fun initProviderList() {
@@ -268,6 +317,12 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
     }
 
     private fun initPromptDetail() {
+        binding.editPrompt.typeface = Typeface.MONOSPACE
+        binding.editPrompt.doOnTextChanged { _, _, _, _ ->
+            if (!ignorePromptHighlight) {
+                highlightSkillMarkdown()
+            }
+        }
         binding.buttonSavePrompt.setOnClickListener {
             val prompt = currentPrompt ?: return@setOnClickListener
             AiPromptStore.save(prompt, binding.editPrompt.text?.toString().orEmpty())
@@ -277,7 +332,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         binding.buttonResetPrompt.setOnClickListener {
             val prompt = currentPrompt ?: return@setOnClickListener
             AiPromptStore.reset(prompt)
-            binding.editPrompt.setText(prompt.defaultPrompt)
+            setSkillEditorText(prompt.defaultPrompt)
             Toast.makeText(requireContext(), R.string.ai_prompt_reset_done, Toast.LENGTH_SHORT)
                 .show()
         }
@@ -438,14 +493,17 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         )
         binding.textPromptEntrySummary.text = getString(
             R.string.ai_prompt_menu_summary,
-            AiPromptStore.Prompt.entries.size.toString()
+            visibleAiPrompts().size.toString()
         )
         binding.textPurifyEntrySummary.text = getString(
             R.string.ai_purify_settings_summary,
             getString(if (AiConfig.purifyAutoApply) R.string.enabled else R.string.disabled),
             getString(if (AiConfig.purifyChapterAutoApply) R.string.enabled else R.string.disabled),
             AiConfig.purifyParagraphLimit.toString(),
-            AiConfig.purifyChapterSegmentLimit.toString()
+            AiConfig.purifyChapterSegmentLimit.toString(),
+            AiConfig.purifyChapterSampleLimit.toString(),
+            AiConfig.purifyChapterConcurrencyLimit.toString(),
+            AiConfig.purifyChapterRetryCount.toString()
         )
     }
 
@@ -487,14 +545,113 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
     }
 
     private fun refreshPrompts() {
-        promptAdapter.setItems(AiPromptStore.Prompt.entries.toList())
+        promptAdapter.setItems(visibleAiPrompts())
+    }
+
+    private fun visibleAiPrompts(): List<AiPromptStore.Prompt> {
+        return AiPromptStore.Prompt.entries.toList()
     }
 
     private fun refreshPromptDetail() {
         val prompt = currentPrompt ?: return
         binding.textPromptDetailTitle.text = prompt.displayName()
         binding.textPromptDetailSummary.text = prompt.summary()
-        binding.editPrompt.setText(AiPromptStore.prompt(prompt))
+        setSkillEditorText(AiPromptStore.prompt(prompt))
+    }
+
+    private fun setSkillEditorText(text: String) {
+        ignorePromptHighlight = true
+        try {
+            binding.editPrompt.setText(text)
+            binding.editPrompt.setSelection(0)
+        } finally {
+            ignorePromptHighlight = false
+        }
+        highlightSkillMarkdown()
+    }
+
+    private fun highlightSkillMarkdown() {
+        val editable = binding.editPrompt.text ?: return
+        val length = editable.length
+        if (length == 0) {
+            return
+        }
+        val selectionStart = binding.editPrompt.selectionStart
+        val selectionEnd = binding.editPrompt.selectionEnd
+        editable.getSpans(0, length, SkillMarkdownSpan::class.java).forEach {
+            editable.removeSpan(it)
+        }
+
+        val text = editable.toString()
+        val headingColor = accentColor
+        val mutedColor = ContextCompat.getColor(requireContext(), R.color.ng_on_surface_variant)
+        val codeColor = ContextCompat.getColor(requireContext(), R.color.ng_info)
+        val listColor = ContextCompat.getColor(requireContext(), R.color.ng_warning)
+        val codeBackground = ContextCompat.getColor(requireContext(), R.color.ng_neutral_container)
+        var lineStart = 0
+        var inFence = false
+        text.split('\n').forEach { line ->
+            val lineEnd = lineStart + line.length
+            val trimmed = line.trimStart()
+            when {
+                trimmed.startsWith("```") -> {
+                    editable.applySkillSpan(SkillMarkdownColorSpan(codeColor), lineStart, lineEnd)
+                    editable.applySkillSpan(SkillMarkdownStyleSpan(Typeface.BOLD), lineStart, lineEnd)
+                    inFence = !inFence
+                }
+                inFence -> {
+                    editable.applySkillSpan(
+                        SkillMarkdownBackgroundSpan(codeBackground),
+                        lineStart,
+                        lineEnd
+                    )
+                    editable.applySkillSpan(SkillMarkdownColorSpan(codeColor), lineStart, lineEnd)
+                }
+                trimmed.startsWith("#") -> {
+                    editable.applySkillSpan(SkillMarkdownColorSpan(headingColor), lineStart, lineEnd)
+                    editable.applySkillSpan(SkillMarkdownStyleSpan(Typeface.BOLD), lineStart, lineEnd)
+                }
+                trimmed == "---" -> {
+                    editable.applySkillSpan(SkillMarkdownColorSpan(mutedColor), lineStart, lineEnd)
+                    editable.applySkillSpan(SkillMarkdownStyleSpan(Typeface.BOLD), lineStart, lineEnd)
+                }
+                trimmed.startsWith("- ") || trimmed.matches(Regex("""\d+\.\s+.*""")) -> {
+                    val markerEnd = lineStart + line.length - trimmed.length + when {
+                        trimmed.startsWith("- ") -> 1
+                        else -> trimmed.indexOf('.').takeIf { it >= 0 }?.plus(1) ?: 0
+                    }
+                    editable.applySkillSpan(SkillMarkdownColorSpan(listColor), lineStart, markerEnd)
+                }
+            }
+            lineStart = lineEnd + 1
+        }
+
+        Regex("`[^`\\n]+`").findAll(text).forEach { match ->
+            editable.applySkillSpan(
+                SkillMarkdownColorSpan(codeColor),
+                match.range.first,
+                match.range.last + 1
+            )
+            editable.applySkillSpan(
+                SkillMarkdownBackgroundSpan(codeBackground),
+                match.range.first,
+                match.range.last + 1
+            )
+        }
+        Regex("\\*\\*[^*\\n]+\\*\\*").findAll(text).forEach { match ->
+            editable.applySkillSpan(
+                SkillMarkdownStyleSpan(Typeface.BOLD),
+                match.range.first,
+                match.range.last + 1
+            )
+        }
+
+        if (selectionStart >= 0 && selectionEnd >= 0) {
+            binding.editPrompt.setSelection(
+                selectionStart.coerceAtMost(editable.length),
+                selectionEnd.coerceAtMost(editable.length)
+            )
+        }
     }
 
     private fun refreshPurifySettings() {
@@ -510,6 +667,9 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
             binding.imagePurifyChapterAutoIcon.imageTintList = entryIconTint
             binding.imagePurifyChapterInterceptIcon.imageTintList = entryIconTint
             binding.imagePurifyChapterLimitIcon.imageTintList = entryIconTint
+            binding.imagePurifyChapterSampleLimitIcon.imageTintList = entryIconTint
+            binding.imagePurifyChapterConcurrencyIcon.imageTintList = entryIconTint
+            binding.imagePurifyChapterRetryIcon.imageTintList = entryIconTint
             binding.switchAiPurifyAuto.isChecked = AiConfig.purifyAutoApply
             binding.switchAiPurifyIntercept.isChecked = AiConfig.purifyExceptionIntercept
             binding.switchAiPurifyChapterAuto.isChecked = AiConfig.purifyChapterAutoApply
@@ -524,6 +684,21 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
             if (binding.editPurifyChapterSegmentLimit.text?.toString() != chapterLimit) {
                 binding.editPurifyChapterSegmentLimit.setText(chapterLimit)
                 binding.editPurifyChapterSegmentLimit.setSelection(chapterLimit.length)
+            }
+            val chapterSampleLimit = AiConfig.purifyChapterSampleLimit.toString()
+            if (binding.editPurifyChapterSampleLimit.text?.toString() != chapterSampleLimit) {
+                binding.editPurifyChapterSampleLimit.setText(chapterSampleLimit)
+                binding.editPurifyChapterSampleLimit.setSelection(chapterSampleLimit.length)
+            }
+            val chapterConcurrencyLimit = AiConfig.purifyChapterConcurrencyLimit.toString()
+            if (binding.editPurifyChapterConcurrencyLimit.text?.toString() != chapterConcurrencyLimit) {
+                binding.editPurifyChapterConcurrencyLimit.setText(chapterConcurrencyLimit)
+                binding.editPurifyChapterConcurrencyLimit.setSelection(chapterConcurrencyLimit.length)
+            }
+            val chapterRetryCount = AiConfig.purifyChapterRetryCount.toString()
+            if (binding.editPurifyChapterRetryCount.text?.toString() != chapterRetryCount) {
+                binding.editPurifyChapterRetryCount.setText(chapterRetryCount)
+                binding.editPurifyChapterRetryCount.setSelection(chapterRetryCount.length)
             }
         } finally {
             ignorePurifyFormChanges = false
@@ -799,7 +974,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
     private fun AiPromptStore.Prompt.displayName(): String {
         return when (this) {
             AiPromptStore.Prompt.PARAGRAPH_PURIFY -> getString(R.string.ai_prompt_paragraph_purify)
-            AiPromptStore.Prompt.CHAPTER_OPTIMIZE -> getString(R.string.ai_prompt_chapter_optimize)
+            AiPromptStore.Prompt.RULE_GENERATE -> getString(R.string.ai_prompt_rule_generate)
         }
     }
 
@@ -807,15 +982,15 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         return when (this) {
             AiPromptStore.Prompt.PARAGRAPH_PURIFY ->
                 getString(R.string.ai_prompt_paragraph_purify_summary)
-            AiPromptStore.Prompt.CHAPTER_OPTIMIZE ->
-                getString(R.string.ai_prompt_chapter_optimize_summary)
+            AiPromptStore.Prompt.RULE_GENERATE ->
+                getString(R.string.ai_prompt_rule_generate_summary)
         }
     }
 
     private fun AiPromptStore.Prompt.iconText(): String {
         return when (this) {
             AiPromptStore.Prompt.PARAGRAPH_PURIFY -> "段"
-            AiPromptStore.Prompt.CHAPTER_OPTIMIZE -> "章"
+            AiPromptStore.Prompt.RULE_GENERATE -> "规"
         }
     }
 
@@ -914,6 +1089,26 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         }
 
         override fun registerListener(holder: ItemViewHolder, binding: ItemAiPromptBinding) {
+        }
+    }
+
+    private interface SkillMarkdownSpan
+
+    private class SkillMarkdownColorSpan(color: Int) :
+        ForegroundColorSpan(color),
+        SkillMarkdownSpan
+
+    private class SkillMarkdownBackgroundSpan(color: Int) :
+        BackgroundColorSpan(color),
+        SkillMarkdownSpan
+
+    private class SkillMarkdownStyleSpan(style: Int) :
+        StyleSpan(style),
+        SkillMarkdownSpan
+
+    private fun Editable.applySkillSpan(span: SkillMarkdownSpan, start: Int, end: Int) {
+        if (start < end && start >= 0 && end <= length) {
+            setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
     }
 }

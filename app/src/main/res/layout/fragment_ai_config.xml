@@ -170,7 +170,7 @@
                 style="@style/Ng.SettingsSectionLabel"
                 android:text="@string/ai_purify_paragraph_section" />
 
-        <io.legado.app.ui.widget.NgGlassLayout style="@style/Ng.SettingsGroup">
+            <LinearLayout style="@style/Ng.SettingsGroup">
 
             <View style="@style/Ng.SettingsGroupEdgeSpace" />
 
@@ -178,7 +178,8 @@
                 android:id="@+id/layout_ai_purify_auto"
                 style="@style/Ng.SettingsItem"
                 android:clickable="false"
-                android:focusable="false">
+                android:focusable="false"
+                android:foreground="@null">
 
                 <ImageView
                     android:id="@+id/image_purify_auto_icon"
@@ -220,7 +221,8 @@
                 android:id="@+id/layout_ai_purify_intercept"
                 style="@style/Ng.SettingsItem"
                 android:clickable="false"
-                android:focusable="false">
+                android:focusable="false"
+                android:foreground="@null">
 
                 <ImageView
                     android:id="@+id/image_purify_intercept_icon"
@@ -260,7 +262,8 @@
             <LinearLayout
                 style="@style/Ng.SettingsItem"
                 android:clickable="false"
-                android:focusable="false">
+                android:focusable="false"
+                android:foreground="@null">
 
                 <ImageView
                     android:id="@+id/image_purify_limit_icon"
@@ -301,7 +304,7 @@
 
             <View style="@style/Ng.SettingsGroupEdgeSpace" />
 
-            </io.legado.app.ui.widget.NgGlassLayout>
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/text_purify_chapter_section_label"
@@ -309,7 +312,7 @@
                 android:layout_marginTop="18dp"
                 android:text="@string/ai_purify_chapter_section" />
 
-            <io.legado.app.ui.widget.NgGlassLayout style="@style/Ng.SettingsGroup">
+            <LinearLayout style="@style/Ng.SettingsGroup">
 
                 <View style="@style/Ng.SettingsGroupEdgeSpace" />
 
@@ -317,7 +320,8 @@
                     android:id="@+id/layout_ai_purify_chapter_auto"
                     style="@style/Ng.SettingsItem"
                     android:clickable="false"
-                    android:focusable="false">
+                    android:focusable="false"
+                    android:foreground="@null">
 
                     <ImageView
                         android:id="@+id/image_purify_chapter_auto_icon"
@@ -359,7 +363,8 @@
                     android:id="@+id/layout_ai_purify_chapter_intercept"
                     style="@style/Ng.SettingsItem"
                     android:clickable="false"
-                    android:focusable="false">
+                    android:focusable="false"
+                    android:foreground="@null">
 
                     <ImageView
                         android:id="@+id/image_purify_chapter_intercept_icon"
@@ -399,7 +404,98 @@
                 <LinearLayout
                     style="@style/Ng.SettingsItem"
                     android:clickable="false"
-                    android:focusable="false">
+                    android:focusable="false"
+                    android:foreground="@null">
+
+                    <ImageView
+                        android:id="@+id/image_purify_chapter_concurrency_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_purify_chapter_concurrency_limit"
+                        android:src="@drawable/ic_ai_prompt" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_purify_chapter_concurrency_limit" />
+
+                        <TextView
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="1"
+                            android:text="@string/ai_purify_chapter_concurrency_limit_summary" />
+
+                    </LinearLayout>
+
+                    <EditText
+                        android:id="@+id/edit_purify_chapter_concurrency_limit"
+                        style="@style/Ng.OutlinedField.Compact"
+                        android:layout_width="92dp"
+                        android:layout_marginStart="12dp"
+                        android:gravity="center"
+                        android:inputType="number"
+                        android:singleLine="true" />
+
+                </LinearLayout>
+
+                <View style="@style/Ng.SettingsItemGap" />
+
+                <LinearLayout
+                    style="@style/Ng.SettingsItem"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:foreground="@null">
+
+                    <ImageView
+                        android:id="@+id/image_purify_chapter_retry_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_purify_chapter_retry_count"
+                        android:src="@drawable/ic_ai_prompt" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_purify_chapter_retry_count" />
+
+                        <TextView
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="1"
+                            android:text="@string/ai_purify_chapter_retry_count_summary" />
+
+                    </LinearLayout>
+
+                    <EditText
+                        android:id="@+id/edit_purify_chapter_retry_count"
+                        style="@style/Ng.OutlinedField.Compact"
+                        android:layout_width="92dp"
+                        android:layout_marginStart="12dp"
+                        android:gravity="center"
+                        android:inputType="number"
+                        android:singleLine="true" />
+
+                </LinearLayout>
+
+                <View style="@style/Ng.SettingsItemGap" />
+
+                <LinearLayout
+                    style="@style/Ng.SettingsItem"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:foreground="@null">
 
                     <ImageView
                         android:id="@+id/image_purify_chapter_limit_icon"
@@ -438,9 +534,54 @@
 
                 </LinearLayout>
 
+                <View style="@style/Ng.SettingsItemGap" />
+
+                <LinearLayout
+                    style="@style/Ng.SettingsItem"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:foreground="@null">
+
+                    <ImageView
+                        android:id="@+id/image_purify_chapter_sample_limit_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_purify_chapter_sample_limit"
+                        android:src="@drawable/ic_ai_prompt" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_purify_chapter_sample_limit" />
+
+                        <TextView
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="1"
+                            android:text="@string/ai_purify_chapter_sample_limit_summary" />
+
+                    </LinearLayout>
+
+                    <EditText
+                        android:id="@+id/edit_purify_chapter_sample_limit"
+                        style="@style/Ng.OutlinedField.Compact"
+                        android:layout_width="92dp"
+                        android:layout_marginStart="12dp"
+                        android:gravity="center"
+                        android:inputType="number"
+                        android:singleLine="true" />
+
+                </LinearLayout>
+
                 <View style="@style/Ng.SettingsGroupEdgeSpace" />
 
-            </io.legado.app.ui.widget.NgGlassLayout>
+            </LinearLayout>
 
         </LinearLayout>
 
@@ -477,7 +618,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:paddingStart="@dimen/ng_page_padding"
-        android:paddingTop="16dp"
+        android:paddingTop="8dp"
         android:paddingEnd="@dimen/ng_page_padding"
         android:visibility="gone">
 
@@ -485,31 +626,35 @@
             android:id="@+id/text_prompt_detail_title"
             style="@style/Ng.Title"
             android:layout_width="match_parent"
-            android:textSize="24sp" />
+            android:textSize="24sp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/text_prompt_detail_summary"
             style="@style/Ng.Summary"
             android:layout_marginTop="8dp"
-            android:maxLines="3" />
+            android:maxLines="3"
+            android:visibility="gone" />
 
         <EditText
             android:id="@+id/edit_prompt"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginTop="18dp"
             android:layout_weight="1"
             android:background="@drawable/ng_bg_outlined_field"
+            android:fontFamily="monospace"
             android:gravity="top|start"
-            android:inputType="textMultiLine"
+            android:inputType="textMultiLine|textNoSuggestions"
             android:minLines="12"
             android:paddingStart="16dp"
             android:paddingTop="14dp"
             android:paddingEnd="16dp"
             android:paddingBottom="14dp"
+            android:scrollbarStyle="insideInset"
+            android:scrollbars="vertical"
             android:textColor="@color/ng_on_surface"
             android:textColorHint="@color/ng_on_surface_variant"
-            android:textSize="15sp" />
+            android:textSize="13sp" />
 
         <LinearLayout
             style="@style/Ng.ActionBar"
