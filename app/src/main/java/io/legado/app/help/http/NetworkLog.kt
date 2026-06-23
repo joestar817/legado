@@ -45,7 +45,7 @@ object NetworkLog {
             Entry(
                 id = nextId.incrementAndGet(),
                 time = System.currentTimeMillis(),
-                source = currentSourceLabel(),
+                source = request.networkLogSource() ?: currentSourceLabel(),
                 type = "OkHttp",
                 method = request.method,
                 url = request.url.toString(),
@@ -116,6 +116,16 @@ object NetworkLog {
                 append(it)
             }
         }.ifBlank { "全局" }
+    }
+
+    data class SourceLabel(val value: String)
+
+    fun sourceLabel(value: String?): SourceLabel? {
+        return value?.takeIf { it.isNotBlank() }?.let { SourceLabel(it) }
+    }
+
+    private fun Request.networkLogSource(): String? {
+        return tag(SourceLabel::class.java)?.value?.takeIf { it.isNotBlank() }
     }
 
     private fun Headers.format(): String = buildString {
