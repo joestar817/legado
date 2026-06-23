@@ -96,12 +96,7 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
                 it.setOnPreferenceChangeListener { _, newValue ->
                     view?.post {
                         val themeMode = newValue as? String
-                        when (themeMode) {
-                            "4" -> applyBuiltInTheme("暖色渐变")
-                            "5" -> applyBuiltInTheme("竹影之韵")
-                            "6" -> applyBuiltInTheme("灰色雾霭")
-                            else -> applyStandardTheme()
-                        }
+                        ThemeConfig.applyThemeMode(requireContext(), themeMode ?: "4")
                     }
                     true
                 }
@@ -120,27 +115,6 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
                     applyMyMenuLayout(preference)
                 }
             }
-        }
-
-        private fun applyStandardTheme() {
-            requireContext().putPrefInt(
-                PreferKey.cPrimary,
-                requireContext().getCompatColor(R.color.md_brown_500)
-            )
-            requireContext().putPrefBoolean(PreferKey.tNavBar, false)
-            requireContext().putPrefBoolean(PreferKey.tNavBarN, false)
-            requireContext().removePref(PreferKey.bgImage)
-            requireContext().removePref(PreferKey.bgImageN)
-            requireContext().putPrefInt(PreferKey.bgImageBlurring, 0)
-            requireContext().putPrefInt(PreferKey.bgImageNBlurring, 0)
-            ThemeConfig.applyDayNight(requireContext())
-        }
-
-        private fun applyBuiltInTheme(themeName: String) {
-            ThemeConfig.configList
-                .firstOrNull { it.themeName == themeName }
-                ?.let { ThemeConfig.applyConfig(requireContext(), it) }
-                ?: ThemeConfig.applyDayNight(requireContext())
         }
 
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {

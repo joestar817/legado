@@ -48,10 +48,16 @@ import java.io.FileOutputStream
 object ThemeConfig {
     const val configFileName = "themeConfig.json"
     private const val ASSET_BACKGROUND_PREFIX = "asset://"
+    private const val THEME_MODE_FOLLOW_SYSTEM = "0"
+    private const val THEME_MODE_NATIVE = "1"
+    private const val THEME_MODE_DARK = "2"
+    private const val THEME_MODE_EINK = "3"
+    private const val THEME_MODE_WARM = "4"
+    private const val THEME_MODE_GRAY = "6"
     private val readingNgBuiltInThemeNames = mapOf(
-        "4" to "暖色渐变",
+        THEME_MODE_WARM to "暖色渐变",
         "5" to "竹影之韵",
-        "6" to "灰色雾霭"
+        THEME_MODE_GRAY to "灰色雾霭"
     )
     val configFilePath = FileUtils.getPath(appCtx.filesDir, configFileName)
 
@@ -73,47 +79,122 @@ object ThemeConfig {
     }
 
     fun isReadingNgBackgroundTheme(themeMode: String = AppConfig.themeMode): Boolean {
-        return readingNgBuiltInThemeNames.containsKey(themeMode)
+        return themeMode == THEME_MODE_FOLLOW_SYSTEM || readingNgBuiltInThemeNames.containsKey(themeMode)
     }
 
     fun getReadingNgImageSurfaceColor(): Int {
-        return when (AppConfig.themeMode) {
-            "4" -> "#FFF1E8".toColorInt()
+        return when (getActiveReadingNgThemeMode()) {
+            THEME_MODE_WARM -> "#FFF1E8".toColorInt()
             "5" -> "#EFF7EA".toColorInt()
-            "6" -> "#ECF1F5".toColorInt()
+            THEME_MODE_GRAY -> "#ECF1F5".toColorInt()
             else -> "#EEEEEE".toColorInt()
         }
     }
 
-    private fun getReadingNgBuiltInTheme(): Config? {
-        val themeName = readingNgBuiltInThemeNames[AppConfig.themeMode] ?: return null
+    private fun getActiveReadingNgThemeMode(): String {
+        return if (AppConfig.themeMode == THEME_MODE_FOLLOW_SYSTEM) {
+            if (AppConfig.isSystemNightTheme) THEME_MODE_GRAY else THEME_MODE_WARM
+        } else {
+            AppConfig.themeMode
+        }
+    }
+
+    private fun getReadingNgBuiltInTheme(themeMode: String): Config? {
+        val themeName = readingNgBuiltInThemeNames[themeMode] ?: return null
         return configList.firstOrNull { it.themeName == themeName && !it.isNightTheme }
     }
 
-    private fun ensureReadingNgBuiltInTheme(context: Context) {
-        val config = getReadingNgBuiltInTheme() ?: return
+    private fun ensureThemeModePrefs(context: Context) {
+        when (AppConfig.themeMode) {
+            THEME_MODE_FOLLOW_SYSTEM -> ensureFollowSystemTheme(context)
+            THEME_MODE_NATIVE,
+            THEME_MODE_DARK -> ensureNativeTheme(context)
+            THEME_MODE_EINK -> Unit
+            else -> ensureReadingNgBuiltInTheme(context, AppConfig.themeMode, false)
+        }
+    }
+
+    private fun ensureFollowSystemTheme(context: Context) {
+        ensureReadingNgBuiltInTheme(context, getActiveReadingNgThemeMode(), false)
+    }
+
+    private fun ensureReadingNgBuiltInTheme(
+        context: Context,
+        themeMode: String,
+        targetNightTheme: Boolean
+    ) {
+        val config = getReadingNgBuiltInTheme(themeMode) ?: return
         val backgroundPath = config.backgroundImgPath
+        val backgroundKey = if (targetNightTheme) PreferKey.bgImageN else PreferKey.bgImage
+        val themeNameKey = if (targetNightTheme) PreferKey.dNThemeName else PreferKey.dThemeName
+        val blurringKey =
+            if (targetNightTheme) PreferKey.bgImageNBlurring else PreferKey.bgImageBlurring
+        val transparentNavBarKey =
+            if (targetNightTheme) PreferKey.tNavBarN else PreferKey.tNavBar
         val savedBackgroundPath = when {
             backgroundPath?.startsWith(ASSET_BACKGROUND_PREFIX) == true -> {
-                copyAssetBackgroundIfNeed(context, PreferKey.bgImage, backgroundPath)
+                copyAssetBackgroundIfNeed(context, backgroundKey, backgroundPath)
             }
 
             else -> backgroundPath
         }
-        val needsApply = context.getPrefString(PreferKey.dThemeName) != config.themeName ||
-                context.getPrefString(PreferKey.bgImage).isNullOrBlank() ||
-                context.getPrefBoolean(PreferKey.tNavBar, false) != config.transparentNavBar
+        val needsApply = context.getPrefString(themeNameKey) != config.themeName ||
+                context.getPrefString(backgroundKey).isNullOrBlank() ||
+                context.getPrefBoolean(transparentNavBarKey, false) != config.transparentNavBar
         if (!needsApply) {
             return
         }
-        context.putPrefString(PreferKey.dThemeName, config.themeName)
-        context.putPrefInt(PreferKey.cPrimary, config.primaryColor.toColorInt())
-        context.putPrefInt(PreferKey.cAccent, config.accentColor.toColorInt())
-        context.putPrefInt(PreferKey.cBackground, config.backgroundColor.toColorInt())
-        context.putPrefInt(PreferKey.cBBackground, config.bottomBackground.toColorInt())
-        context.putPrefBoolean(PreferKey.tNavBar, config.transparentNavBar)
-        context.putPrefString(PreferKey.bgImage, savedBackgroundPath)
-        context.putPrefInt(PreferKey.bgImageBlurring, config.backgroundImgBlur)
+        if (targetNightTheme) {
+            context.putPrefString(PreferKey.dNThemeName, config.themeName)
+            context.putPrefInt(PreferKey.cNPrimary, config.primaryColor.toColorInt())
+            context.putPrefInt(PreferKey.cNAccent, config.accentColor.toColorInt())
+            context.putPrefInt(PreferKey.cNBackground, config.backgroundColor.toColorInt())
+            context.putPrefInt(PreferKey.cNBBackground, config.bottomBackground.toColorInt())
+            context.putPrefBoolean(PreferKey.tNavBarN, config.transparentNavBar)
+            context.putPrefString(PreferKey.bgImageN, savedBackgroundPath)
+            context.putPrefInt(PreferKey.bgImageNBlurring, config.backgroundImgBlur)
+        } else {
+            context.putPrefString(PreferKey.dThemeName, config.themeName)
+            context.putPrefInt(PreferKey.cPrimary, config.primaryColor.toColorInt())
+            context.putPrefInt(PreferKey.cAccent, config.accentColor.toColorInt())
+            context.putPrefInt(PreferKey.cBackground, config.backgroundColor.toColorInt())
+            context.putPrefInt(PreferKey.cBBackground, config.bottomBackground.toColorInt())
+            context.putPrefBoolean(PreferKey.tNavBar, config.transparentNavBar)
+            context.putPrefString(PreferKey.bgImage, savedBackgroundPath)
+            context.putPrefInt(PreferKey.bgImageBlurring, config.backgroundImgBlur)
+        }
+    }
+
+    private fun ensureNativeTheme(context: Context) = with(context) {
+        putPrefString(PreferKey.dThemeName, "原生主题")
+        putPrefInt(PreferKey.cPrimary, getCompatColor(R.color.md_brown_500))
+        putPrefInt(PreferKey.cAccent, getCompatColor(R.color.md_red_600))
+        putPrefInt(PreferKey.cBackground, getCompatColor(R.color.md_grey_100))
+        putPrefInt(PreferKey.cBBackground, getCompatColor(R.color.md_grey_200))
+        putPrefBoolean(PreferKey.tNavBar, false)
+        putPrefString(PreferKey.bgImage, null)
+        putPrefInt(PreferKey.bgImageBlurring, 0)
+        putPrefString(PreferKey.dNThemeName, "暗色主题")
+        putPrefInt(PreferKey.cNPrimary, getCompatColor(R.color.md_blue_grey_600))
+        putPrefInt(PreferKey.cNAccent, getCompatColor(R.color.md_deep_orange_800))
+        putPrefInt(PreferKey.cNBackground, getCompatColor(R.color.md_grey_900))
+        putPrefInt(PreferKey.cNBBackground, getCompatColor(R.color.md_grey_850))
+        putPrefBoolean(PreferKey.tNavBarN, false)
+        putPrefString(PreferKey.bgImageN, null)
+        putPrefInt(PreferKey.bgImageNBlurring, 0)
+    }
+
+    fun applyThemeMode(context: Context, themeMode: String) {
+        AppConfig.themeMode = themeMode
+        AppConfig.isEInkMode = themeMode == THEME_MODE_EINK
+        when (themeMode) {
+            THEME_MODE_FOLLOW_SYSTEM -> ensureFollowSystemTheme(context)
+            THEME_MODE_NATIVE,
+            THEME_MODE_DARK -> ensureNativeTheme(context)
+            THEME_MODE_EINK -> Unit
+            else -> ensureReadingNgBuiltInTheme(context, themeMode, false)
+        }
+        applyDayNight(context)
     }
 
     fun isDarkTheme(): Boolean {
@@ -247,7 +328,7 @@ object ThemeConfig {
         val bgImgBlu = when (themeMode) {
             Theme.Light -> context.getPrefInt(PreferKey.bgImageBlurring, 0)
             Theme.Dark -> context.getPrefInt(PreferKey.bgImageNBlurring, 0)
-            else -> 0
+            Theme.EInk -> 0
         }
         val bgImage = BitmapUtils
             .decodeBitmap(path, metrics.widthPixels, metrics.heightPixels)
@@ -516,7 +597,7 @@ object ThemeConfig {
      * 更新主题
      */
     fun applyTheme(context: Context) = with(context) {
-        ensureReadingNgBuiltInTheme(this)
+        ensureThemeModePrefs(this)
         when {
             AppConfig.isEInkMode -> {
                 ThemeStore.editTheme(this)
@@ -554,14 +635,7 @@ object ThemeConfig {
 
             else -> {
                 val defaultPrimary = getCompatColor(R.color.md_brown_500)
-                val primary = getPrefInt(PreferKey.cPrimary, defaultPrimary).let { savedPrimary ->
-                    if (AppConfig.themeMode == "0" && savedPrimary == Color.WHITE) {
-                        putPrefInt(PreferKey.cPrimary, defaultPrimary)
-                        defaultPrimary
-                    } else {
-                        savedPrimary
-                    }
-                }
+                val primary = getPrefInt(PreferKey.cPrimary, defaultPrimary)
                 val accent =
                     getPrefInt(PreferKey.cAccent, getCompatColor(R.color.md_red_600))
                 var background =

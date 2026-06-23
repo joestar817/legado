@@ -104,6 +104,7 @@ object PreferKey {
     const val shareLayout = "shareLayout"
     const val comicStyleSelect = "comicStyleSelect"
     const val readStyleSelect = "readStyleSelect"
+    const val readNightTheme = "readNightTheme"
     const val systemTypefaces = "system_typefaces"
     const val readBodyToLh = "readBodyToLh"
     const val textFullJustify = "textFullJustify"

@@ -200,7 +200,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun initView(reset: Boolean = false) = binding.run {
-        if (AppConfig.isNightTheme) {
+        if (ReadBookConfig.isNightTheme) {
             fabNightTheme.setImageResource(R.drawable.ic_daytime)
         } else {
             fabNightTheme.setImageResource(R.drawable.ic_brightness)
@@ -659,8 +659,8 @@ class ReadMenu @JvmOverloads constructor(
 
         //夜间模式
         fabNightTheme.setOnClickListener {
-            AppConfig.isNightTheme = !AppConfig.isNightTheme
-            ThemeConfig.applyDayNight(context)
+            ReadBookConfig.isNightTheme = !ReadBookConfig.isNightTheme
+            callBack.onReadThemeChanged()
         }
 
         //AI功能
@@ -807,6 +807,7 @@ class ReadMenu @JvmOverloads constructor(
         fun showMoreSetting()
         fun showReadAloudDialog()
         fun upSystemUiVisibility()
+        fun onReadThemeChanged()
         fun onClickReadAloud()
         fun showHelp()
         fun showLogin()

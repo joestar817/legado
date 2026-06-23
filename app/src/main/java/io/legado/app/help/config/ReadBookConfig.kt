@@ -232,6 +232,13 @@ object ReadBookConfig {
                 appCtx.putPrefBoolean(PreferKey.shareLayout, value)
             }
         }
+    var isNightTheme = appCtx.getPrefBoolean(PreferKey.readNightTheme, false)
+        set(value) {
+            field = value
+            if (appCtx.getPrefBoolean(PreferKey.readNightTheme, false) != value) {
+                appCtx.putPrefBoolean(PreferKey.readNightTheme, value)
+            }
+        }
 
     /**
      * 两端对齐
@@ -639,7 +646,7 @@ object ReadBookConfig {
                     textColorIntEInk = color
                 }
 
-                AppConfig.isNightTheme -> {
+                ReadBookConfig.isNightTheme -> {
                     textColorNight = "#${color.hexString}"
                     textColorIntNight = color
                 }
@@ -657,7 +664,7 @@ object ReadBookConfig {
             }
             return when {
                 AppConfig.isEInkMode -> textColorIntEInk
-                AppConfig.isNightTheme -> textColorIntNight
+                ReadBookConfig.isNightTheme -> textColorIntNight
                 else -> textColorInt
             }
         }
@@ -669,7 +676,7 @@ object ReadBookConfig {
                     textAccentColorIntEInk = color
                 }
 
-                AppConfig.isNightTheme -> {
+                ReadBookConfig.isNightTheme -> {
                     textAccentColorNight = "#${color.hexString}"
                     textAccentColorIntNight = color
                 }
@@ -687,7 +694,7 @@ object ReadBookConfig {
             }
             return when {
                 AppConfig.isEInkMode -> textAccentColorIntEInk
-                AppConfig.isNightTheme -> textAccentColorIntNight
+                ReadBookConfig.isNightTheme -> textAccentColorIntNight
                 else -> textAccentColorInt
             }
         }
@@ -695,7 +702,7 @@ object ReadBookConfig {
         fun setCurStatusIconDark(isDark: Boolean) {
             when {
                 AppConfig.isEInkMode -> darkStatusIconEInk = isDark
-                AppConfig.isNightTheme -> darkStatusIconNight = isDark
+                ReadBookConfig.isNightTheme -> darkStatusIconNight = isDark
                 else -> darkStatusIcon = isDark
             }
         }
@@ -703,7 +710,7 @@ object ReadBookConfig {
         fun curStatusIconDark(): Boolean {
             return when {
                 AppConfig.isEInkMode -> darkStatusIconEInk
-                AppConfig.isNightTheme -> darkStatusIconNight
+                ReadBookConfig.isNightTheme -> darkStatusIconNight
                 else -> darkStatusIcon
             }
         }
@@ -729,7 +736,7 @@ object ReadBookConfig {
                     bgStrEInk = bg
                 }
 
-                AppConfig.isNightTheme -> {
+                ReadBookConfig.isNightTheme -> {
                     bgTypeNight = bgType
                     bgStrNight = bg
                 }
@@ -744,7 +751,7 @@ object ReadBookConfig {
         fun curBgStr(): String {
             return when {
                 AppConfig.isEInkMode -> bgStrEInk
-                AppConfig.isNightTheme -> bgStrNight
+                ReadBookConfig.isNightTheme -> bgStrNight
                 else -> bgStr
             }
         }
@@ -752,7 +759,7 @@ object ReadBookConfig {
         fun curBgType(): Int {
             return when {
                 AppConfig.isEInkMode -> bgTypeEInk
-                AppConfig.isNightTheme -> bgTypeNight
+                ReadBookConfig.isNightTheme -> bgTypeNight
                 else -> bgType
             }
         }

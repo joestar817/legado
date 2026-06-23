@@ -2359,6 +2359,15 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
+    override fun onReadThemeChanged() {
+        binding.readView.upBg()
+        binding.readView.upStyle()
+        binding.readView.upContent(0, false)
+        binding.readMenu.reset()
+        binding.readMenu.upBrightnessState()
+        upSystemUiVisibility()
+    }
+
     override fun loadChapterList(book: Book) {
         ReadBook.upMsg(getString(R.string.toc_updateing))
         viewModel.loadChapterList(book)

@@ -34,15 +34,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var editTheme = appCtx.getPrefInt(PreferKey.editTheme, 0)
     var editThemeDark = appCtx.getPrefInt(PreferKey.editThemeDark, 0)
     var editTemeAuto = appCtx.getPrefBoolean(PreferKey.editTemeAuto)
-    private fun getThemeModePref(): String {
-        val mode = appCtx.getPrefString(PreferKey.themeMode, "4") ?: "4"
-        return if (mode == "1") {
-            appCtx.putPrefString(PreferKey.themeMode, "4")
-            "4"
-        } else {
-            mode
-        }
-    }
+    private fun getThemeModePref(): String = appCtx.getPrefString(PreferKey.themeMode, "4") ?: "4"
 
     var isEInkMode = getThemeModePref() == "3"
     var clickActionTL = appCtx.getPrefInt(PreferKey.clickActionTL, 2)
@@ -175,6 +167,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var isNightTheme: Boolean
         get() = when (themeMode) {
             "2" -> true
+            "0" -> false
+            "1" -> false
             "3" -> false
             "4" -> false
             "5" -> false
@@ -186,10 +180,13 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
                 if (value) {
                     appCtx.putPrefString(PreferKey.themeMode, "2")
                 } else {
-                    appCtx.putPrefString(PreferKey.themeMode, "4")
+                    appCtx.putPrefString(PreferKey.themeMode, "1")
                 }
             }
         }
+    val isSystemNightTheme: Boolean
+        get() = sysConfiguration.isNightMode
+
     var showBookname: Int
         get() = appCtx.getPrefInt(PreferKey.showBooknameLayout, 0)
         set(value) {
@@ -220,13 +217,13 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     var readBrightness: Int
-        get() = if (isNightTheme) {
+        get() = if (ReadBookConfig.isNightTheme) {
             appCtx.getPrefInt(PreferKey.nightBrightness, 100)
         } else {
             appCtx.getPrefInt(PreferKey.brightness, 100)
         }
         set(value) {
-            if (isNightTheme) {
+            if (ReadBookConfig.isNightTheme) {
                 appCtx.putPrefInt(PreferKey.nightBrightness, value)
             } else {
                 appCtx.putPrefInt(PreferKey.brightness, value)
