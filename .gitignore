@@ -12,6 +12,8 @@ node_modules/
 /app/app
 /app/google
 /app/gradle.properties
+/app/signing.properties
+/app/legado.jks
 package-lock.json
 .idea/
 # Kotlin 2.0
@@ -24,3 +26,5 @@ package-lock.json
 AGENTS.md
 /data/
 /app/src/test/resources/ai-purify-fixtures/
+.codex-remote-attachments
+.codex
