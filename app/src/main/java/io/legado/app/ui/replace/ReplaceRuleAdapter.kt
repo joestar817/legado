@@ -185,15 +185,7 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
                 }
             }
             cbSection.setOnClickListener {
-                (getItem(holder.layoutPosition) as? ReplaceRuleListItem.Section)?.let {
-                    if (cbSection.isChecked) {
-                        selected.addAll(it.rules)
-                    } else {
-                        selected.removeAll(it.rules.toSet())
-                    }
-                    notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
-                    callBack.upCountView()
-                }
+                toggleSectionSelection(holder.layoutPosition)
             }
             ivSectionMore.setOnClickListener {
                 (getItem(holder.layoutPosition) as? ReplaceRuleListItem.Section)?.let {
@@ -297,26 +289,41 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
     val dragSelectCallback: DragSelectTouchHelper.Callback =
         object : DragSelectTouchHelper.AdvanceCallback<ReplaceRule>(Mode.ToggleAndReverse) {
             override fun currentSelectedId(): MutableSet<ReplaceRule> {
-                return selected
+                return selected.toMutableSet().apply {
+                    getItems().forEachIndexed { index, item ->
+                        val section = item as? ReplaceRuleListItem.Section ?: return@forEachIndexed
+                        if (section.rules.isNotEmpty() && section.rules.all { selected.contains(it) }) {
+                            add(sectionItemId(index))
+                        }
+                    }
+                }
             }
 
             override fun getItemId(position: Int): ReplaceRule {
                 return (getItem(position) as? ReplaceRuleListItem.Rule)?.rule
-                    ?: ReplaceRule(id = Long.MIN_VALUE + position)
+                    ?: sectionItemId(position)
             }
 
             override fun updateSelectState(position: Int, isSelected: Boolean): Boolean {
-                (getItem(position) as? ReplaceRuleListItem.Rule)?.let {
-                    if (isSelected) {
-                        selected.add(it.rule)
-                    } else {
-                        selected.remove(it.rule)
+                when (val item = getItem(position)) {
+                    is ReplaceRuleListItem.Rule -> {
+                        if (isSelected) {
+                            selected.add(item.rule)
+                        } else {
+                            selected.remove(item.rule)
+                        }
+                        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+                        callBack.upCountView()
+                        return true
                     }
-                    notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
-                    callBack.upCountView()
-                    return true
+
+                    is ReplaceRuleListItem.Section -> {
+                        selectSection(position, isSelected)
+                        return true
+                    }
+
+                    else -> return false
                 }
-                return false
             }
         }
 
@@ -341,6 +348,31 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
                 }
             }
             .distinctBy { it.id }
+    }
+
+    private fun toggleSectionSelection(position: Int) {
+        val section = getItem(position) as? ReplaceRuleListItem.Section ?: return
+        val isAllSelected = section.rules.isNotEmpty() && section.rules.all { selected.contains(it) }
+        selectSection(position, !isAllSelected)
+    }
+
+    private fun selectSection(position: Int, isSelected: Boolean) {
+        val section = getItem(position) as? ReplaceRuleListItem.Section ?: return
+        if (isSelected) {
+            selected.addAll(section.rules)
+        } else {
+            selected.removeAll(section.rules.toSet())
+        }
+        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+        callBack.upCountView()
+    }
+
+    private fun sectionItemId(position: Int): ReplaceRule {
+        val section = getItem(position) as? ReplaceRuleListItem.Section
+        return ReplaceRule(
+            id = Long.MIN_VALUE + position,
+            name = "__section_${section?.key ?: position}"
+        )
     }
 
     private fun dp(value: Int): Int {
