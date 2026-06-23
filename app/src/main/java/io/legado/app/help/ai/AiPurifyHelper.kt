@@ -1,5 +1,6 @@
 package io.legado.app.help.ai
 
+import com.google.gson.annotations.SerializedName
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.delay
 
@@ -182,8 +183,11 @@ object AiPurifyHelper {
         val output = normalizeModelOutput(text)
         val candidate = output.extractJsonObjectCandidate()
         check(candidate.isNotBlank()) { "AI 未返回 JSON 对象" }
+        val closedCandidate = candidate.closeJsonStructures()
         return parseRuleOutputJson(candidate)
-            ?: parseRuleOutputJson(candidate.closeJsonStructures())
+            ?: parseRuleOutputJson(closedCandidate)
+            ?: parseRuleOutputJson(candidate.repairJsonForModelOutput())
+            ?: parseRuleOutputJson(closedCandidate.repairJsonForModelOutput())
             ?: error("AI 返回 JSON 解析失败")
     }
 
@@ -249,6 +253,81 @@ object AiPurifyHelper {
             return this
         }
         return this + stack.asReversed().joinToString("")
+    }
+
+    private fun String.repairJsonForModelOutput(): String {
+        return escapeRawControlCharsInJsonStrings()
+            .removeTrailingCommasInJson()
+            .closeJsonStructures()
+    }
+
+    private fun String.escapeRawControlCharsInJsonStrings(): String {
+        val builder = StringBuilder(length)
+        var inString = false
+        var escaped = false
+        forEach { char ->
+            if (escaped) {
+                builder.append(char)
+                escaped = false
+                return@forEach
+            }
+            when {
+                char == '\\' && inString -> {
+                    builder.append(char)
+                    escaped = true
+                }
+
+                char == '"' -> {
+                    builder.append(char)
+                    inString = !inString
+                }
+
+                inString && char == '\n' -> builder.append("\\n")
+                inString && char == '\r' -> builder.append("\\r")
+                inString && char == '\t' -> builder.append("\\t")
+                inString && char.code < 0x20 -> {
+                    builder.append("\\u")
+                    builder.append(char.code.toString(16).padStart(4, '0'))
+                }
+
+                else -> builder.append(char)
+            }
+        }
+        return builder.toString()
+    }
+
+    private fun String.removeTrailingCommasInJson(): String {
+        val builder = StringBuilder(length)
+        var inString = false
+        var escaped = false
+        forEachIndexed { index, char ->
+            if (escaped) {
+                builder.append(char)
+                escaped = false
+                return@forEachIndexed
+            }
+            when {
+                char == '\\' && inString -> {
+                    builder.append(char)
+                    escaped = true
+                }
+
+                char == '"' -> {
+                    builder.append(char)
+                    inString = !inString
+                }
+
+                !inString && char == ',' -> {
+                    val next = substring(index + 1).firstOrNull { !it.isWhitespace() }
+                    if (next != '}' && next != ']') {
+                        builder.append(char)
+                    }
+                }
+
+                else -> builder.append(char)
+            }
+        }
+        return builder.toString()
     }
 
     private fun AiPurifyRuleCandidate.validated(
@@ -508,11 +587,14 @@ object AiPurifyHelper {
     )
 
     private data class BatchInput(
+        @SerializedName("id")
         val id: Int,
+        @SerializedName("input")
         val input: String
     )
 
     private data class RuleOutput(
+        @SerializedName("rules")
         val rules: List<AiPurifyRuleCandidate> = emptyList()
     )
 }
@@ -539,8 +621,12 @@ data class AiPurifyRuleGenerateResult(
 )
 
 data class AiPurifyRuleCandidate(
+    @SerializedName("id")
     val id: Int,
+    @SerializedName("type")
     val type: String,
+    @SerializedName("old")
     val old: String,
+    @SerializedName("new")
     val new: String
 )

@@ -1213,10 +1213,6 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun showAiPurifyChapterRangeDialog() {
-        if (ReadBook.curTextChapter?.isCompleted != true) {
-            toastOnUi("章节还在加载，稍后再试")
-            return
-        }
         if (ReadBook.chapterSize <= 0) {
             toastOnUi("当前书籍没有可采样章节")
             return
