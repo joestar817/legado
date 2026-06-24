@@ -39,7 +39,7 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference
-            android:icon="@drawable/ic_cfg_web"
+            android:icon="@drawable/ic_ai_provider"
             android:key="aiConfig"
             android:summary="@string/ai_setting_summary"
             android:title="@string/ai_setting"
