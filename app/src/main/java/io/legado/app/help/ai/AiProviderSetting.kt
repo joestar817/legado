@@ -1,28 +1,50 @@
 package io.legado.app.help.ai
 
+import com.google.gson.annotations.SerializedName
+
 data class AiProviderSetting(
+    @SerializedName(value = "id", alternate = ["a"])
     val id: String,
+    @SerializedName(value = "type", alternate = ["b"])
     val type: AiProviderType,
+    @SerializedName(value = "enabled", alternate = ["c"])
     val enabled: Boolean = true,
+    @SerializedName(value = "builtIn", alternate = ["d"])
     val builtIn: Boolean = true,
+    @SerializedName(value = "name", alternate = ["e"])
     val name: String,
+    @SerializedName(value = "apiKey", alternate = ["f"])
     val apiKey: String = "",
+    @SerializedName(value = "baseUrl", alternate = ["g"])
     val baseUrl: String,
+    @SerializedName(value = "model", alternate = ["h"])
     val model: String = "",
+    @SerializedName(value = "models", alternate = ["i"])
     val models: List<AiModel> = emptyList(),
+    @SerializedName(value = "timeoutSeconds", alternate = ["j"])
     val timeoutSeconds: Int = 60,
+    @SerializedName(value = "chatCompletionsPath", alternate = ["k"])
     val chatCompletionsPath: String = "/chat/completions",
+    @SerializedName(value = "modelsUrl", alternate = ["l"])
     val modelsUrl: String = "",
+    @SerializedName(value = "supportsThinking", alternate = ["m"])
     val supportsThinking: Boolean = false,
+    @SerializedName(value = "supportsEffort", alternate = ["n"])
     val supportsEffort: Boolean = false,
+    @SerializedName(value = "thinkingParam", alternate = ["o"])
     val thinkingParam: String = "",
+    @SerializedName(value = "effortParam", alternate = ["p"])
     val effortParam: String = "",
+    @SerializedName(value = "reasoningOutputField", alternate = ["q"])
     val reasoningOutputField: String = ""
 )
 
 enum class AiProviderType(val prefValue: String, val displayName: String) {
+    @SerializedName(value = "OPENAI", alternate = ["X", "openai"])
     OPENAI("openai", "OpenAI compatible"),
+    @SerializedName(value = "GOOGLE", alternate = ["Y", "google"])
     GOOGLE("google", "Google Gemini"),
+    @SerializedName(value = "CLAUDE", alternate = ["Z", "claude"])
     CLAUDE("claude", "Anthropic compatible");
 
     companion object {

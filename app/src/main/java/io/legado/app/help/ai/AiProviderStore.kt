@@ -101,8 +101,8 @@ object AiProviderStore {
                 ?.mapNotNull { parseProvider(it) }
                 ?: emptyList()
         }.getOrDefault(emptyList())
+            .mapNotNull { sanitize(it) }
             .filter { it.id.isNotBlank() && it.baseUrl.isNotBlank() }
-            .map { normalize(it) }
     }
 
     private fun parseProvider(element: JsonElement): AiProviderSetting? {
@@ -187,6 +187,31 @@ object AiProviderStore {
         )
     }
 
+    private fun sanitize(provider: AiProviderSetting): AiProviderSetting? {
+        return runCatching {
+            val id = nullableString(provider.id)
+            val type = nullableType(provider.type)
+            val name = nullableString(provider.name)
+            val baseUrl = nullableString(provider.baseUrl)
+            provider.copy(
+                id = id,
+                type = type,
+                name = name.ifBlank { id },
+                apiKey = nullableString(provider.apiKey),
+                baseUrl = baseUrl,
+                model = nullableString(provider.model),
+                models = normalizeModels(nullableModels(provider.models)),
+                timeoutSeconds = provider.timeoutSeconds.coerceIn(5, 600),
+                chatCompletionsPath = nullableString(provider.chatCompletionsPath)
+                    .ifBlank { "/chat/completions" },
+                modelsUrl = nullableString(provider.modelsUrl),
+                thinkingParam = nullableString(provider.thinkingParam),
+                effortParam = nullableString(provider.effortParam),
+                reasoningOutputField = nullableString(provider.reasoningOutputField)
+            )
+        }.getOrNull()
+    }
+
     private fun defaultCustomProvider(type: AiProviderType): AiProviderSetting {
         return when (type) {
             AiProviderType.CLAUDE -> AiProviderSetting(
@@ -221,6 +246,18 @@ object AiProviderStore {
             index++
         }
         return "${prefix}_$index"
+    }
+
+    private fun nullableString(value: String?): String {
+        return value.orEmpty()
+    }
+
+    private fun nullableType(value: AiProviderType?): AiProviderType {
+        return value ?: AiProviderType.OPENAI
+    }
+
+    private fun nullableModels(value: List<*>?): List<*> {
+        return value ?: emptyList<Any>()
     }
 
     private fun normalizeModels(models: List<*>): List<AiModel> {
