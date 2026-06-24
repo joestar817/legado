@@ -7,9 +7,20 @@ import okhttp3.Request
 class ClaudeAiProvider : AiProvider {
 
     override suspend fun listModels(setting: AiProviderSetting): List<AiModel> {
+        val explicitModelsUrl = setting.modelsUrl.trim()
+        val modelsUrl = explicitModelsUrl.ifBlank {
+            "${setting.baseUrl.trimEndSlash()}/models"
+        }
         val request = Request.Builder()
-            .url("${setting.baseUrl.trimEndSlash()}/models")
-            .addHeader("x-api-key", setting.apiKey)
+            .url(modelsUrl)
+            .apply {
+                if (setting.apiKey.isNotBlank()) {
+                    addHeader("x-api-key", setting.apiKey)
+                    if (explicitModelsUrl.isNotBlank()) {
+                        addHeader("Authorization", "Bearer ${setting.apiKey}")
+                    }
+                }
+            }
             .addHeader("anthropic-version", "2023-06-01")
             .get()
             .build()
@@ -17,7 +28,11 @@ class ClaudeAiProvider : AiProvider {
         return json.arrayOrNull("data")?.mapNotNull { item ->
             val obj = item.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
             val id = obj.stringOrNull("id") ?: return@mapNotNull null
-            AiModel(id = id, name = obj.stringOrNull("display_name") ?: id, ownedBy = "Anthropic")
+            AiModel(
+                id = id,
+                name = obj.stringOrNull("display_name") ?: obj.stringOrNull("name") ?: id,
+                ownedBy = obj.stringOrNull("owned_by").orEmpty().ifBlank { "Anthropic" }
+            )
         } ?: emptyList()
     }
 

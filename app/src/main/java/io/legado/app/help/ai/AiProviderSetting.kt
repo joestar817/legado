@@ -23,7 +23,7 @@ data class AiProviderSetting(
 enum class AiProviderType(val prefValue: String, val displayName: String) {
     OPENAI("openai", "OpenAI compatible"),
     GOOGLE("google", "Google Gemini"),
-    CLAUDE("claude", "Claude");
+    CLAUDE("claude", "Anthropic compatible");
 
     companion object {
         fun from(value: String?): AiProviderType {

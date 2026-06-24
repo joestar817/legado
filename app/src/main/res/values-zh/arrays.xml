@@ -32,7 +32,7 @@
     <string-array name="ai_provider_type">
         <item>OpenAI 兼容</item>
         <item>Google Gemini</item>
-        <item>Claude</item>
+        <item>Anthropic 兼容</item>
     </string-array>
 
     <string-array name="ai_provider_type_values">

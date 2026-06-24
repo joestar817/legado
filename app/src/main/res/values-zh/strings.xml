@@ -107,6 +107,11 @@
     <string name="ai_provider_menu">提供商</string>
     <string name="ai_provider_menu_summary">%1$s 个提供商，当前：%2$s</string>
     <string name="ai_provider_drag_sort">按住拖动排序提供商</string>
+    <string name="ai_add_provider">添加提供商</string>
+    <string name="ai_add_provider_openai">OpenAI 兼容</string>
+    <string name="ai_add_provider_anthropic">Anthropic 兼容</string>
+    <string name="ai_delete_provider">删除提供商</string>
+    <string name="ai_provider_deleted">已删除提供商</string>
     <string name="ai_settings_section_features">AI 功能</string>
     <string name="ai_prompt_menu">技能</string>
     <string name="ai_prompt_menu_summary">内置 %s 个技能</string>

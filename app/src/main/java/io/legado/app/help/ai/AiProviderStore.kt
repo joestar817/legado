@@ -36,7 +36,36 @@ object AiProviderStore {
     }
 
     fun saveProvider(provider: AiProviderSetting) {
-        saveProviders(providers().map { if (it.id == provider.id) provider else it })
+        val providers = providers()
+        if (providers.any { it.id == provider.id }) {
+            saveProviders(providers.map { if (it.id == provider.id) provider else it })
+        } else {
+            saveProviders(providers + provider)
+        }
+    }
+
+    fun createCustomProvider(type: AiProviderType): AiProviderSetting {
+        val provider = defaultCustomProvider(type).copy(id = nextCustomProviderId(type))
+        saveProvider(provider)
+        return provider
+    }
+
+    fun deleteCustomProvider(id: String): Boolean {
+        val providers = providers()
+        val provider = providers.firstOrNull { it.id == id } ?: return false
+        if (provider.builtIn) {
+            return false
+        }
+        val wasActive = appCtx.getPrefString(PreferKey.aiActiveProviderId) == id
+        val remaining = providers.filterNot { it.id == id }
+        saveProviders(remaining)
+        if (wasActive) {
+            val nextActive = remaining.firstOrNull { it.enabled } ?: remaining.firstOrNull()
+            if (nextActive != null) {
+                setActiveProvider(nextActive.id)
+            }
+        }
+        return true
     }
 
     fun saveProviders(providers: List<AiProviderSetting>) {
@@ -156,6 +185,42 @@ object AiProviderStore {
             timeoutSeconds = provider.timeoutSeconds.coerceIn(5, 600),
             models = normalizeModels(provider.models)
         )
+    }
+
+    private fun defaultCustomProvider(type: AiProviderType): AiProviderSetting {
+        return when (type) {
+            AiProviderType.CLAUDE -> AiProviderSetting(
+                id = "",
+                type = AiProviderType.CLAUDE,
+                builtIn = false,
+                name = "Custom Anthropic",
+                baseUrl = "https://api.anthropic.com/v1",
+                enabled = true
+            )
+            AiProviderType.OPENAI,
+            AiProviderType.GOOGLE -> AiProviderSetting(
+                id = "",
+                type = AiProviderType.OPENAI,
+                builtIn = false,
+                name = "Custom OpenAI",
+                baseUrl = "https://api.openai.com/v1",
+                enabled = true
+            )
+        }
+    }
+
+    private fun nextCustomProviderId(type: AiProviderType): String {
+        val prefix = when (type) {
+            AiProviderType.CLAUDE -> "custom_anthropic"
+            AiProviderType.GOOGLE -> "custom_google"
+            AiProviderType.OPENAI -> "custom_openai"
+        }
+        val ids = providers().map { it.id }.toSet()
+        var index = 1
+        while ("${prefix}_$index" in ids) {
+            index++
+        }
+        return "${prefix}_$index"
     }
 
     private fun normalizeModels(models: List<*>): List<AiModel> {

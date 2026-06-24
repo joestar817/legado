@@ -63,11 +63,17 @@ class ItemTouchCallback(private val callback: Callback) : ItemTouchHelper.Callba
 
             // 为了方便理解，相当于分为横着的ListView和竖着的ListView
             if (orientation == LinearLayoutManager.HORIZONTAL) {// 如果是横向的布局
-                swipeFlag = ItemTouchHelper.UP or ItemTouchHelper.DOWN
+                swipeFlag = callback.getSwipeFlags(
+                    viewHolder.bindingAdapterPosition,
+                    ItemTouchHelper.UP or ItemTouchHelper.DOWN
+                )
                 dragFlag = ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT
             } else if (orientation == LinearLayoutManager.VERTICAL) {// 如果是竖向的布局，相当于ListView
                 dragFlag = ItemTouchHelper.UP or ItemTouchHelper.DOWN
-                swipeFlag = ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT
+                swipeFlag = callback.getSwipeFlags(
+                    viewHolder.bindingAdapterPosition,
+                    ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT
+                )
             }
             return makeMovementFlags(dragFlag, swipeFlag)
         }
@@ -101,7 +107,7 @@ class ItemTouchCallback(private val callback: Callback) : ItemTouchHelper.Callba
     }
 
     override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-        callback.onSwiped(viewHolder.bindingAdapterPosition)
+        callback.onSwiped(viewHolder.bindingAdapterPosition, direction)
     }
 
     override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
@@ -124,6 +130,14 @@ class ItemTouchCallback(private val callback: Callback) : ItemTouchHelper.Callba
          */
         fun onSwiped(adapterPosition: Int) {
 
+        }
+
+        fun onSwiped(adapterPosition: Int, direction: Int) {
+            onSwiped(adapterPosition)
+        }
+
+        fun getSwipeFlags(adapterPosition: Int, defaultFlags: Int): Int {
+            return defaultFlags
         }
 
         /**

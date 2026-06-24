@@ -232,7 +232,9 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
     private fun initProviderList() {
         binding.recyclerProviders.layoutManager = LinearLayoutManager(requireContext())
         providerAdapter.bindToRecyclerView(binding.recyclerProviders)
-        providerItemTouchHelper = ItemTouchHelper(ItemTouchCallback(providerAdapter))
+        providerItemTouchHelper = ItemTouchHelper(ItemTouchCallback(providerAdapter).apply {
+            isCanSwipe = true
+        })
         providerItemTouchHelper.attachToRecyclerView(binding.recyclerProviders)
         providerAdapter.setOnItemClickListener { _, item ->
             showDetail(item.id)
@@ -241,6 +243,9 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
             AiProviderStore.setActiveProvider(item.id)
             refreshProviders()
             refreshMain()
+        }
+        binding.buttonAddProvider.setOnClickListener {
+            showAddProviderDialog()
         }
         bindSearchEditText(binding.editSearchProvider)
         binding.editSearchProvider.doOnTextChanged { text, _, _, _ ->
@@ -302,6 +307,9 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         }
         binding.buttonQueryBalance.setOnClickListener {
             queryBalance()
+        }
+        binding.buttonDeleteProvider.setOnClickListener {
+            confirmDeleteCurrentProvider()
         }
     }
 
@@ -547,6 +555,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
                 providerSearchQuery.isBlank()
                     || it.name.contains(providerSearchQuery, ignoreCase = true)
                     || it.type.displayName.contains(providerSearchQuery, ignoreCase = true)
+                    || it.type.localizedDisplayName().contains(providerSearchQuery, ignoreCase = true)
             }
         providerAdapter.activeProviderId = AiProviderStore.activeProviderId()
         providerAdapter.setItems(providers)
@@ -561,21 +570,46 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         try {
             binding.switchEnabled.isChecked = provider.enabled
             binding.editProviderName.setText(provider.name)
+            binding.textProviderTypeValue.text = provider.type.localizedDisplayName()
             binding.editBaseUrl.setText(provider.baseUrl)
             binding.editApiKey.setText(provider.apiKey)
             binding.editChatPath.setText(provider.chatCompletionsPath)
             binding.editModelsUrl.setText(provider.modelsUrl)
             binding.editTimeoutSeconds.setText(provider.timeoutSeconds.toString())
+            binding.buttonDeleteProvider.isVisible = !provider.builtIn
             val openAiCompatible = provider.type == AiProviderType.OPENAI
+            val hasModelUrl = provider.type != AiProviderType.GOOGLE
             binding.textOpenaiPathLabel.isVisible = openAiCompatible
             binding.editChatPath.isVisible = openAiCompatible
-            binding.textModelsUrlLabel.isVisible = openAiCompatible
-            binding.editModelsUrl.isVisible = openAiCompatible
+            binding.textModelsUrlLabel.isVisible = hasModelUrl
+            binding.editModelsUrl.isVisible = hasModelUrl
             refreshModelSpinner(provider)
             updateApiKeyVisibility()
         } finally {
             ignoreProviderFormChanges = false
         }
+    }
+
+    private fun showAddProviderDialog() {
+        val types = listOf(AiProviderType.OPENAI, AiProviderType.CLAUDE)
+        val labels = arrayOf(
+            getString(R.string.ai_add_provider_openai),
+            getString(R.string.ai_add_provider_anthropic)
+        )
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.ai_add_provider)
+            .setItems(labels) { _, which ->
+                val provider = AiProviderStore.createCustomProvider(types[which])
+                if (providerSearchQuery.isNotBlank()) {
+                    providerSearchQuery = ""
+                    binding.editSearchProvider.setText("")
+                }
+                refreshMain()
+                showDetail(provider.id)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+            .applyTint()
     }
 
     private fun refreshPrompts() {
@@ -1016,6 +1050,41 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
         }
     }
 
+    private fun confirmDeleteCurrentProvider() {
+        val provider = currentProviderId?.let { AiProviderStore.provider(it) } ?: return
+        confirmDeleteProvider(provider) {
+            showProviderList()
+        }
+    }
+
+    private fun confirmDeleteProvider(
+        provider: AiProviderSetting,
+        onCancel: () -> Unit = {},
+        onDeleted: () -> Unit = {}
+    ) {
+        if (provider.builtIn) {
+            onCancel()
+            return
+        }
+        alert(getString(R.string.ai_delete_provider)) {
+            setMessage(getString(R.string.sure_del_any, provider.name))
+            okButton {
+                if (AiProviderStore.deleteCustomProvider(provider.id)) {
+                    Toast.makeText(
+                        requireContext(),
+                        R.string.ai_provider_deleted,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    onDeleted()
+                    refreshMain()
+                }
+            }
+            cancelButton {
+                onCancel()
+            }
+        }
+    }
+
     private fun updateApiKeyVisibility() {
         val selection = binding.editApiKey.selectionStart.coerceAtLeast(0)
         binding.editApiKey.inputType = if (apiKeyVisible) {
@@ -1104,12 +1173,24 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
             "gemini" -> R.drawable.ic_provider_gemini
             "deepseek" -> R.drawable.ic_provider_deepseek
             "xiaomi_mimo" -> R.drawable.ic_provider_mimo
-            else -> R.drawable.ic_ai_provider
+            else -> when (type) {
+                AiProviderType.OPENAI -> R.drawable.ic_provider_openai
+                AiProviderType.CLAUDE -> R.drawable.ic_provider_claude
+                AiProviderType.GOOGLE -> R.drawable.ic_provider_gemini
+            }
         }
     }
 
     private fun AiProviderSetting.visibleModelCount(): Int {
         return if (apiKey.isBlank()) 0 else models.size
+    }
+
+    private fun AiProviderType.localizedDisplayName(): String {
+        return when (this) {
+            AiProviderType.OPENAI -> getString(R.string.ai_add_provider_openai)
+            AiProviderType.CLAUDE -> getString(R.string.ai_add_provider_anthropic)
+            AiProviderType.GOOGLE -> displayName
+        }
     }
 
     private fun AiPromptStore.Prompt.displayName(): String {
@@ -1199,6 +1280,24 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config) {
             swapItem(srcPosition, targetPosition)
             isMoved = true
             return true
+        }
+
+        override fun getSwipeFlags(adapterPosition: Int, defaultFlags: Int): Int {
+            val item = getItems().getOrNull(adapterPosition) ?: return 0
+            return if (!item.builtIn) ItemTouchHelper.RIGHT else 0
+        }
+
+        override fun onSwiped(adapterPosition: Int, direction: Int) {
+            val item = getItems().getOrNull(adapterPosition)
+            if (item == null || item.builtIn || direction != ItemTouchHelper.RIGHT) {
+                refreshProviders()
+                return
+            }
+            confirmDeleteProvider(
+                provider = item,
+                onCancel = { refreshProviders() },
+                onDeleted = { refreshProviders() }
+            )
         }
 
         override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {

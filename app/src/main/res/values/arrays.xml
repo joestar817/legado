@@ -75,7 +75,7 @@
     <string-array name="ai_provider_type">
         <item>OpenAI compatible</item>
         <item>Google Gemini</item>
-        <item>Claude</item>
+        <item>Anthropic compatible</item>
     </string-array>
 
     <string-array name="ai_provider_type_values">

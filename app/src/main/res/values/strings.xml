@@ -108,6 +108,11 @@
     <string name="ai_provider_menu">Providers</string>
     <string name="ai_provider_menu_summary">%1$s providers, active: %2$s</string>
     <string name="ai_provider_drag_sort">Hold and drag to sort providers</string>
+    <string name="ai_add_provider">Add provider</string>
+    <string name="ai_add_provider_openai">OpenAI compatible</string>
+    <string name="ai_add_provider_anthropic">Anthropic compatible</string>
+    <string name="ai_delete_provider">Delete provider</string>
+    <string name="ai_provider_deleted">Provider deleted</string>
     <string name="ai_settings_section_features">AI features</string>
     <string name="ai_prompt_menu">Skills</string>
     <string name="ai_prompt_menu_summary">%s built-in skills</string>
