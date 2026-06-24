@@ -34,7 +34,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var editTheme = appCtx.getPrefInt(PreferKey.editTheme, 0)
     var editThemeDark = appCtx.getPrefInt(PreferKey.editThemeDark, 0)
     var editTemeAuto = appCtx.getPrefBoolean(PreferKey.editTemeAuto)
-    var isEInkMode = appCtx.getPrefString(PreferKey.themeMode) == "3"
+    private fun getThemeModePref(): String = appCtx.getPrefString(PreferKey.themeMode, "4") ?: "4"
+
+    var isEInkMode = getThemeModePref() == "3"
     var clickActionTL = appCtx.getPrefInt(PreferKey.clickActionTL, 2)
     var clickActionTC = appCtx.getPrefInt(PreferKey.clickActionTC, 2)
     var clickActionTR = appCtx.getPrefInt(PreferKey.clickActionTR, 1)
@@ -44,11 +46,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var clickActionBL = appCtx.getPrefInt(PreferKey.clickActionBL, 2)
     var clickActionBC = appCtx.getPrefInt(PreferKey.clickActionBC, 1)
     var clickActionBR = appCtx.getPrefInt(PreferKey.clickActionBR, 1)
-    var themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
+    var themeMode = getThemeModePref()
     var useDefaultCover = appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
     var optimizeRender = CanvasRecorderFactory.isSupport
             && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
     var recordLog = appCtx.getPrefBoolean(PreferKey.recordLog)
+    var recordNetworkLog = appCtx.getPrefBoolean(PreferKey.recordNetworkLog)
     var editFontScale = appCtx.getPrefInt(PreferKey.editFontScale, 16)
     var editNonPrintable = appCtx.getPrefInt(PreferKey.editNonPrintable, 0)
     var editAutoWrap = appCtx.getPrefBoolean(PreferKey.editAutoWrap, true)
@@ -66,7 +69,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             PreferKey.adaptSpecialStyle -> adaptSpecialStyle = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
 
             PreferKey.themeMode -> {
-                themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
+                themeMode = getThemeModePref()
                 isEInkMode = themeMode == "3"
             }
 
@@ -126,6 +129,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
                     && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
 
             PreferKey.recordLog -> recordLog = appCtx.getPrefBoolean(PreferKey.recordLog)
+            PreferKey.recordNetworkLog -> recordNetworkLog =
+                appCtx.getPrefBoolean(PreferKey.recordNetworkLog)
 
         }
     }
@@ -161,9 +166,13 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     var isNightTheme: Boolean
         get() = when (themeMode) {
-            "1" -> false
             "2" -> true
+            "0" -> false
+            "1" -> false
             "3" -> false
+            "4" -> false
+            "5" -> false
+            "6" -> false
             else -> sysConfiguration.isNightMode
         }
         set(value) {
@@ -175,6 +184,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
                 }
             }
         }
+    val isSystemNightTheme: Boolean
+        get() = sysConfiguration.isNightMode
+
     var showBookname: Int
         get() = appCtx.getPrefInt(PreferKey.showBooknameLayout, 0)
         set(value) {
@@ -205,13 +217,13 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     var readBrightness: Int
-        get() = if (isNightTheme) {
+        get() = if (ReadBookConfig.isNightTheme) {
             appCtx.getPrefInt(PreferKey.nightBrightness, 100)
         } else {
             appCtx.getPrefInt(PreferKey.brightness, 100)
         }
         set(value) {
-            if (isNightTheme) {
+            if (ReadBookConfig.isNightTheme) {
                 appCtx.putPrefInt(PreferKey.nightBrightness, value)
             } else {
                 appCtx.putPrefInt(PreferKey.brightness, value)
@@ -450,6 +462,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefInt(PreferKey.webPort, 1122)
         set(value) {
             appCtx.putPrefInt(PreferKey.webPort, value)
+        }
+
+    var mcpPort: Int
+        get() = appCtx.getPrefInt(PreferKey.mcpPort, 1124)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.mcpPort, value)
         }
 
     var tocUiUseReplace: Boolean
@@ -823,4 +841,3 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val autoUpdateVariant get() = appCtx.getPrefBoolean("autoUpdateVariant", true)
 }
-

@@ -198,11 +198,6 @@
             android:title="@string/video_setting" />
 
         <io.legado.app.lib.prefs.Preference
-            android:key="webPort"
-            android:title="@string/web_port_title"
-            app:iconSpaceReserved="false" />
-
-        <io.legado.app.lib.prefs.Preference
             android:key="cleanCache"
             android:summary="@string/clear_cache_summary"
             android:title="@string/clear_cache"
@@ -237,6 +232,19 @@
             android:key="recordLog"
             android:summary="@string/record_debug_log"
             android:title="@string/record_log"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="recordNetworkLog"
+            android:summary="@string/record_network_log_summary"
+            android:title="@string/record_network_log"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="networkRequestLog"
+            android:summary="@string/network_request_log_summary"
+            android:title="@string/network_request_log"
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.SwitchPreference

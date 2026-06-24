@@ -3,8 +3,12 @@ package io.legado.app.ui.book.read
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.Looper
+import android.os.SystemClock
+import android.text.InputType
 import android.view.Gravity
 import android.view.InputDevice
 import android.view.KeyEvent
@@ -12,10 +16,17 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.CheckBox
+import android.widget.EditText
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.content.ContextCompat
 import androidx.core.view.get
 import androidx.core.view.size
 import androidx.lifecycle.lifecycleScope
@@ -33,10 +44,16 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.IntentData
 import io.legado.app.help.TTS
+import io.legado.app.help.ai.AiConfig
+import io.legado.app.help.ai.AiPurifyHelper
+import io.legado.app.help.ai.AiPurifyResult
+import io.legado.app.help.ai.AiPurifyRuleCandidate as AiPurifyGeneratedRule
+import io.legado.app.help.ai.AiPurifyRuleGenerateResult
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isAudio
@@ -70,6 +87,7 @@ import io.legado.app.receiver.NetworkChangedListener
 import io.legado.app.receiver.TimeBatteryReceiver
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.about.NetworkLogDialog
 import io.legado.app.ui.book.bookmark.BookmarkDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.changesource.ChangeChapterSourceDialog
@@ -104,6 +122,7 @@ import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.replace.edit.ReplaceEditActivity
 import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.dialog.PhotoDialog
+import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.ACache
 import io.legado.app.utils.Debounce
 import io.legado.app.utils.LogUtils
@@ -112,6 +131,7 @@ import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.buildMainHandler
 import io.legado.app.utils.dismissDialogFragment
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.hexString
@@ -135,15 +155,20 @@ import io.legado.app.utils.visible
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import com.script.rhino.runScriptWithContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.ui.login.SourceLoginJsExtensions
+import java.text.Normalizer
 
 /**
  * 阅读界面
@@ -222,6 +247,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
     private var menu: Menu? = null
     private var backupJob: Job? = null
+    private var aiPurifyJob: Job? = null
     private var tts: TTS? = null
     val textActionMenu: TextActionMenu by lazy {
         TextActionMenu(this, this)
@@ -357,6 +383,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         }
         upSystemUiVisibility()
+        viewModel.resetReplaceRuleStateAfterResume()
         registerReceiver(timeBatteryReceiver, timeBatteryReceiver.filter)
         binding.readView.upTime()
         screenOffTimerStart()
@@ -574,6 +601,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
 
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
+            R.id.menu_network_log -> showDialogFragment<NetworkLogDialog>()
             R.id.menu_toc_regex -> showDialogFragment(
                 TxtTocRuleDialog(ReadBook.book?.tocUrl)
             )
@@ -893,6 +921,11 @@ class ReadBookActivity : BaseReadBookActivity(),
                 return true
             }
 
+            R.id.menu_ai_purify -> {
+                startAiPurifySelectedText()
+                return true
+            }
+
             R.id.menu_search_content -> {
                 viewModel.searchContentQuery = selectedText
                 openSearchActivity(selectedText)
@@ -905,6 +938,1615 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         }
         return false
+    }
+
+    private fun startAiPurifySelectedText(text: String = selectedText) {
+        val source = AiPurifyHelper.normalizeSelectedText(text)
+        if (source.isBlank()) {
+            toastOnUi("选中文本为空")
+            return
+        }
+        aiPurifyJob?.cancel()
+        val waitDialog = WaitDialog(this).apply {
+            setText(R.string.ai_purify)
+            setOnCancelListener {
+                aiPurifyJob?.cancel()
+            }
+            show()
+        }
+        aiPurifyJob = lifecycleScope.launch {
+            try {
+                val startedAt = SystemClock.elapsedRealtime()
+                val result = withContext(IO) {
+                    AiPurifyHelper.purify(source)
+                }
+                val elapsedMs = SystemClock.elapsedRealtime() - startedAt
+                waitDialog.dismiss()
+                if (shouldAutoApplyAiPurifyResult(result)) {
+                    applyAiPurifyResult(result)
+                } else {
+                    showAiPurifyConfirmDialog(result, elapsedMs)
+                }
+            } catch (e: Throwable) {
+                waitDialog.dismiss()
+                alert(titleResource = R.string.ai_purify) {
+                    setMessage(e.localizedMessage ?: e.toString())
+                    okButton()
+                }
+            }
+        }
+    }
+
+    private fun showAiPurifyConfirmDialog(result: AiPurifyResult, elapsedMs: Long) {
+        val view = layoutInflater.inflate(R.layout.dialog_ai_purify_confirm, null)
+        view.findViewById<TextView>(R.id.tv_purify_deleted_count).text = result.deletedCount.toString()
+        view.findViewById<TextView>(R.id.tv_purify_rule_count).text = "1"
+        view.findViewById<TextView>(R.id.tv_purify_elapsed).text = formatAiPurifyElapsed(elapsedMs)
+        view.findViewById<TextView>(R.id.tv_purify_model).text = formatAiPurifyModel(result.model)
+        view.findViewById<TextView>(R.id.tv_original).text = result.original
+        view.findViewById<TextView>(R.id.tv_cleaned).text = result.cleaned
+        view.findViewById<TextView>(R.id.tv_deleted).text = formatAiPurifyInlineChangeSummary(result)
+        view.prepareAiPurifyDialogSize(R.id.scroll_ai_purify_content)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(view)
+            .create()
+        view.findViewById<View>(R.id.btn_apply).setOnClickListener {
+            dialog.dismiss()
+            applyAiPurifyResult(result)
+        }
+        view.findViewById<View>(R.id.btn_retry).setOnClickListener {
+            dialog.dismiss()
+            startAiPurifySelectedText(result.original)
+        }
+        view.findViewById<View>(R.id.btn_cancel).setOnClickListener {
+            dialog.dismiss()
+        }
+        dialog.setOnShowListener {
+            dialog.window?.run {
+                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                val width = resources.displayMetrics.widthPixels - 48.dpToPx()
+                setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+            }
+        }
+        dialog.show()
+    }
+
+    private fun View.prepareAiPurifyDialogSize(scrollViewId: Int) {
+        val maxHeight = (resources.displayMetrics.heightPixels * 0.86f).toInt()
+        val width = resources.displayMetrics.widthPixels - 48.dpToPx()
+        measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        if (measuredHeight <= maxHeight) {
+            return
+        }
+        layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                maxHeight
+        )
+        findViewById<ScrollView>(scrollViewId).layoutParams =
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            ).apply {
+                topMargin = 10.dpToPx()
+            }
+    }
+
+    private fun shouldAutoApplyAiPurifyResult(result: AiPurifyResult): Boolean {
+        if (!AiConfig.purifyAutoApply || result.original == result.cleaned) {
+            return false
+        }
+        return !AiConfig.purifyExceptionIntercept || result.canAutoApply
+    }
+
+    private data class AiPurifyChapterSample(
+        val index: Int,
+        val title: String,
+        val paragraphs: List<String>
+    )
+
+    private data class AiPurifyChapterFailure(
+        val sample: AiPurifyChapterSample,
+        val error: Throwable
+    )
+
+    private data class AiPurifyRuleCandidate(
+        val pattern: String,
+        val replacement: String,
+        val evidenceLabels: MutableList<String>,
+        val type: String = "typo"
+    )
+
+    private data class AiPurifyRuleSource(
+        val chapterIndex: Int,
+        val paragraphIndex: Int,
+        val text: String
+    )
+
+    private data class AiPurifyRulePart(
+        val pattern: String,
+        val replacement: String,
+        val generalPattern: String? = null,
+        val generalReplacement: String? = null,
+        val hasRawDeletion: Boolean = false,
+        val hasRawReplacement: Boolean = false,
+        val deletedPattern: String = ""
+    )
+
+    private data class AiPurifyRuleDiff(
+        val parts: List<AiPurifyRulePart>,
+        val hasInsertion: Boolean
+    )
+
+    private data class AiPurifyDiffOp(
+        val kind: Int,
+        val original: String,
+        val cleaned: String
+    )
+
+    private fun applyAiPurifyResult(result: AiPurifyResult) {
+        if (result.original == result.cleaned) {
+            toastOnUi("AI 未修改任何内容")
+            return
+        }
+        applyAiPurifyResults(listOf(result))
+    }
+
+    private fun applyAiPurifyResults(results: List<AiPurifyResult>) {
+        val changedResults = results
+            .filter { it.original != it.cleaned }
+        if (changedResults.isEmpty()) {
+            toastOnUi("AI 未修改任何内容")
+            return
+        }
+        lifecycleScope.launch {
+            try {
+                withContext(IO) {
+                    val scope = currentReplaceScope()
+                    val maxOrder = appDb.replaceRuleDao.maxOrder
+                    val baseId = System.currentTimeMillis()
+                    val rules = changedResults.mapIndexed { index, result ->
+                        ReplaceRule(
+                            id = baseId + index,
+                            name = result.original.ruleNamePreview(),
+                            group = "AI净化",
+                            pattern = result.original,
+                            replacement = result.cleaned,
+                            scope = scope,
+                            scopeTitle = false,
+                            scopeContent = true,
+                            isEnabled = true,
+                            isRegex = false,
+                            timeoutMillisecond = 3000L,
+                            order = maxOrder + index + 1
+                        )
+                    }
+                    appDb.replaceRuleDao.insert(*rules.toTypedArray())
+                    ContentProcessor.upReplaceRules()
+                }
+                ReadBook.book?.let { book ->
+                    if (!book.getUseReplaceRule()) {
+                        book.setUseReplaceRule(true)
+                        ReadBook.saveRead()
+                        menu?.findItem(R.id.menu_enable_replace)?.isChecked = true
+                    }
+                }
+                viewModel.replaceRuleChanged()
+                toastOnUi(
+                    if (changedResults.size == 1) {
+                        getString(R.string.ai_purify_saved)
+                    } else {
+                        "已添加 ${changedResults.size} 条AI净化规则"
+                    }
+                )
+            } catch (e: Throwable) {
+                alert(titleResource = R.string.ai_purify) {
+                    setMessage(e.localizedMessage ?: e.toString())
+                    okButton()
+                }
+            }
+        }
+    }
+
+    private fun applyAiPurifyRuleCandidates(candidates: List<AiPurifyRuleCandidate>) {
+        val selectedCandidates = candidates
+            .filter { it.pattern.isNotBlank() && !it.pattern.isNormalizedSameAs(it.replacement) }
+        if (selectedCandidates.isEmpty()) {
+            toastOnUi("未选择有效净化规则")
+            return
+        }
+        lifecycleScope.launch {
+            try {
+                withContext(IO) {
+                    val scope = currentReplaceScope()
+                    val maxOrder = appDb.replaceRuleDao.maxOrder
+                    val baseId = System.currentTimeMillis()
+                    val rules = selectedCandidates.mapIndexed { index, candidate ->
+                        ReplaceRule(
+                            id = baseId + index,
+                            name = candidate.pattern.ruleNamePreview(),
+                            group = "AI净化",
+                            pattern = candidate.pattern,
+                            replacement = candidate.replacement,
+                            scope = scope,
+                            scopeTitle = false,
+                            scopeContent = true,
+                            isEnabled = true,
+                            isRegex = false,
+                            timeoutMillisecond = 3000L,
+                            order = maxOrder + index + 1
+                        )
+                    }
+                    appDb.replaceRuleDao.insert(*rules.toTypedArray())
+                    ContentProcessor.upReplaceRules()
+                }
+                ReadBook.book?.let { book ->
+                    if (!book.getUseReplaceRule()) {
+                        book.setUseReplaceRule(true)
+                        ReadBook.saveRead()
+                        menu?.findItem(R.id.menu_enable_replace)?.isChecked = true
+                    }
+                }
+                viewModel.replaceRuleChanged()
+                toastOnUi(
+                    if (selectedCandidates.size == 1) {
+                        getString(R.string.ai_purify_saved)
+                    } else {
+                        "已添加 ${selectedCandidates.size} 条AI净化规则"
+                    }
+                )
+            } catch (e: Throwable) {
+                alert(titleResource = R.string.ai_purify) {
+                    setMessage(e.localizedMessage ?: e.toString())
+                    okButton()
+                }
+            }
+        }
+    }
+
+    override fun onClickAiPurifyChapter() {
+        showAiPurifyChapterRangeDialog()
+    }
+
+    private fun showAiPurifyChapterRangeDialog() {
+        if (ReadBook.chapterSize <= 0) {
+            toastOnUi("当前书籍没有可采样章节")
+            return
+        }
+        val labels = arrayOf(
+            getString(R.string.ai_purify_sample_current_chapter),
+            getString(R.string.ai_purify_sample_custom_range)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.ai_purify_chapter_sample_range)
+            .setItems(labels) { _, which ->
+                if (which == 0) {
+                    startAiPurifyChapterRange(ReadBook.durChapterIndex, ReadBook.durChapterIndex)
+                } else {
+                    showAiPurifyCustomChapterRangeDialog()
+                }
+            }
+            .show()
+    }
+
+    private fun showAiPurifyCustomChapterRangeDialog() {
+        val total = ReadBook.chapterSize
+        val limit = AiConfig.purifyChapterSampleLimit
+        val currentChapter = (ReadBook.durChapterIndex + 1).coerceIn(1, total.coerceAtLeast(1))
+        val defaultEnd = (currentChapter + limit - 1).coerceAtMost(total)
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20.dpToPx(), 8.dpToPx(), 20.dpToPx(), 0)
+            addView(TextView(this@ReadBookActivity).apply {
+                text = getString(R.string.ai_purify_sample_range_hint, total, limit)
+                setTextColor(ContextCompat.getColor(this@ReadBookActivity, R.color.ng_on_surface_variant))
+                textSize = 13f
+            })
+        }
+        val startEdit = createAiPurifyRangeEditText(
+            label = getString(R.string.ai_purify_sample_range_start),
+            value = currentChapter
+        ).also { content.addView(it.first) }.second
+        val endEdit = createAiPurifyRangeEditText(
+            label = getString(R.string.ai_purify_sample_range_end),
+            value = defaultEnd
+        ).also { content.addView(it.first) }.second
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.ai_purify_sample_custom_range)
+            .setView(content)
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val start = startEdit.text?.toString()?.toIntOrNull()
+                val end = endEdit.text?.toString()?.toIntOrNull()
+                when {
+                    start == null || end == null || start > end ->
+                        toastOnUi(getString(R.string.ai_purify_sample_range_invalid))
+                    start < 1 || end > total ->
+                        toastOnUi(getString(R.string.ai_purify_sample_range_out_of_bounds, total))
+                    end - start + 1 > limit ->
+                        toastOnUi(getString(R.string.ai_purify_sample_range_exceeded, limit))
+                    else -> {
+                        dialog.dismiss()
+                        startAiPurifyChapterRange(start - 1, end - 1)
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun createAiPurifyRangeEditText(label: String, value: Int): Pair<LinearLayout, EditText> {
+        val editText = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+            gravity = Gravity.CENTER
+            setText(value.toString())
+            setSelection(0, text?.length ?: 0)
+            textSize = 16f
+        }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 10.dpToPx(), 0, 0)
+            addView(TextView(this@ReadBookActivity).apply {
+                text = label
+                setTextColor(ContextCompat.getColor(this@ReadBookActivity, R.color.ng_on_surface))
+                textSize = 15f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            addView(editText, LinearLayout.LayoutParams(96.dpToPx(), LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
+        return row to editText
+    }
+
+    private fun startAiPurifyChapter() {
+        startAiPurifyChapterRange(ReadBook.durChapterIndex, ReadBook.durChapterIndex)
+    }
+
+    private fun startAiPurifyChapters(sampleCount: Int) {
+        val startIndex = ReadBook.durChapterIndex
+        val safeCount = sampleCount.coerceIn(1, AiConfig.purifyChapterSampleLimit)
+        val endIndex = (startIndex + safeCount - 1).coerceAtMost(ReadBook.chapterSize - 1)
+        startAiPurifyChapterRange(startIndex, endIndex)
+    }
+
+    private fun startAiPurifyChapterRange(startIndex: Int, endIndex: Int) {
+        val sampleCount = endIndex - startIndex + 1
+        if (sampleCount <= 0 || startIndex < 0 || endIndex >= ReadBook.chapterSize) {
+            toastOnUi(getString(R.string.ai_purify_sample_range_invalid))
+            return
+        }
+        val sampleLimit = AiConfig.purifyChapterSampleLimit
+        if (sampleCount > sampleLimit) {
+            toastOnUi(getString(R.string.ai_purify_sample_range_exceeded, sampleLimit))
+            return
+        }
+        aiPurifyJob?.cancel()
+        val waitDialog = WaitDialog(this).apply {
+            setText(
+                if (sampleCount == 1) {
+                    getString(R.string.ai_purify_chapter)
+                } else {
+                    getString(R.string.ai_purify_chapter_sampling, sampleCount)
+                }
+            )
+            setOnCancelListener {
+                aiPurifyJob?.cancel()
+            }
+            show()
+        }
+        aiPurifyJob = lifecycleScope.launch {
+            try {
+                val startedAt = SystemClock.elapsedRealtime()
+                val samples = withContext(IO) {
+                    loadAiPurifyChapterSamples(startIndex, endIndex)
+                }
+                val ruleAttempts = withContext(IO) {
+                    val semaphore = Semaphore(AiConfig.purifyChapterConcurrencyLimit)
+                    samples.map { sample ->
+                        async {
+                            semaphore.withPermit {
+                                runCatching {
+                                    sample to AiPurifyHelper.generateRuleCandidates(
+                                        sample.paragraphs,
+                                        sample.title
+                                    )
+                                }
+                            }
+                        }
+                    }.awaitAll()
+                }
+                val ruleResults = ruleAttempts.mapNotNull { it.getOrNull() }
+                val failures = ruleAttempts.mapIndexedNotNull { index, result ->
+                    result.exceptionOrNull()?.let { error ->
+                        AiPurifyChapterFailure(samples[index], error)
+                    }
+                }
+                if (ruleResults.isEmpty() && failures.isNotEmpty()) {
+                    throw NoStackTraceException(formatAiPurifyChapterFailures(failures))
+                }
+                val elapsedMs = SystemClock.elapsedRealtime() - startedAt
+                val candidates = buildAiPurifyRuleCandidatesFromGenerated(ruleResults)
+                waitDialog.dismiss()
+                if (failures.isNotEmpty()) {
+                    toastOnUi("已跳过 ${failures.size} 章失败结果，可重试")
+                }
+                when {
+                    candidates.isEmpty() -> toastOnUi("AI 未生成可应用的净化规则")
+                    sampleCount == 1 && AiConfig.purifyChapterAutoApply ->
+                        applyAiPurifyRuleCandidates(candidates)
+                    else -> showAiPurifyChapterConfirmDialog(
+                        candidates = candidates,
+                        originalCharCount = ruleResults.sumOf { it.second.originalCharCount },
+                        cleanedCharCount = estimateAiPurifyCleanedCount(samples, candidates),
+                        model = formatAiPurifyModelNames(ruleResults.mapNotNull { it.second.model }),
+                        elapsedMs = elapsedMs,
+                        sampleStartIndex = startIndex,
+                        sampleEndIndex = endIndex
+                    )
+                }
+            } catch (e: Throwable) {
+                waitDialog.dismiss()
+                alert(titleResource = R.string.ai_purify_chapter) {
+                    setMessage(e.localizedMessage ?: e.toString())
+                    okButton()
+                }
+            }
+        }
+    }
+
+    private fun formatAiPurifyChapterFailures(failures: List<AiPurifyChapterFailure>): String {
+        return buildString {
+            append("AI 净化失败 ")
+            append(failures.size)
+            append(" 章")
+            failures.take(5).forEach { failure ->
+                append('\n')
+                append("第")
+                append(failure.sample.index + 1)
+                append("章")
+                failure.sample.title.takeIf { it.isNotBlank() }?.let {
+                    append("《")
+                    append(it)
+                    append("》")
+                }
+                append("：")
+                append(failure.error.localizedMessage ?: failure.error.toString())
+            }
+            if (failures.size > 5) {
+                append("\n...")
+            }
+        }
+    }
+
+    private fun loadAiPurifyChapterSamples(startIndex: Int, endIndex: Int): List<AiPurifyChapterSample> {
+        val book = ReadBook.book ?: throw NoStackTraceException("当前书籍为空")
+        val processor = ContentProcessor.get(book)
+        return (startIndex..endIndex).map { index ->
+            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index)
+                ?: throw NoStackTraceException("找不到第${index + 1}章")
+            val rawContent = BookHelp.getContent(book, chapter)
+                ?: throw NoStackTraceException("第${index + 1}章正文未缓存，请先打开或缓存该章节后再净化")
+            val bookContent = processor.getContent(book, chapter, rawContent)
+            val paragraphs = bookContent.textList
+                .map { AiPurifyHelper.normalizeSelectedText(it) }
+                .filter { it.isNotBlank() }
+            if (paragraphs.isEmpty()) {
+                throw NoStackTraceException("第${index + 1}章正文为空")
+            }
+            AiPurifyChapterSample(
+                index = index,
+                title = chapter.title,
+                paragraphs = paragraphs
+            )
+        }
+    }
+
+    private fun shouldAutoApplyAiPurifyChapterResults(results: List<AiPurifyResult>): Boolean {
+        if (!AiConfig.purifyChapterAutoApply || results.isEmpty()) {
+            return false
+        }
+        return !AiConfig.purifyChapterExceptionIntercept || results.all { it.canAutoApply }
+    }
+
+    private fun showAiPurifyChapterConfirmDialog(
+        candidates: List<AiPurifyRuleCandidate>,
+        originalCharCount: Int,
+        cleanedCharCount: Int,
+        model: String,
+        elapsedMs: Long,
+        sampleStartIndex: Int,
+        sampleEndIndex: Int
+    ) {
+        if (candidates.isEmpty()) {
+            toastOnUi("AI 未生成可应用的净化规则")
+            return
+        }
+        val view = layoutInflater.inflate(R.layout.dialog_ai_purify_chapter_confirm, null)
+        view.findViewById<TextView>(R.id.tv_chapter_original_count).text =
+            originalCharCount.toString()
+        view.findViewById<TextView>(R.id.tv_chapter_cleaned_count).text =
+            cleanedCharCount.toString()
+        view.findViewById<TextView>(R.id.tv_chapter_rule_count).text = candidates.size.toString()
+        view.findViewById<TextView>(R.id.tv_chapter_elapsed).text = formatAiPurifyElapsed(elapsedMs)
+        view.findViewById<TextView>(R.id.tv_chapter_model).text = model
+        val selectedIndexes = candidates.indices.toMutableSet()
+        val ruleCountView = view.findViewById<TextView>(R.id.tv_chapter_rule_count)
+        fun updateSelectionState() {
+            ruleCountView.text = "${selectedIndexes.size}/${candidates.size}"
+        }
+        fun selectionActionText(): String {
+            return getString(
+                if (selectedIndexes.size == candidates.size) {
+                    R.string.revert_selection
+                } else {
+                    R.string.select_all
+                }
+            )
+        }
+        val ruleTable = view.findViewById<LinearLayout>(R.id.layout_chapter_rule_table)
+        lateinit var bindRuleTable: () -> Unit
+        val toggleRuleSelection = {
+            if (selectedIndexes.size == candidates.size) {
+                selectedIndexes.clear()
+            } else {
+                selectedIndexes.clear()
+                selectedIndexes.addAll(candidates.indices)
+            }
+            bindRuleTable()
+            updateSelectionState()
+        }
+        bindRuleTable = {
+            bindAiPurifyChapterRuleTable(
+                ruleTable = ruleTable,
+                candidates = candidates,
+                selectedIndexes = selectedIndexes,
+                selectionActionText = selectionActionText(),
+                onSelectionAction = toggleRuleSelection,
+                onSelectionChanged = {
+                    bindRuleTable()
+                    updateSelectionState()
+                },
+                onRuleClick = ::showAiPurifyRuleDetailDialog
+            )
+        }
+        bindRuleTable()
+        updateSelectionState()
+        view.prepareAiPurifyDialogSize(R.id.scroll_ai_purify_chapter_content)
+        val dialog = AlertDialog.Builder(this)
+            .setView(view)
+            .create()
+        view.findViewById<View>(R.id.btn_retry).setOnClickListener {
+            dialog.dismiss()
+            startAiPurifyChapterRange(sampleStartIndex, sampleEndIndex)
+        }
+        view.findViewById<View>(R.id.btn_apply).setOnClickListener {
+            val selectedCandidates = candidates.filterIndexed { index, _ -> index in selectedIndexes }
+            if (selectedCandidates.isEmpty()) {
+                toastOnUi("未选择净化规则")
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            applyAiPurifyRuleCandidates(selectedCandidates)
+        }
+        view.findViewById<View>(R.id.btn_cancel).setOnClickListener {
+            dialog.dismiss()
+        }
+        dialog.setOnShowListener {
+            dialog.window?.run {
+                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                val width = resources.displayMetrics.widthPixels - 48.dpToPx()
+                setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+            }
+        }
+        dialog.show()
+    }
+
+    private fun formatAiPurifyModels(results: List<AiPurifyResult>): String {
+        val models = results
+            .mapNotNull { it.model?.takeIf { model -> model.isNotBlank() } }
+            .distinct()
+        return formatAiPurifyModelNames(models)
+    }
+
+    private fun formatAiPurifyModelNames(models: List<String>): String {
+        val distinctModels = models
+            .filter { it.isNotBlank() }
+            .distinct()
+        if (distinctModels.isEmpty()) {
+            return formatAiPurifyModel(null)
+        }
+        return if (distinctModels.size == 1) {
+            distinctModels.first()
+        } else {
+            "${distinctModels.first()} +${distinctModels.size - 1}"
+        }
+    }
+
+    private fun formatAiPurifyModel(model: String?): String {
+        return model?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.ai_purify_model_unknown)
+    }
+
+    private fun formatAiPurifyElapsed(elapsedMs: Long): String {
+        return getString(R.string.ai_purify_elapsed_seconds, elapsedMs / 1000f)
+    }
+
+    private fun bindAiPurifyChapterRuleTable(
+        ruleTable: LinearLayout,
+        candidates: List<AiPurifyRuleCandidate>,
+        selectedIndexes: MutableSet<Int>,
+        selectionActionText: String,
+        onSelectionAction: () -> Unit,
+        onSelectionChanged: () -> Unit,
+        onRuleClick: (AiPurifyRuleCandidate) -> Unit
+    ) {
+        ruleTable.removeAllViews()
+        ruleTable.addView(
+            createAiPurifyChapterRuleTableRow(
+                checked = null,
+                hitCount = getString(R.string.ai_purify_rule_column_hit_count),
+                type = getString(R.string.ai_purify_rule_column_type),
+                content = getString(R.string.ai_purify_rule_column_content),
+                isHeader = true,
+                applyHeaderText = selectionActionText,
+                onApplyHeaderClick = onSelectionAction
+            )
+        )
+        candidates.forEachIndexed { index, candidate ->
+            val checked = index in selectedIndexes
+            ruleTable.addView(
+                createAiPurifyChapterRuleTableRow(
+                    checked = checked,
+                    hitCount = getString(
+                        R.string.ai_purify_rule_hit_count_value,
+                        candidate.evidenceLabels.size
+                    ),
+                    type = candidate.aiPurifyRuleTypeLabel(),
+                    content = candidate.aiPurifyRuleContentSummary(),
+                    isHeader = false,
+                    onCheckedChanged = { isChecked ->
+                        if (isChecked) {
+                            selectedIndexes.add(index)
+                        } else {
+                            selectedIndexes.remove(index)
+                        }
+                        onSelectionChanged()
+                    },
+                    onRowClick = { onRuleClick(candidate) }
+                )
+            )
+        }
+    }
+
+    private fun createAiPurifyChapterRuleTableRow(
+        checked: Boolean?,
+        hitCount: String,
+        type: String,
+        content: String,
+        isHeader: Boolean,
+        applyHeaderText: String? = null,
+        onApplyHeaderClick: (() -> Unit)? = null,
+        onCheckedChanged: ((Boolean) -> Unit)? = null,
+        onRowClick: (() -> Unit)? = null
+    ): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 1.dpToPx(), 0, 1.dpToPx())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            if (!isHeader && onRowClick != null) {
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { onRowClick.invoke() }
+            }
+            addView(
+                if (checked == null) {
+                    createAiPurifyTableText(
+                        text = applyHeaderText ?: getString(R.string.ai_purify_rule_column_apply),
+                        widthDp = 36,
+                        isHeader = isHeader,
+                        gravityValue = Gravity.CENTER
+                    ).apply {
+                        if (onApplyHeaderClick != null) {
+                            setTextColor(
+                                ContextCompat.getColor(
+                                    this@ReadBookActivity,
+                                    R.color.ng_error
+                                )
+                            )
+                            isClickable = true
+                            isFocusable = true
+                            setOnClickListener { onApplyHeaderClick.invoke() }
+                        }
+                    }
+                } else {
+                    CheckBox(this@ReadBookActivity).apply {
+                        isChecked = checked
+                        gravity = Gravity.CENTER
+                        buttonTintList = android.content.res.ColorStateList.valueOf(
+                            ContextCompat.getColor(this@ReadBookActivity, R.color.ng_error)
+                        )
+                        setOnCheckedChangeListener { _, value ->
+                            onCheckedChanged?.invoke(value)
+                        }
+                        minWidth = 0
+                        minHeight = 0
+                        minimumWidth = 0
+                        minimumHeight = 0
+                        setPadding(0, 0, 0, 0)
+                        scaleX = 0.82f
+                        scaleY = 0.82f
+                        layoutParams = LinearLayout.LayoutParams(36.dpToPx(), 32.dpToPx())
+                    }
+                }
+            )
+            addView(
+                createAiPurifyTableText(
+                    hitCount,
+                    42,
+                    isHeader = isHeader,
+                    gravityValue = Gravity.CENTER
+                )
+            )
+            addView(
+                createAiPurifyTableText(
+                    type,
+                    48,
+                    isHeader = isHeader,
+                    gravityValue = Gravity.CENTER
+                )
+            )
+            addView(
+                createAiPurifyTableText(
+                    content,
+                    0,
+                    weight = 1f,
+                    isHeader = isHeader,
+                    gravityValue = if (isHeader) Gravity.CENTER else Gravity.CENTER_VERTICAL
+                )
+            )
+        }
+    }
+
+    private fun createAiPurifyTableText(
+        text: String,
+        widthDp: Int,
+        weight: Float = 0f,
+        isHeader: Boolean,
+        gravityValue: Int,
+        fixedWidthPx: Int? = null
+    ): TextView {
+        return TextView(this).apply {
+            this.text = text
+            setTextColor(
+                ContextCompat.getColor(
+                    this@ReadBookActivity,
+                    if (isHeader) R.color.ng_on_surface_variant else R.color.ng_on_surface
+                )
+            )
+            textSize = if (isHeader) 11f else 12f
+            typeface = if (isHeader) android.graphics.Typeface.DEFAULT_BOLD else null
+            gravity = gravityValue
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            maxLines = 1
+            setLineSpacing(1.dpToPx().toFloat(), 1.0f)
+            setPadding(2.dpToPx(), 6.dpToPx(), 2.dpToPx(), 6.dpToPx())
+            minHeight = 30.dpToPx()
+            layoutParams = if (weight > 0f) {
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, weight)
+            } else if (fixedWidthPx != null) {
+                LinearLayout.LayoutParams(fixedWidthPx, LinearLayout.LayoutParams.WRAP_CONTENT)
+            } else {
+                LinearLayout.LayoutParams(widthDp.dpToPx(), LinearLayout.LayoutParams.WRAP_CONTENT)
+            }
+        }
+    }
+
+    private fun showAiPurifyRuleDetailDialog(candidate: AiPurifyRuleCandidate) {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundResource(R.drawable.ng_bg_card)
+            setPadding(20.dpToPx(), 18.dpToPx(), 20.dpToPx(), 16.dpToPx())
+        }
+        root.addView(TextView(this).apply {
+            text = getString(R.string.ai_purify_rule_detail)
+            setTextColor(ContextCompat.getColor(this@ReadBookActivity, R.color.ng_on_surface))
+            textSize = 19f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 2.dpToPx(), 0, 2.dpToPx())
+            addView(
+                createAiPurifyRuleDetailSection(
+                    title = getString(R.string.original_text),
+                    text = candidate.pattern,
+                    titleColor = R.color.ng_on_surface_variant
+                )
+            )
+            addView(
+                createAiPurifyRuleDetailSection(
+                    title = getString(R.string.ai_purify_cleaned_text),
+                    text = candidate.replacement.ifBlank {
+                        getString(R.string.ai_purify_rule_deleted_result)
+                    },
+                    titleColor = R.color.ng_success
+                )
+            )
+            addView(
+                createAiPurifyRuleDetailSection(
+                    title = getString(R.string.ai_purify_deleted_content),
+                    text = candidate.aiPurifyRuleBriefContentSummary(),
+                    titleColor = R.color.ng_error
+                )
+            )
+        }
+        val scrollView = ScrollView(this).apply {
+            scrollBarStyle = View.SCROLLBARS_INSIDE_INSET
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            addView(
+                content,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = 12.dpToPx()
+            }
+        }
+        root.addView(scrollView)
+
+        val closeButton = TextView(this).apply {
+            setText(R.string.close)
+            setTextColor(ContextCompat.getColor(this@ReadBookActivity, R.color.ng_error))
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setPadding(18.dpToPx(), 8.dpToPx(), 18.dpToPx(), 8.dpToPx())
+        }
+        root.addView(LinearLayout(this).apply {
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = 12.dpToPx()
+            }
+            addView(closeButton)
+        })
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(root)
+            .create()
+        closeButton.setOnClickListener {
+            dialog.dismiss()
+        }
+        dialog.setOnShowListener {
+            dialog.window?.run {
+                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                setLayout(
+                    resources.displayMetrics.widthPixels - 72.dpToPx(),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            }
+            scrollView.post {
+                val maxHeight = (resources.displayMetrics.heightPixels * 0.62f).toInt()
+                if (content.height > maxHeight) {
+                    scrollView.layoutParams = (scrollView.layoutParams as LinearLayout.LayoutParams).apply {
+                        height = maxHeight
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun createAiPurifyRuleDetailSection(
+        title: String,
+        text: String,
+        titleColor: Int
+    ): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundResource(R.drawable.ng_bg_purify_panel)
+            setPadding(12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = 10.dpToPx()
+            }
+            addView(LinearLayout(this@ReadBookActivity).apply {
+                gravity = Gravity.CENTER
+                orientation = LinearLayout.HORIZONTAL
+                addView(View(this@ReadBookActivity).apply {
+                    setBackgroundResource(R.drawable.ng_bg_purify_separator)
+                    layoutParams = LinearLayout.LayoutParams(0, 1.dpToPx(), 1f)
+                })
+                addView(TextView(this@ReadBookActivity).apply {
+                    this.text = title
+                    setTextColor(ContextCompat.getColor(this@ReadBookActivity, titleColor))
+                    textSize = 13f
+                    gravity = Gravity.CENTER
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        marginStart = 10.dpToPx()
+                        marginEnd = 10.dpToPx()
+                    }
+                })
+                addView(View(this@ReadBookActivity).apply {
+                    setBackgroundResource(R.drawable.ng_bg_purify_separator)
+                    layoutParams = LinearLayout.LayoutParams(0, 1.dpToPx(), 1f)
+                })
+            })
+            addView(TextView(this@ReadBookActivity).apply {
+                this.text = text
+                setTextColor(ContextCompat.getColor(this@ReadBookActivity, R.color.ng_on_surface))
+                textSize = 14f
+                setLineSpacing(2.dpToPx().toFloat(), 1f)
+                setTextIsSelectable(true)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 8.dpToPx()
+                }
+            })
+        }
+    }
+
+    private fun AiPurifyRuleCandidate.aiPurifyRuleTypeLabel(): String {
+        return when (type) {
+            "typo" -> getString(R.string.ai_purify_rule_type_typo)
+            "noise" -> getString(R.string.ai_purify_rule_type_noise)
+            "ad" -> getString(R.string.ai_purify_rule_type_ad)
+            else -> when {
+                replacement.isEmpty() -> getString(R.string.ai_purify_rule_type_delete)
+                pattern.isNotEmpty() -> getString(R.string.ai_purify_rule_type_replace)
+                else -> getString(R.string.ai_purify_rule_type_change)
+            }
+        }
+    }
+
+    private fun AiPurifyRuleCandidate.aiPurifyRuleContentSummary(): String {
+        return if (replacement.isEmpty()) {
+            getString(R.string.ai_purify_deleted_change, pattern)
+        } else {
+            getString(R.string.ai_purify_replaced_change, "$pattern -> $replacement")
+        }
+    }
+
+    private fun AiPurifyRuleCandidate.aiPurifyRuleBriefContentSummary(): String {
+        if (replacement.isEmpty()) {
+            return getString(R.string.ai_purify_deleted_change, pattern.compactAiPurifyRulePreview())
+        }
+        val diff = AiPurifyResult(
+            original = pattern,
+            cleaned = replacement,
+            deletedCount = 0,
+            replacementCount = 0,
+            deletedPreview = "",
+            replacementPreview = "",
+            canAutoApply = true,
+            riskReason = null,
+            model = null
+        ).toAiPurifyRuleDiff()
+        val changes = arrayListOf<String>()
+        val deletedPreview = diff.parts
+            .filter { it.replacement.isEmpty() }
+            .joinToString("") { it.pattern }
+            .compactAiPurifyRulePreview()
+        if (deletedPreview.isNotBlank()) {
+            changes.add(getString(R.string.ai_purify_deleted_change, deletedPreview))
+        }
+        val replacementPreview = diff.parts
+            .filter { it.replacement.isNotEmpty() }
+            .map {
+                val oldValue = (it.generalPattern ?: it.pattern).compactAiPurifyRulePreview(18)
+                val newValue = (it.generalReplacement ?: it.replacement).compactAiPurifyRulePreview(18)
+                "$oldValue -> $newValue"
+            }
+            .filterNot { it.isSameSideReplacementPreview() }
+            .joinToString("、")
+            .compactAiPurifyRulePreview()
+        if (replacementPreview.isNotBlank()) {
+            changes.add(getString(R.string.ai_purify_replaced_change, replacementPreview))
+        }
+        return changes.joinToString("\n").ifBlank {
+            getString(
+                R.string.ai_purify_replaced_change,
+                "${pattern.compactAiPurifyRulePreview(28)} -> ${replacement.compactAiPurifyRulePreview(28)}"
+            )
+        }
+    }
+
+    private fun String.compactAiPurifyRulePreview(maxLength: Int = 56): String {
+        val compact = replace("\n", "\\n").trim()
+        return if (compact.length <= maxLength) {
+            compact
+        } else {
+            compact.take(maxLength) + "..."
+        }
+    }
+
+    private fun buildAiPurifyRuleCandidatesFromGenerated(
+        sampleResults: List<Pair<AiPurifyChapterSample, AiPurifyRuleGenerateResult>>
+    ): List<AiPurifyRuleCandidate> {
+        val sources = sampleResults.flatMap { (sample, _) -> sample.aiPurifyRuleSources() }
+        val directRules = sampleResults
+            .flatMap { it.second.rules }
+            .filter { AiConfig.isPurifyChapterRuleTypeEnabled(it.type) }
+        val candidates = linkedMapOf<String, AiPurifyRuleCandidate>()
+        val derivedRules = directRules
+            .flatMap { it.derivedAiPurifyTypoRules() }
+            .distinct()
+            .filter { (pattern, replacement) ->
+                sources.aiPurifyEvidenceLabels(pattern).distinct().size > 1 &&
+                        !pattern.isNormalizedSameAs(replacement)
+            }
+        derivedRules.forEach { (pattern, replacement) ->
+            candidates.addAiPurifyRuleCandidate(
+                type = "typo",
+                pattern = pattern,
+                replacement = replacement,
+                sources = sources
+            )
+        }
+        directRules.forEach { rule ->
+            if (rule.old.isBlank() || rule.old.isNormalizedSameAs(rule.new)) {
+                return@forEach
+            }
+            if (
+                rule.type == "typo" &&
+                derivedRules.any { (pattern, replacement) ->
+                    rule.old.replace(pattern, replacement) == rule.new
+                }
+            ) {
+                return@forEach
+            }
+            candidates.addAiPurifyRuleCandidate(
+                type = rule.type,
+                pattern = rule.old,
+                replacement = rule.new,
+                sources = sources
+            )
+        }
+        return candidates.values.toList()
+    }
+
+    private fun MutableMap<String, AiPurifyRuleCandidate>.addAiPurifyRuleCandidate(
+        type: String,
+        pattern: String,
+        replacement: String,
+        sources: List<AiPurifyRuleSource>
+    ) {
+        if (pattern.isBlank() || pattern.isNormalizedSameAs(replacement)) {
+            return
+        }
+        val evidenceLabels = sources.aiPurifyEvidenceLabels(pattern)
+        if (evidenceLabels.isEmpty()) {
+            return
+        }
+        val key = pattern + "\u0000" + replacement
+        val candidate = getOrPut(key) {
+            AiPurifyRuleCandidate(
+                pattern = pattern,
+                replacement = replacement,
+                evidenceLabels = arrayListOf(),
+                type = type
+            )
+        }
+        candidate.evidenceLabels.addAll(evidenceLabels)
+    }
+
+    private fun AiPurifyGeneratedRule.derivedAiPurifyTypoRules(): List<Pair<String, String>> {
+        if (type != "typo" || old.length != new.length || old.length < 2) {
+            return emptyList()
+        }
+        val rules = arrayListOf<Pair<String, String>>()
+        old.indices.forEach { index ->
+            val oldChar = old[index]
+            val newChar = new[index]
+            if (!oldChar.isSafeAiPurifyVariantReplacement(newChar)) {
+                return@forEach
+            }
+            val starts = listOf(index - 1, index)
+            starts.forEach { start ->
+                if (start < 0 || start + 2 > old.length) {
+                    return@forEach
+                }
+                val pattern = old.substring(start, start + 2)
+                val replacement = new.substring(start, start + 2)
+                if (
+                    pattern != replacement &&
+                    pattern.any { it == oldChar } &&
+                    pattern.all { it.isCjkIdeographForAiPurify() }
+                ) {
+                    rules.add(pattern to replacement)
+                }
+            }
+        }
+        return rules.distinct()
+    }
+
+    private fun Char.isSafeAiPurifyVariantReplacement(replacement: Char): Boolean {
+        return when (this) {
+            '幺', '麽' -> replacement == '么'
+            '擡' -> replacement == '抬'
+            else -> false
+        }
+    }
+
+    private fun AiPurifyChapterSample.aiPurifyRuleSources(): List<AiPurifyRuleSource> {
+        return paragraphs.mapIndexedNotNull { index, text ->
+            val source = AiPurifyHelper.normalizeSelectedText(text)
+            if (source.isBlank() || index == 0 && source == title) {
+                null
+            } else {
+                AiPurifyRuleSource(
+                    chapterIndex = this.index,
+                    paragraphIndex = index + 1,
+                    text = source
+                )
+            }
+        }
+    }
+
+    private fun List<AiPurifyRuleSource>.aiPurifyEvidenceLabels(pattern: String): List<String> {
+        return flatMap { source ->
+            val count = source.text.countAiPurifyLiteralHits(pattern)
+            List(count) {
+                getString(
+                    R.string.ai_purify_rule_chapter_paragraph_value,
+                    source.chapterIndex + 1,
+                    source.paragraphIndex
+                )
+            }
+        }
+    }
+
+    private fun String.countAiPurifyLiteralHits(pattern: String): Int {
+        if (pattern.isEmpty()) {
+            return 0
+        }
+        var count = 0
+        var start = indexOf(pattern)
+        while (start >= 0) {
+            count++
+            start = indexOf(pattern, start + pattern.length)
+        }
+        return count
+    }
+
+    private fun estimateAiPurifyCleanedCount(
+        samples: List<AiPurifyChapterSample>,
+        candidates: List<AiPurifyRuleCandidate>
+    ): Int {
+        return samples
+            .flatMap { it.aiPurifyRuleSources() }
+            .sumOf { source ->
+                candidates.fold(source.text) { text, candidate ->
+                    text.replace(candidate.pattern, candidate.replacement)
+                }.length
+            }
+    }
+
+    private fun buildAiPurifyRuleCandidates(
+        results: List<AiPurifyResult>
+    ): List<AiPurifyRuleCandidate> {
+        val candidateSources = arrayListOf<Pair<AiPurifyResult, List<AiPurifyRulePart>>>()
+        val generalCandidates = linkedMapOf<String, AiPurifyRuleCandidate>()
+        results.forEach { result ->
+            val diff = result.toAiPurifyRuleDiff()
+            if (diff.hasInsertion) {
+                return@forEach
+            }
+            val parts = diff.parts
+                .takeIf { it.isNotEmpty() }
+                ?: listOf(AiPurifyRulePart(result.original, result.cleaned))
+            if (!result.canBuildAiPurifyRuleCandidates(parts)) {
+                return@forEach
+            }
+            candidateSources.add(result to parts)
+            parts.forEach { part ->
+                val generalPattern = part.generalPattern ?: return@forEach
+                val generalReplacement = part.generalReplacement ?: return@forEach
+                if (
+                    generalPattern.isBlank() ||
+                    generalPattern.isNormalizedSameAs(generalReplacement)
+                ) {
+                    return@forEach
+                }
+                val key = generalPattern + "\u0000" + generalReplacement
+                val candidate = generalCandidates.getOrPut(key) {
+                    AiPurifyRuleCandidate(
+                        pattern = generalPattern,
+                        replacement = generalReplacement,
+                        evidenceLabels = arrayListOf()
+                    )
+                }
+                val label = result.aiPurifyEvidenceLabel()
+                if (!candidate.evidenceLabels.contains(label)) {
+                    candidate.evidenceLabels.add(label)
+                }
+            }
+        }
+        val keptGeneralKeys = generalCandidates
+            .filterValues { it.evidenceLabels.distinct().size > 1 }
+            .keys
+            .toSet()
+        val candidates = linkedMapOf<String, AiPurifyRuleCandidate>()
+        generalCandidates.forEach { (key, candidate) ->
+            if (key in keptGeneralKeys) {
+                candidates[key] = candidate
+            }
+        }
+        candidateSources.forEach { (result, parts) ->
+            parts.forEach { part ->
+                val generalKey = part.generalPattern
+                    ?.let { generalPattern ->
+                        part.generalReplacement?.let { generalReplacement ->
+                            generalPattern + "\u0000" + generalReplacement
+                        }
+                    }
+                val pattern: String
+                val replacement: String
+                if (generalKey != null && generalKey in keptGeneralKeys) {
+                    return@forEach
+                } else {
+                    pattern = part.pattern
+                    replacement = part.replacement
+                }
+                if (pattern.isBlank() || pattern.isNormalizedSameAs(replacement)) {
+                    return@forEach
+                }
+                val key = pattern + "\u0000" + replacement
+                val candidate = candidates.getOrPut(key) {
+                    AiPurifyRuleCandidate(
+                        pattern = pattern,
+                        replacement = replacement,
+                        evidenceLabels = arrayListOf()
+                    )
+                }
+                val label = result.aiPurifyEvidenceLabel()
+                if (!candidate.evidenceLabels.contains(label)) {
+                    candidate.evidenceLabels.add(label)
+                }
+            }
+        }
+        return candidates.values.toList()
+    }
+
+    private fun AiPurifyResult.aiPurifyEvidenceLabel(): String {
+        val paragraphLabel = getString(
+            R.string.ai_purify_rule_paragraph_value,
+            paragraphIndex ?: 0
+        )
+        return chapterIndex?.let { chapterIndex ->
+            getString(R.string.ai_purify_rule_chapter_paragraph_value, chapterIndex + 1, paragraphIndex ?: 0)
+        } ?: paragraphLabel
+    }
+
+    private fun AiPurifyResult.canBuildAiPurifyRuleCandidates(
+        parts: List<AiPurifyRulePart>
+    ): Boolean {
+        return parts.all { part ->
+            when {
+                part.hasRawDeletion && part.hasRawReplacement -> false
+                part.hasRawDeletion -> isSafeAiPurifyDeletionRule(part.deletedPattern)
+                else -> true
+            }
+        }
+    }
+
+    private fun AiPurifyResult.isSafeAiPurifyDeletionRule(pattern: String): Boolean {
+        return if (cleaned.isBlank() && pattern == original) {
+            pattern.isLikelyStandaloneAiPurifyPollution()
+        } else {
+            pattern.isLikelyInlineAiPurifyNoise()
+        }
+    }
+
+    private fun String.isLikelyStandaloneAiPurifyPollution(): Boolean {
+        val value = trim()
+        if (value.isBlank()) {
+            return false
+        }
+        val lower = value.lowercase()
+        val pollutionKeywords = listOf(
+            "http",
+            "www",
+            "com",
+            "域名",
+            "首发",
+            "无错章节",
+            "乱序章节",
+            "记住我们网",
+            "书友",
+            "读者",
+            "推荐票",
+            "月票",
+            "收藏",
+            "打赏",
+            "盟主",
+            "ps",
+            "本书",
+            "新书",
+            "活动",
+            "徽章",
+            "抽奖"
+        )
+        return pollutionKeywords.any { lower.contains(it) } || value.isLikelyInlineAiPurifyNoise()
+    }
+
+    private fun String.isLikelyInlineAiPurifyNoise(): Boolean {
+        val value = trim()
+        if (value.isBlank()) {
+            return false
+        }
+        if (value.length == 1 && value[0].isCjkIdeographForAiPurify()) {
+            return false
+        }
+        return value.any { it.isAiPurifyNoiseMarker() }
+    }
+
+    private fun Char.isAiPurifyNoiseMarker(): Boolean {
+        if (this == '\uFFFD') {
+            return true
+        }
+        if (isLetterOrDigit() && !isCjkIdeographForAiPurify()) {
+            return true
+        }
+        if (this in '①'..'⑳' || this in '⓪'..'⓿') {
+            return true
+        }
+        return when (this) {
+            '(', ')', '[', ']', '{', '}', '<', '>', '（', '）', '【', '】',
+            '?', '？', '%', '@', '#', '$', '^', '&', '*', '_', '+', '=',
+            '|', '\\', '/', '~', '`', '⊙', '∞', '�' -> true
+            else -> false
+        }
+    }
+
+    private fun Char.isCjkIdeographForAiPurify(): Boolean {
+        return when (Character.UnicodeBlock.of(this)) {
+            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
+            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A,
+            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B,
+            Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS -> true
+            else -> false
+        }
+    }
+
+    private fun AiPurifyResult.toAiPurifyRuleDiff(): AiPurifyRuleDiff {
+        if (original == cleaned) {
+            return AiPurifyRuleDiff(emptyList(), false)
+        }
+        val cellCount = (original.length + 1L) * (cleaned.length + 1L)
+        if (cellCount > 4_000_000L) {
+            return AiPurifyRuleDiff(listOf(AiPurifyRulePart(original, cleaned)), false)
+        }
+        val width = cleaned.length + 1
+        val cost = IntArray((original.length + 1) * width)
+        for (i in 0..original.length) {
+            cost[i * width] = i
+        }
+        for (j in 0..cleaned.length) {
+            cost[j] = j
+        }
+        for (i in 1..original.length) {
+            for (j in 1..cleaned.length) {
+                val replaceCost = if (original[i - 1] == cleaned[j - 1]) 0 else 1
+                cost[i * width + j] = minOf(
+                    cost[(i - 1) * width + j] + 1,
+                    cost[i * width + j - 1] + 1,
+                    cost[(i - 1) * width + j - 1] + replaceCost
+                )
+            }
+        }
+        val ops = arrayListOf<AiPurifyDiffOp>()
+        var i = original.length
+        var j = cleaned.length
+        while (i > 0 || j > 0) {
+            val current = cost[i * width + j]
+            if (
+                i > 0 &&
+                j > 0 &&
+                original[i - 1] == cleaned[j - 1] &&
+                current == cost[(i - 1) * width + j - 1]
+            ) {
+                ops.add(AiPurifyDiffOp(0, original[i - 1].toString(), cleaned[j - 1].toString()))
+                i--
+                j--
+            } else if (
+                i > 0 &&
+                j > 0 &&
+                current == cost[(i - 1) * width + j - 1] + 1
+            ) {
+                ops.add(AiPurifyDiffOp(1, original[i - 1].toString(), cleaned[j - 1].toString()))
+                i--
+                j--
+            } else if (i > 0 && current == cost[(i - 1) * width + j] + 1) {
+                ops.add(AiPurifyDiffOp(2, original[i - 1].toString(), ""))
+                i--
+            } else {
+                ops.add(AiPurifyDiffOp(3, "", cleaned[j - 1].toString()))
+                j--
+            }
+        }
+        ops.reverse()
+        val hasInsertion = ops.any { it.kind == 3 }
+        val parts = arrayListOf<AiPurifyRulePart>()
+        var index = 0
+        while (index < ops.size) {
+            if (ops[index].kind == 0) {
+                index++
+                continue
+            }
+            val rawStart = index
+            while (index < ops.size && ops[index].kind != 0) {
+                index++
+            }
+            val rawEnd = index
+            val rawOps = ops.subList(rawStart, rawEnd)
+            val hasRawDeletion = rawOps.any { it.kind == 2 }
+            val hasRawReplacement = rawOps.any { it.kind == 1 }
+            val deletedPattern = rawOps.joinToString("") {
+                if (it.kind == 2) it.original else ""
+            }
+            val start = expandAiPurifyContextStart(ops, rawStart)
+            val end = expandAiPurifyContextEnd(ops, rawEnd)
+            val originalPart: String
+            val cleanedPart: String
+            if (hasRawDeletion && !hasRawReplacement) {
+                originalPart = deletedPattern
+                cleanedPart = ""
+            } else {
+                originalPart = ops.subList(start, end).joinToString("") { it.original }
+                cleanedPart = ops.subList(start, end).joinToString("") { it.cleaned }
+            }
+            val generalPart = rawOps
+                .takeIf { candidateOps -> candidateOps.all { it.kind == 1 } }
+                ?.let { rawOps ->
+                    val generalPattern = rawOps.joinToString("") { it.original }
+                    val generalReplacement = rawOps.joinToString("") { it.cleaned }
+                    if (
+                        generalPattern.isNotBlank() &&
+                        !generalPattern.isNormalizedSameAs(generalReplacement)
+                    ) {
+                        generalPattern to generalReplacement
+                    } else {
+                        null
+                    }
+                }
+            val part = AiPurifyRulePart(
+                pattern = originalPart,
+                replacement = cleanedPart,
+                generalPattern = generalPart?.first,
+                generalReplacement = generalPart?.second,
+                hasRawDeletion = hasRawDeletion,
+                hasRawReplacement = hasRawReplacement,
+                deletedPattern = deletedPattern
+            )
+            if (part.pattern.isNotBlank() && !part.pattern.isNormalizedSameAs(part.replacement)) {
+                parts.add(part)
+            }
+        }
+        return AiPurifyRuleDiff(parts, hasInsertion)
+    }
+
+    private fun expandAiPurifyContextStart(
+        ops: List<AiPurifyDiffOp>,
+        rawStart: Int
+    ): Int {
+        var start = rawStart
+        var count = 0
+        while (
+            start > 0 &&
+            count < 2 &&
+            ops[start - 1].kind == 0 &&
+            ops[start - 1].original.singleOrNull()?.isCjkIdeographForAiPurify() == true
+        ) {
+            start--
+            count++
+        }
+        return start
+    }
+
+    private fun expandAiPurifyContextEnd(
+        ops: List<AiPurifyDiffOp>,
+        rawEnd: Int
+    ): Int {
+        var end = rawEnd
+        var count = 0
+        while (
+            end < ops.size &&
+            count < 2 &&
+            ops[end].kind == 0 &&
+            ops[end].original.singleOrNull()?.isCjkIdeographForAiPurify() == true
+        ) {
+            end++
+            count++
+        }
+        return end
+    }
+
+    private fun String.normalizedAiPurifyReplacementPreview(): String {
+        if (isBlank()) return ""
+        return split("、")
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !it.isSameSideReplacementPreview() }
+            .joinToString("、")
+    }
+
+    private fun String.isSameSideReplacementPreview(): Boolean {
+        val arrowIndex = indexOf(" -> ")
+        if (arrowIndex <= 0) return false
+        val left = substring(0, arrowIndex).trim()
+        val right = substring(arrowIndex + 4)
+            .substringBefore("×")
+            .trim()
+        return left.isNormalizedSameAs(right)
+    }
+
+    private fun String.isNormalizedSameAs(other: String): Boolean {
+        return this == other ||
+                Normalizer.normalize(this, Normalizer.Form.NFKC) ==
+                Normalizer.normalize(other, Normalizer.Form.NFKC)
+    }
+
+    private fun formatAiPurifyInlineChangeSummary(result: AiPurifyResult): String {
+        val changes = arrayListOf<String>()
+        if (result.deletedCount > 0) {
+            changes.add(
+                getString(
+                    R.string.ai_purify_deleted_change,
+                    result.deletedPreview.ifBlank { getString(R.string.ai_purify_deleted_content_none) }
+                )
+            )
+        }
+        val replacement = result.replacementPreview.normalizedAiPurifyReplacementPreview()
+        if (result.replacementCount > 0 && replacement.isNotBlank()) {
+            changes.add(
+                getString(
+                    R.string.ai_purify_replaced_change,
+                    replacement
+                )
+            )
+        }
+        return changes.joinToString("\n")
+            .ifBlank { getString(R.string.ai_purify_change_content_none) }
+    }
+
+    private fun currentReplaceScope(): String {
+        val scopes = arrayListOf<String>()
+        ReadBook.book?.name?.let { scopes.add(it) }
+        ReadBook.bookSource?.bookSourceUrl?.let { scopes.add(it) }
+        return scopes.joinToString(";")
+    }
+
+    private fun String.ruleNamePreview(): String {
+        val compact = replace("\n", " ").trim()
+        return "AI净化: " + if (compact.length <= 40) compact else compact.take(40) + "..."
     }
 
     /**
@@ -936,7 +2578,6 @@ class ReadBookActivity : BaseReadBookActivity(),
             keyPageDebounce(direction, mouseWheel = true, longPress = false)
         }
     }
-
     /**
      * 音量键翻页
      */
@@ -995,6 +2636,15 @@ class ReadBookActivity : BaseReadBookActivity(),
             upMenu()
             binding.readMenu.upBookView()
         }
+    }
+
+    override fun onReadThemeChanged() {
+        binding.readView.upBg()
+        binding.readView.upStyle()
+        binding.readView.upContent(0, false)
+        binding.readMenu.reset()
+        binding.readMenu.upBrightnessState()
+        upSystemUiVisibility()
     }
 
     override fun loadChapterList(book: Book) {
@@ -1182,7 +2832,14 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 替换
      */
     override fun openReplaceRule() {
-        replaceActivity.launch(Intent(this, ReplaceRuleActivity::class.java))
+        replaceActivity.launch(
+            ReplaceRuleActivity.startIntent(
+                this,
+                bookName = ReadBook.book?.name,
+                sourceName = ReadBook.bookSource?.bookSourceName,
+                sourceUrl = ReadBook.bookSource?.bookSourceUrl
+            )
+        )
     }
 
     /**
@@ -1721,6 +3378,7 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onDestroy() {
         super.onDestroy()
+        aiPurifyJob?.cancel()
         tts?.clearTts()
         textActionMenu.dismiss()
         popupAction.dismiss()

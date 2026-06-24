@@ -66,6 +66,7 @@ import androidx.core.view.size
 import io.legado.app.constant.AppConst.imagePathKey
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.http.NetworkLog
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
@@ -546,6 +547,13 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         currentWebView.addJavascriptInterface(JSInterface(this), nameBasic)
         currentWebView.webViewClient = CustomWebViewClient()
         currentWebView.settings.userAgentString = headerMap.get(AppConst.UA_NAME, true)
+        NetworkLog.recordEvent(
+            type = "WebView",
+            method = "LOAD_DATA",
+            url = url,
+            requestHeaders = headerMap.entries.joinToString("\n") { "${it.key}: ${it.value}" },
+            source = source?.getTag()
+        )
         source?.let { source ->
             (activity as? AppCompatActivity)?.let { currentActivity ->
                 val webJsExtensions =
@@ -784,6 +792,12 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         }
 
         private fun shouldOverrideUrlLoading(url: Uri): Boolean {
+            NetworkLog.recordEvent(
+                type = "WebView",
+                method = "NAVIGATE",
+                url = url.toString(),
+                source = source?.getTag()
+            )
             return when (url.scheme) {
                 "http", "https" -> false
                 "legado", "yuedu" -> {
@@ -814,6 +828,14 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             view: WebView, request: WebResourceRequest
         ): WebResourceResponse? {
             val url = request.url.toString()
+            NetworkLog.recordEvent(
+                type = "WebView",
+                method = request.method,
+                url = url,
+                requestHeaders = request.requestHeaders?.entries
+                    ?.joinToString("\n") { "${it.key}: ${it.value}" },
+                source = source?.getTag()
+            )
             if (request.isForMainFrame) {
                 if (!preloadJs.isNullOrEmpty()) {
                     jsInjected = false

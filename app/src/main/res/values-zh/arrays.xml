@@ -21,9 +21,24 @@
 
     <string-array name="theme_mode">
         <item>跟随系统</item>
-        <item>亮色主题</item>
+        <item>原生主题</item>
         <item>暗色主题</item>
         <item>E-Ink(墨水屏)</item>
+        <item>暖色渐变</item>
+        <item>竹影之韵</item>
+        <item>灰色雾霭</item>
+    </string-array>
+
+    <string-array name="ai_provider_type">
+        <item>OpenAI 兼容</item>
+        <item>Google Gemini</item>
+        <item>Claude</item>
+    </string-array>
+
+    <string-array name="ai_provider_type_values">
+        <item>openai</item>
+        <item>google</item>
+        <item>claude</item>
     </string-array>
 
     <string-array name="double_page_title">

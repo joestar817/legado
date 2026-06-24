@@ -4,7 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.database.ContentObserver
+import android.graphics.Canvas
+import android.graphics.ColorFilter
 import android.graphics.PorterDuff
+import android.graphics.PixelFormat
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.provider.Settings
@@ -44,6 +48,7 @@ import io.legado.app.utils.ConstraintModify
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
@@ -53,6 +58,7 @@ import io.legado.app.utils.openUrl
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.visible
+import io.legado.app.utils.windowSize
 import splitties.views.onClick
 import splitties.views.onLongClick
 import androidx.core.graphics.toColorInt
@@ -71,6 +77,7 @@ class ReadMenu @JvmOverloads constructor(
     private val binding = ViewReadMenuBinding.inflate(LayoutInflater.from(context), this, true)
     private var confirmSkipToChapter: Boolean = false
     private var isMenuOutAnimating = false
+    private var aiFabExpanded = false
     private val menuTopIn: Animation by lazy {
         loadAnimation(context, R.anim.anim_readbook_top_in)
     }
@@ -85,23 +92,26 @@ class ReadMenu @JvmOverloads constructor(
     }
     private val immersiveMenu: Boolean
         get() = AppConfig.readBarStyleFollowPage && ReadBookConfig.durConfig.curBgType() == 0
-    private var bgColor: Int = if (immersiveMenu) {
+    private val useGradientThemeMenu: Boolean
+        get() = !AppConfig.isEInkMode && ThemeConfig.isReadingNgBackgroundTheme()
+    private var bgColor: Int = if (useGradientThemeMenu) {
+        context.bottomBackground
+    } else if (immersiveMenu) {
         kotlin.runCatching {
             ReadBookConfig.durConfig.curBgStr().toColorInt()
         }.getOrDefault(context.bottomBackground)
     } else {
         context.bottomBackground
     }
-    private var textColor: Int = if (immersiveMenu) {
+    private var textColor: Int = if (useGradientThemeMenu) {
+        context.getCompatColor(R.color.primaryText)
+    } else if (immersiveMenu) {
         ReadBookConfig.durConfig.curTextColor()
     } else {
         context.getPrimaryTextColor(ColorUtils.isColorLight(bgColor))
     }
 
-    private var bottomBackgroundList: ColorStateList = Selector.colorBuild()
-        .setDefaultColor(bgColor)
-        .setPressedColor(ColorUtils.darkenColor(bgColor))
-        .create()
+    private var bottomBackgroundList: ColorStateList = createFloatingButtonBackgroundList()
     private var onMenuOutEnd: (() -> Unit)? = null
     private val showBrightnessView
         get() = context.getPrefBoolean(
@@ -121,6 +131,23 @@ class ReadMenu @JvmOverloads constructor(
                 true
             }
         }
+    }
+
+    private fun createFloatingButtonBackgroundList(): ColorStateList {
+        val defaultColor = if (useGradientThemeMenu) {
+            ThemeConfig.getReadingNgImageSurfaceColor()
+        } else {
+            bgColor
+        }
+        val pressedColor = if (useGradientThemeMenu) {
+            ColorUtils.darkenColor(defaultColor)
+        } else {
+            ColorUtils.darkenColor(bgColor)
+        }
+        return Selector.colorBuild()
+            .setDefaultColor(defaultColor)
+            .setPressedColor(pressedColor)
+            .create()
     }
     private val menuInListener = object : Animation.AnimationListener {
         override fun onAnimationStart(animation: Animation) {
@@ -173,14 +200,19 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun initView(reset: Boolean = false) = binding.run {
-        if (AppConfig.isNightTheme) {
+        if (ReadBookConfig.isNightTheme) {
             fabNightTheme.setImageResource(R.drawable.ic_daytime)
         } else {
             fabNightTheme.setImageResource(R.drawable.ic_brightness)
         }
         initAnimation()
         tvCustomBtn.setColorFilter(context.accentColor)
-        if (immersiveMenu) {
+        if (useGradientThemeMenu) {
+            titleBar.setTextColor(textColor)
+            titleBar.setColorFilter(textColor)
+            tvChapterName.setTextColor(context.getCompatColor(R.color.tv_text_summary))
+            tvChapterUrl.setTextColor(context.getCompatColor(R.color.tv_text_summary))
+        } else if (immersiveMenu) {
             val lightTextColor = ColorUtils.withAlpha(ColorUtils.lightenColor(textColor), 0.75f)
             titleBar.setTextColor(textColor)
             titleBar.setBackgroundColor(bgColor)
@@ -203,8 +235,13 @@ class ReadMenu @JvmOverloads constructor(
         if (AppConfig.isEInkMode) {
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
             llBottomBg.setBackgroundResource(R.drawable.bg_eink_border_top)
+        } else if (useGradientThemeMenu) {
+            if (!applyGradientThemeMenuBackground()) {
+                titleBar.setBackgroundColor(context.primaryColor)
+                ReadDrawerStyle.applyTopRoundedBackground(llBottomBg, bgColor)
+            }
         } else {
-            llBottomBg.setBackgroundColor(bgColor)
+            ReadDrawerStyle.applyTopRoundedBackground(llBottomBg, bgColor)
         }
         fabSearch.backgroundTintList = bottomBackgroundList
         fabSearch.setColorFilter(textColor)
@@ -214,6 +251,15 @@ class ReadMenu @JvmOverloads constructor(
         fabReplaceRule.setColorFilter(textColor)
         fabNightTheme.backgroundTintList = bottomBackgroundList
         fabNightTheme.setColorFilter(textColor)
+        fabAi.backgroundTintList = bottomBackgroundList
+        fabAi.setColorFilter(textColor)
+        fabAiPurifyChapter.setTextColor(textColor)
+        fabAiPurifyChapter.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 6.dpToPx().toFloat()
+            setColor(bgColor)
+        }
+        tvSourceAction.setTextColor(context.accentColor)
         tvPre.setTextColor(textColor)
         tvNext.setTextColor(textColor)
         ivCatalog.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
@@ -253,22 +299,75 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun upColorConfig() {
-        bgColor = if (immersiveMenu) {
+        bgColor = if (useGradientThemeMenu) {
+            context.bottomBackground
+        } else if (immersiveMenu) {
             kotlin.runCatching {
                 ReadBookConfig.durConfig.curBgStr().toColorInt()
             }.getOrDefault(context.bottomBackground)
         } else {
             context.bottomBackground
         }
-        textColor = if (immersiveMenu) {
+        textColor = if (useGradientThemeMenu) {
+            context.getCompatColor(R.color.primaryText)
+        } else if (immersiveMenu) {
             ReadBookConfig.durConfig.curTextColor()
         } else {
             context.getPrimaryTextColor(ColorUtils.isColorLight(bgColor))
         }
-        bottomBackgroundList = Selector.colorBuild()
-            .setDefaultColor(bgColor)
-            .setPressedColor(ColorUtils.darkenColor(bgColor))
-            .create()
+        bottomBackgroundList = createFloatingButtonBackgroundList()
+    }
+
+    private fun applyGradientThemeMenuBackground(): Boolean {
+        val metrics = activity?.windowManager?.windowSize ?: return false
+        val titleBackground = ThemeConfig.getBgImage(context, metrics)?.withoutMinimumSize()
+        val bottomBackground = ThemeConfig.getBgImage(context, metrics)?.withoutMinimumSize()
+        if (titleBackground == null || bottomBackground == null) {
+            return false
+        }
+        binding.titleBar.background = titleBackground
+        binding.titleBar.elevation = 0f
+        binding.llBottomBg.background = ReadDrawerStyle.wrapTopRounded(bottomBackground)
+        return true
+    }
+
+    private fun Drawable.withoutMinimumSize(): Drawable {
+        val source = this
+        return object : Drawable() {
+            override fun draw(canvas: Canvas) {
+                source.bounds = bounds
+                source.draw(canvas)
+            }
+
+            override fun setAlpha(alpha: Int) {
+                source.alpha = alpha
+            }
+
+            override fun setColorFilter(colorFilter: ColorFilter?) {
+                source.colorFilter = colorFilter
+            }
+
+            @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+            override fun getOpacity(): Int {
+                return PixelFormat.TRANSLUCENT
+            }
+
+            override fun getIntrinsicWidth(): Int {
+                return -1
+            }
+
+            override fun getIntrinsicHeight(): Int {
+                return -1
+            }
+
+            override fun getMinimumWidth(): Int {
+                return 0
+            }
+
+            override fun getMinimumHeight(): Int {
+                return 0
+            }
+        }
     }
 
     fun upBrightnessState() {
@@ -383,6 +482,7 @@ class ReadMenu @JvmOverloads constructor(
         if (isMenuOutAnimating) {
             return
         }
+        setAiFabExpanded(false)
         callBack.onMenuHide()
         this.onMenuOutEnd = onMenuOutEnd
         if (this.isVisible) {
@@ -559,8 +659,19 @@ class ReadMenu @JvmOverloads constructor(
 
         //夜间模式
         fabNightTheme.setOnClickListener {
-            AppConfig.isNightTheme = !AppConfig.isNightTheme
-            ThemeConfig.applyDayNight(context)
+            ReadBookConfig.isNightTheme = !ReadBookConfig.isNightTheme
+            callBack.onReadThemeChanged()
+        }
+
+        //AI功能
+        fabAi.setOnClickListener {
+            setAiFabExpanded(!aiFabExpanded)
+        }
+        fabAiPurifyChapter.setOnClickListener {
+            setAiFabExpanded(false)
+            runMenuOut {
+                callBack.onClickAiPurifyChapter()
+            }
         }
 
         //上一章
@@ -660,6 +771,17 @@ class ReadMenu @JvmOverloads constructor(
         fabAutoPage.setColorFilter(textColor)
     }
 
+    private fun setAiFabExpanded(expanded: Boolean) = binding.run {
+        aiFabExpanded = expanded
+        if (expanded) {
+            fabAiPurifyChapter.visible()
+            fabAi.rotation = 45f
+        } else {
+            fabAiPurifyChapter.gone()
+            fabAi.rotation = 0f
+        }
+    }
+
     private fun upBrightnessVwPos() {
         if (AppConfig.brightnessVwPos) {
             binding.root.modifyBegin()
@@ -685,6 +807,7 @@ class ReadMenu @JvmOverloads constructor(
         fun showMoreSetting()
         fun showReadAloudDialog()
         fun upSystemUiVisibility()
+        fun onReadThemeChanged()
         fun onClickReadAloud()
         fun showHelp()
         fun showLogin()
@@ -693,6 +816,7 @@ class ReadMenu @JvmOverloads constructor(
         fun skipToChapter(index: Int)
         fun onMenuShow()
         fun onMenuHide()
+        fun onClickAiPurifyChapter()
     }
 
 }

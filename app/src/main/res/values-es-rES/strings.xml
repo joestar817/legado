@@ -2,7 +2,6 @@
 <resources>
     <!--App-->
     <string name="app_name">Legado</string>
-    <string name="app_name_a">Legado·A</string>
     <string name="receiving_shared_label">Legado·buscador</string>
     <string name="tip_perm_request_storage">Legado necesita de acceso de almacenamineto para buscar y leer libros. Por favor, diríjase a los "Ajustes de la aplicación" para conceder el "Permiso de almacenamineto".</string>
 
@@ -75,7 +74,6 @@
     <string name="other_setting">Otros ajustes</string>
     <string name="other_setting_s">Algunas configuraciones relacionadas a su funcionamiento</string>
     <string name="about">Acerca de</string>
-    <string name="donate">Donaciones</string>
     <string name="exit">Sair</string>
     <string name="exit_no_save">Todavía se guardó. ¿Desea continuar editando?</string>
     <string name="read_style">Tipos de libros</string>
@@ -98,7 +96,7 @@
     <string name="offline_cache_s">precarga el o los capítulos(s) seleccionado(s) en Almacenamiento en caché</string>
     <string name="change_origin">Cambiar origen</string>
     <string name="about_description">\u3000\u3000 Este es una aplicación de lectura bajo software libre, desarrollado en Kotlin, en que podrás participar. </string>
-    <string name="app_share_description">Legado (YueDu 3.0) disponible para descargar en：\n https://github.com/gedoor/legado/releases</string>
+    <string name="app_share_description">阅读NG download link：\n https://github.com/joestar817/legado/releases</string>
     <string name="version_name">Versión %s</string>
     <string name="pt_background_verification">Verificación en segundo plano</string>
     <string name="ps_background_verification">podrá utilizar con libertad cuando se verifique la fuente del libro</string>
@@ -477,7 +475,6 @@
     <string name="theme">Tema</string>
     <string name="theme_mode">Tipo de tema</string>
     <string name="theme_mode_desc">Seleccione el tema que prefiera</string>
-    <string name="join_qq_group">Únase al grupo QQ</string>
     <string name="bg_image_per">Para establecer la imagen de fondo requiere del permiso de almacenamiento</string>
     <string name="input_book_source_url">Ingrese la dirección de origen del libro</string>
     <string name="del_file">Borrar archivo</string>
@@ -698,11 +695,8 @@
     <string name="contact">Contact</string>
     <string name="license">License</string>
     <string name="other">Other</string>
-    <string name="official_account">开源阅读</string>
-    <string name="follow_official_account">Follow WeChat Official Accounts</string>
     <string name="wechat">WeChat</string>
     <string name="thanks">Supporting me will be appreciated</string>
-    <string name="about_official_account">Official Accounts[开源阅读]</string>
     <string name="source_auto_changing">Changing source</string>
     <string name="click_to_apply">Tap to join</string>
     <string name="middle">Middle</string>
@@ -742,15 +736,7 @@
     <string name="starting_download">Iniciando descarga</string>
     <string name="already_in_download">Este libro ya está en la lista de descargas</string>
     <string name="click_to_open">Haga clic para abrir</string>
-    <string name="follow_public_account_summary">Siga [开源阅读] para obtener ayuda haciendo clic en los anuncios</string>
-    <string name="weChat_appreciation_code">Código de sugerencia de WeChat</string>
-    <string name="alipay">AliPay</string>
-    <string name="alipay_red_envelope_search_code">Sobre rojo de AliPay, código de búsqueda</string>
-    <string name="alipay_red_envelope_copy">537954522 Haga clic para copiar</string>
-    <string name="alipay_red_envelope_qr_code">Código QR del sobre rojo de AliPay</string>
-    <string name="alipay_payment_qr_code">Código QR de AliPay</string>
-    <string name="qq_collection_qr_code">Código QR de la Colección QQ</string>
-    <string name="contributors_summary">gedoor, Invinciblelee, Xwite, etc. Para obtener más detalles, vaya a Github</string>
+    <string name="contributors_summary">Checking in GitHub for details</string>
     <string name="clear_cache_summary">Limpiar la caché de libros y fuentes descargados</string>
     <string name="default_cover">Portada predeterminada</string>
     <string name="restore_ignore">Lista de descartados</string>
@@ -772,8 +758,7 @@
     <string name="show_brightness_view">Mostrar widget de brillo</string>
     <string name="language">Idioma</string>
     <string name="import_rss_source">Importar fuente RSS</string>
-    <string name="donate_summary">Su donación mejora esta aplicación</string>
-    <string name="about_summary">Cuenta oficial de Wechat [开源阅读软件]</string>
+    <string name="about_summary">Next Generation Legado - 阅读NG</string>
     <string name="read_record">Leer historial</string>
     <string name="del_read_record">Eliminar historial de lectura</string>
     <string name="read_record_summary">Leer resumen del historial</string>
@@ -956,8 +941,6 @@
     <string name="use_replace">使用替换</string>
     <string name="scope_title">作用于标题</string>
     <string name="scope_content">作用于正文</string>
-    <string name="join_qq_channel">加入QQ频道</string>
-    <string name="qq_channel_summary">点击加入阅读QQ频道</string>
     <string name="menu_refresh_dur">刷新当前章节</string>
     <string name="menu_refresh_after">刷新之后章节</string>
     <string name="menu_refresh_all">刷新全部章节</string>
@@ -1178,7 +1161,6 @@
     <string name="default_version">当前</string>
     <string name="official_version">正式版</string>
     <string name="beta_release_version">测试版</string>
-    <string name="beta_releaseA_version">共存版</string>
     <string name="stream_read_aloud_audio">流式播放音频</string>
     <string name="stream_read_aloud_audio_summary">即边下边播，网络不好时播放会断断续续，仅TTS源有效</string>
     <string name="pause_read_aloud_while_phone_calls_title">来电期间暂停朗读</string>

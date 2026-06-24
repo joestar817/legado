@@ -20,6 +20,7 @@ object DatabaseMigrations {
             migration_31_32, migration_32_33, migration_33_34, migration_34_35,
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
+            migration_89_90,
         )
     }
 
@@ -321,6 +322,22 @@ object DatabaseMigrations {
     private val migration_42_43 = object : Migration(42, 43) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `chapters` ADD `isVolume` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    private val migration_89_90 = object : Migration(89, 90) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP VIEW IF EXISTS `book_sources_part`")
+            db.execSQL(
+                "CREATE VIEW `book_sources_part` AS select bookSourceUrl, bookSourceName, " +
+                    "bookSourceGroup, customOrder, enabled, enabledExplore, \n" +
+                    "    (loginUrl is not null and trim(loginUrl) <> '') hasLoginUrl, " +
+                    "lastUpdateTime, respondTime, weight, \n" +
+                    "    (searchUrl is not null and trim(searchUrl) <> '') hasSearchUrl,\n" +
+                    "    (exploreUrl is not null and trim(exploreUrl) <> '') hasExploreUrl, " +
+                    "eventListener, bookSourceType\n" +
+                    "    from book_sources"
+            )
         }
     }
 

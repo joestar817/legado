@@ -18,13 +18,11 @@ data class AppReleaseInfo(
 
 enum class AppVariant {
     OFFICIAL,
-    BETA_RELEASEA,
-    BETA_RELEASES,
     BETA_RELEASE,
     UNKNOWN;
 
     fun isBeta(): Boolean {
-        return this == BETA_RELEASE || this == BETA_RELEASEA
+        return this == BETA_RELEASE
     }
 
 }
@@ -43,21 +41,6 @@ data class GithubRelease(
             .map { it.assetToAppReleaseInfo(isPreRelease, body) }
     }
 }
-@Keep
-data class GiteeRelease(
-    val assets: List<GiteeAsset>?,
-    val body: String,
-    @SerializedName("prerelease")
-    val prerelease: Boolean,
-) {
-    fun gitReleaseToAppReleaseInfo(): List<AppReleaseInfo> {
-        assets ?: throw NoStackTraceException("获取新版本出错")
-        return assets
-            .filter { it.isValid }
-            .map { it.assetToAppReleaseInfo(prerelease, body) }
-    }
-}
-
 @Keep
 data class Asset(
     @SerializedName("browser_download_url")
@@ -81,37 +64,11 @@ data class Asset(
         val timestamp: Long = instant.toEpochMilli()
 
         val appVariant = when {
-            preRelease && name.contains("releaseA") -> AppVariant.BETA_RELEASEA
-            preRelease && name.contains("releaseS") -> AppVariant.BETA_RELEASES
-            preRelease && name.contains("release") -> AppVariant.BETA_RELEASE
+            preRelease && (name.contains("release") || name.contains("beta")) -> AppVariant.BETA_RELEASE
             else -> AppVariant.OFFICIAL
         }
 
         return AppReleaseInfo(appVariant, timestamp, note, name, apkUrl, url)
     }
 }
-
-@Keep
-data class GiteeAsset(
-    @SerializedName("browser_download_url")
-    val apkUrl: String,
-    @SerializedName("name")
-    val name: String
-) {
-    val isValid: Boolean
-        get() = apkUrl.contains(".apk")
-
-    fun assetToAppReleaseInfo(preRelease: Boolean, note: String): AppReleaseInfo {
-
-        val appVariant = when {
-            name.contains("releaseA") -> AppVariant.BETA_RELEASEA
-            name.contains("releaseS") -> AppVariant.BETA_RELEASES
-            name.contains("release") -> AppVariant.BETA_RELEASE //preRelease &&
-            else -> AppVariant.OFFICIAL
-        }
-
-        return AppReleaseInfo(appVariant, 0, note, name, apkUrl, "")
-    }
-}
-
 

@@ -27,6 +27,7 @@ import io.legado.app.model.CheckSource
 import io.legado.app.model.ImageProvider
 import io.legado.app.receiver.SharedReceiverActivity
 import io.legado.app.service.WebService
+import io.legado.app.ui.about.NetworkLogDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.video.config.SettingsDialog
 import io.legado.app.ui.widget.code.addJsonPattern
@@ -66,6 +67,7 @@ class OtherConfigFragment : PreferenceFragment(),
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         putPrefBoolean(PreferKey.processText, isProcessTextEnabled())
         addPreferencesFromResource(R.xml.pref_config_other)
+        ConfigPreferenceStyle.applyTo(preferenceScreen)
         upPreferenceSummary(PreferKey.userAgent, AppConfig.userAgent)
         upPreferenceSummary(PreferKey.preDownloadNum, AppConfig.preDownloadNum.toString())
         upPreferenceSummary(PreferKey.threadCount, AppConfig.threadCount.toString())
@@ -86,6 +88,7 @@ class OtherConfigFragment : PreferenceFragment(),
         super.onViewCreated(view, savedInstanceState)
         activity?.setTitle(R.string.other_setting)
         preferenceManager.sharedPreferences?.registerOnSharedPreferenceChangeListener(this)
+        ConfigPreferenceStyle.applyListStyle(this)
         listView.setEdgeEffectColor(primaryColor)
     }
 
@@ -166,6 +169,7 @@ class OtherConfigFragment : PreferenceFragment(),
             }
 
             PreferKey.clearWebViewData -> clearWebViewData()
+            "networkRequestLog" -> showDialogFragment<NetworkLogDialog>()
             "localPassword" -> alertLocalPassword()
             PreferKey.shrinkDatabase -> shrinkDatabase()
         }
@@ -202,6 +206,10 @@ class OtherConfigFragment : PreferenceFragment(),
                 LiveEventBus.config().enableLogger(AppConfig.recordLog)
                 AppFreezeMonitor.init(appCtx)
                 DispatchersMonitor.init()
+            }
+
+            PreferKey.recordNetworkLog -> {
+                AppConfig.recordNetworkLog = appCtx.getPrefBoolean(PreferKey.recordNetworkLog)
             }
 
             PreferKey.processText -> sharedPreferences?.let {

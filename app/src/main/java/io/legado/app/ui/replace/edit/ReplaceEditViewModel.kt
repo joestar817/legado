@@ -6,6 +6,7 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.book.ContentProcessor
 import io.legado.app.utils.*
 import kotlinx.coroutines.Dispatchers
 
@@ -59,6 +60,7 @@ class ReplaceEditViewModel(application: Application) : BaseViewModel(application
                 replaceRule.order = appDb.replaceRuleDao.maxOrder + 1
             }
             appDb.replaceRuleDao.insert(replaceRule)
+            ContentProcessor.upReplaceRules()
         }.onSuccess {
             success()
         }.onError {

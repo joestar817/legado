@@ -65,6 +65,9 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     var searchResultList: List<SearchResult>? = null
     var searchResultIndex: Int = 0
     private var changeSourceCoroutine: Coroutine<*>? = null
+    private var enterReplaceRuleResetBookUrl: String? = null
+    private var enterReplaceRuleResetScheduled = false
+    private var enterReplaceRuleResetDone = false
 
     init {
         AppConfig.detectClickArea()
@@ -122,6 +125,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         } else {
             ReadBook.resetData(book)
         }
+        prepareReplaceRuleResetOnEnter(book)
         isInitFinish = true
         if (!book.isLocal && book.tocUrl.isEmpty() && !loadBookInfo(book)) {
             return
@@ -159,6 +163,59 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         if (!book.isLocal && ReadBook.bookSource == null) {
             autoChangeSource(book.name, book.author)
             return
+        }
+    }
+
+    private fun prepareReplaceRuleResetOnEnter(book: Book) {
+        enterReplaceRuleResetBookUrl = if (book.getUseReplaceRule()) book.bookUrl else null
+        enterReplaceRuleResetScheduled = false
+        enterReplaceRuleResetDone = false
+    }
+
+    fun resetReplaceRuleStateAfterResume() {
+        scheduleReplaceRuleStateReset("onResume", force = true)
+    }
+
+    private fun scheduleReplaceRuleStateReset(reason: String, force: Boolean) {
+        val book = ReadBook.book ?: return
+        if (enterReplaceRuleResetBookUrl != book.bookUrl) {
+            prepareReplaceRuleResetOnEnter(book)
+        }
+        if (!book.getUseReplaceRule()) return
+        if (enterReplaceRuleResetScheduled) return
+        if (enterReplaceRuleResetDone && !force) return
+        if (force) {
+            enterReplaceRuleResetDone = false
+        }
+        enterReplaceRuleResetScheduled = true
+        AppLog.putDebug(
+            "替换净化调试: 进入阅读页重置已调度\n" +
+                    "书籍: ${book.name}\n" +
+                    "书源: ${book.origin}\n" +
+                    "章节: ${ReadBook.curTextChapter?.title}\n" +
+                    "触发: $reason"
+        )
+        execute {
+            val curBook = ReadBook.book ?: return@execute
+            enterReplaceRuleResetScheduled = false
+            if (enterReplaceRuleResetBookUrl != curBook.bookUrl || !curBook.getUseReplaceRule()) {
+                AppLog.putDebug(
+                    "替换净化调试: 进入阅读页重置已取消\n" +
+                            "书籍: ${curBook.name}\n" +
+                            "书源: ${curBook.origin}\n" +
+                            "触发: $reason"
+                )
+                return@execute
+            }
+            enterReplaceRuleResetDone = true
+            AppLog.putDebug(
+                "替换净化调试: 进入阅读页执行重置\n" +
+                        "书籍: ${curBook.name}\n" +
+                        "书源: ${curBook.origin}\n" +
+                        "章节: ${ReadBook.curTextChapter?.title}\n" +
+                        "触发: $reason"
+            )
+            replaceRuleChanged()
         }
     }
 
@@ -567,9 +624,19 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
      */
     fun replaceRuleChanged() {
         execute {
-            ReadBook.book?.let {
-                ContentProcessor.get(it.name, it.origin).upReplaceRules()
-                ReadBook.loadContent(resetPageOffset = false)
+            ReadBook.book?.let { book ->
+                val useReplaceRule = book.getUseReplaceRule()
+                val contentProcessor = ContentProcessor.get(book.name, book.origin)
+                contentProcessor.upReplaceRules()
+                if (useReplaceRule) {
+                    try {
+                        book.setUseReplaceRule(false)
+                        ReadBook.reloadContentForReplaceRuleChangedAwait(resetPageOffset = false)
+                    } finally {
+                        book.setUseReplaceRule(true)
+                    }
+                }
+                ReadBook.reloadContentForReplaceRuleChangedAwait(resetPageOffset = false)
             }
         }
     }

@@ -33,6 +33,7 @@ import io.legado.app.help.http.get
 import io.legado.app.help.http.getProxyClient
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.newCallStrResponse
+import io.legado.app.help.http.networkLogSource
 import io.legado.app.help.http.postForm
 import io.legado.app.help.http.postJson
 import io.legado.app.help.http.postMultipart
@@ -447,6 +448,7 @@ class AnalyzeUrl(
                     RequestMethod.POST -> {
                         val res = getClient().newCallStrResponse(retry) {
                             addHeaders(headerMap)
+                            networkLogSource(getTag())
                             url(urlNoQuery)
                             if (!encodedForm.isNullOrEmpty() || body.isNullOrBlank()) {
                                 postForm(encodedForm ?: "")
@@ -477,6 +479,7 @@ class AnalyzeUrl(
             } else {
                 strResponse = getClient().newCallStrResponse(retry) {
                     addHeaders(headerMap)
+                    networkLogSource(getTag())
                     when (method) {
                         RequestMethod.POST -> {
                             url(urlNoQuery)
@@ -555,6 +558,7 @@ class AnalyzeUrl(
             setCookie()
             val response = getClient().newCallResponse(retry) {
                 addHeaders(headerMap)
+                networkLogSource(getTag())
                 when (method) {
                     RequestMethod.POST -> {
                         url(urlNoQuery)
@@ -681,6 +685,7 @@ class AnalyzeUrl(
      */
     suspend fun upload(fileName: String, file: Any, contentType: String): StrResponse {
         return getProxyClient(proxy).newCallStrResponse(retry) {
+            networkLogSource(getTag())
             url(urlNoQuery)
             val bodyMap = GSON.fromJsonObject<HashMap<String, Any>>(body).getOrNull()!!
             bodyMap.forEach { entry ->

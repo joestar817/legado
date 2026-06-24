@@ -20,16 +20,14 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
         get() = when (AppConfig.updateToVariant) {
             "official_version" -> AppVariant.OFFICIAL
             "beta_release_version" -> AppVariant.BETA_RELEASE
-            "beta_releaseA_version" -> AppVariant.BETA_RELEASEA
-            "beta_releaseS_version" -> AppVariant.BETA_RELEASES
             else -> AppConst.appInfo.appVariant
         }
 
     private suspend fun getLatestRelease(): List<AppReleaseInfo> {
         val lastReleaseUrl = if (checkVariant.isBeta()) {
-            "https://api.github.com/repos/gedoor/legado/releases/tags/beta"
+            "https://api.github.com/repos/joestar817/legado/releases/tags/beta"
         } else {
-            "https://api.github.com/repos/gedoor/legado/releases/latest"
+            "https://api.github.com/repos/joestar817/legado/releases/latest"
         }
         val res = okHttpClient.newCallResponse {
             url(lastReleaseUrl)

@@ -116,6 +116,10 @@ fun Request.Builder.addHeaders(headers: Map<String, String>) {
     }
 }
 
+fun Request.Builder.networkLogSource(source: String?) {
+    tag(NetworkLog.SourceLabel::class.java, NetworkLog.sourceLabel(source))
+}
+
 fun Request.Builder.get(url: String, queryMap: Map<String, String>, encoded: Boolean = false) {
     val httpBuilder = url.toHttpUrl().newBuilder()
     queryMap.forEach {

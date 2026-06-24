@@ -64,10 +64,25 @@
 
 	<string-array name="theme_mode">
 		<item>Follow system</item>
-		<item>Bright mode</item>
+		<item>Native theme</item>
 		<item>Dark mode</item>
 		<item>E-Ink mode</item>
+		<item>Warm gradient</item>
+		<item>Bamboo shadow</item>
+		<item>Gray mist</item>
 	</string-array>
+
+    <string-array name="ai_provider_type">
+        <item>OpenAI compatible</item>
+        <item>Google Gemini</item>
+        <item>Claude</item>
+    </string-array>
+
+    <string-array name="ai_provider_type_values">
+        <item>openai</item>
+        <item>google</item>
+        <item>claude</item>
+    </string-array>
 
 	<string-array name="NavBarColors">
 		<item>Auto</item>
@@ -180,8 +195,8 @@
 
 	<string-array name="default_app_variant">
 		<item>@string/default_version</item>
+		<item>@string/official_version</item>
 		<item>@string/beta_release_version</item>
-		<item>@string/beta_releaseS_version</item>
 	</string-array>
 
 	<string-array name="default_home_page_value">
@@ -193,8 +208,8 @@
 
 	<string-array name="default_app_variant_value">
 		<item>default_version</item>
+		<item>official_version</item>
 		<item>beta_release_version</item>
-		<item>beta_releaseS_version</item>
 	</string-array>
 
 	<string-array name="tip_color">

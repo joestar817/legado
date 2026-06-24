@@ -1,7 +1,6 @@
 <resources>
     <!--App-->
     <string name="app_name">閱讀</string>
-    <string name="app_name_a">閱讀·A</string>
     <string name="receiving_shared_label">閱讀·搜尋</string>
     <string name="tip_perm_request_storage">閱讀需要存取記憶卡權限，請前往「設定」—「應用程式權限」—打開所需權限</string>
 
@@ -69,7 +68,6 @@
     <string name="other_setting">其它設定</string>
     <string name="other_setting_s">與功能相關的一些設定</string>
     <string name="about">關於</string>
-    <string name="donate">捐贈</string>
     <string name="exit">退出</string>
     <string name="exit_no_save">尚未儲存，是否繼續編輯</string>
     <string name="read_style">閱讀樣式設定</string>
@@ -95,7 +93,7 @@
         \u3000\u3000這是一款使用Kotlin全新開發的開源的閱讀軟體，歡迎您的加入。
     </string>
     <string name="app_share_description">
-        閱讀3.0下載網址：\nhttps://github.com/gedoor/legado/releases
+        閱讀NG下載網址：\nhttps://github.com/joestar817/legado/releases
     </string>
     <string name="version_name">Version %s</string>
     <string name="pt_background_verification">後臺校驗書源</string>
@@ -475,7 +473,6 @@
     <string name="theme">主題</string>
     <string name="theme_mode">主題模式</string>
     <string name="theme_mode_desc">選擇主題模式</string>
-    <string name="join_qq_group">加入QQ群</string>
     <string name="bg_image_per">獲取背景圖片需儲存權限</string>
     <string name="input_book_source_url">輸入書源網址</string>
     <string name="del_file">刪除文件</string>
@@ -695,11 +692,8 @@
     <string name="contact">聯繫我們</string>
     <string name="license">開源許可</string>
     <string name="other">其它</string>
-    <string name="official_account">legado-top</string>
-    <string name="follow_official_account">關注公眾號</string>
     <string name="wechat">微信</string>
     <string name="thanks">您的支援是我更新的動力</string>
-    <string name="about_official_account">公眾號[开源阅读]</string>
     <string name="source_auto_changing">正在自動換源</string>
     <string name="click_to_apply">點擊加入</string>
     <string name="middle">中</string>
@@ -739,15 +733,7 @@
     <string name="starting_download">正在啟動下載</string>
     <string name="already_in_download">該書已在下載列表</string>
     <string name="click_to_open">點擊打開</string>
-    <string name="follow_public_account_summary">關注[legado-top]點擊廣告支持我</string>
-    <string name="weChat_appreciation_code">微信讚賞碼</string>
-    <string name="alipay">支付寶</string>
-    <string name="alipay_red_envelope_search_code">支付寶紅包搜尋碼</string>
-    <string name="alipay_red_envelope_copy">537954522 點擊複製</string>
-    <string name="alipay_red_envelope_qr_code">支付寶紅包二維碼</string>
-    <string name="alipay_payment_qr_code">支付寶收款二維碼</string>
-    <string name="qq_collection_qr_code">QQ收款二維碼</string>
-    <string name="contributors_summary">gedoor、Invinciblelee、Xwite等，詳情請在github中查看</string>
+    <string name="contributors_summary">詳情請在 GitHub 中查看</string>
     <string name="clear_cache_summary">清除已下載書籍和字體快取</string>
     <string name="default_cover">預設封面</string>
     <string name="restore_ignore">復原忽略列表</string>
@@ -769,8 +755,7 @@
     <string name="show_brightness_view">顯示亮度調節控制項</string>
     <string name="language">語言</string>
     <string name="import_rss_source">匯入訂閱源</string>
-    <string name="donate_summary">您的支援是我更新的動力</string>
-    <string name="about_summary">公眾號[开源阅读软件]</string>
+    <string name="about_summary">Next Generation Legado - 閱讀NG</string>
     <string name="read_record">閱讀記錄</string>
     <string name="del_read_record">刪除閲讀記錄</string>
     <string name="read_record_summary">閱讀時間記錄</string>
@@ -953,8 +938,6 @@
     <string name="use_replace">使用取代</string>
     <string name="scope_title">作用於標題</string>
     <string name="scope_content">作用於正文</string>
-    <string name="join_qq_channel">加入QQ頻道</string>
-    <string name="qq_channel_summary">點擊加入閱讀QQ頻道</string>
     <string name="menu_refresh_dur">重新整理目前章節</string>
     <string name="menu_refresh_after">重新整理之後章節</string>
     <string name="menu_refresh_all">重新整理全部章節</string>
@@ -1175,7 +1158,6 @@
     <string name="default_version">当前</string>
     <string name="official_version">正式版</string>
     <string name="beta_release_version">测试版</string>
-    <string name="beta_releaseA_version">共存版</string>
     <string name="stream_read_aloud_audio">流式播放音频</string>
     <string name="stream_read_aloud_audio_summary">即边下边播，网络不好时播放会断断续续，仅TTS源有效</string>
     <string name="pause_read_aloud_while_phone_calls_title">来电期间暂停朗读</string>

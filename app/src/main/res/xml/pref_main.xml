@@ -4,52 +4,66 @@
     android:divider="@color/transparent"
     app:allowDividerBelow="false">
 
-    <io.legado.app.lib.prefs.Preference
-        android:icon="@drawable/ic_cfg_source"
-        android:key="bookSourceManage"
-        android:summary="@string/book_source_manage_desc"
-        android:title="@string/book_source_manage"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.Preference
-        android:icon="@drawable/ic_cfg_source"
-        android:key="txtTocRuleManage"
-        android:summary="@string/config_txt_toc_rule"
-        android:title="@string/txt_toc_rule"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.Preference
-        android:icon="@drawable/ic_cfg_replace"
-        android:key="replaceManage"
-        android:summary="@string/replace_purify_desc"
-        android:title="@string/replace_purify"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.Preference
-        android:icon="@drawable/ic_translate"
-        android:key="dictRuleManage"
-        android:summary="@string/config_dict_rule"
-        android:title="@string/dict_rule"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.NameListPreference
-        android:defaultValue="0"
-        android:entries="@array/theme_mode"
-        android:entryValues="@array/theme_mode_v"
-        android:icon="@drawable/ic_cfg_theme"
-        android:key="themeMode"
-        android:summary="@string/theme_mode_desc"
-        android:title="@string/theme_mode"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:icon="@drawable/ic_cfg_web"
-        android:key="webService"
-        android:summary="@string/web_service_desc"
-        android:title="@string/web_service"
+    <io.legado.app.lib.prefs.PreferenceCategory
+        android:title="@string/my_settings_section_features"
+        app:allowDividerAbove="false"
         app:allowDividerBelow="false"
-        app:iconSpaceReserved="false" />
+        app:iconSpaceReserved="false">
+
+        <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_cfg_source"
+            android:key="bookSourceManage"
+            android:summary="@string/book_source_manage_desc"
+            android:title="@string/book_source_manage"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_cfg_source"
+            android:key="txtTocRuleManage"
+            android:summary="@string/config_txt_toc_rule"
+            android:title="@string/txt_toc_rule"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_cfg_replace"
+            android:key="replaceManage"
+            android:summary="@string/replace_purify_desc"
+            android:title="@string/replace_purify"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_translate"
+            android:key="dictRuleManage"
+            android:summary="@string/config_dict_rule"
+            android:title="@string/dict_rule"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_ai_provider"
+            android:key="aiConfig"
+            android:summary="@string/ai_setting_summary"
+            android:title="@string/ai_setting"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.NameListPreference
+            android:defaultValue="4"
+            android:entries="@array/theme_mode"
+            android:entryValues="@array/theme_mode_v"
+            android:icon="@drawable/ic_cfg_theme"
+            android:key="themeMode"
+            android:summary="@string/theme_mode_desc"
+            android:title="@string/theme_mode"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_cfg_web"
+            android:key="serviceManage"
+            android:summary="@string/service_manage_desc"
+            android:title="@string/service_manage"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+    </io.legado.app.lib.prefs.PreferenceCategory>
 
     <io.legado.app.lib.prefs.PreferenceCategory
         android:title="@string/setting"
@@ -86,8 +100,7 @@
         android:title="@string/other"
         app:allowDividerAbove="false"
         app:allowDividerBelow="false"
-        app:iconSpaceReserved="false"
-        app:layout="@layout/view_preference_category">
+        app:iconSpaceReserved="false">
 
         <io.legado.app.lib.prefs.Preference
             android:icon="@drawable/ic_bookmark"

@@ -232,6 +232,13 @@ object ReadBookConfig {
                 appCtx.putPrefBoolean(PreferKey.shareLayout, value)
             }
         }
+    var isNightTheme = appCtx.getPrefBoolean(PreferKey.readNightTheme, false)
+        set(value) {
+            field = value
+            if (appCtx.getPrefBoolean(PreferKey.readNightTheme, false) != value) {
+                appCtx.putPrefBoolean(PreferKey.readNightTheme, value)
+            }
+        }
 
     /**
      * 两端对齐
@@ -538,11 +545,11 @@ object ReadBookConfig {
     @Keep
     data class Config(
         var name: String = "",
-        var bgStr: String = "#EEEEEE",//白天背景
+        var bgStr: String = "山水画.jpg",//白天背景
         var bgStrNight: String = "#000000",//夜间背景
         var bgStrEInk: String = "#FFFFFF",//EInk背景
         var bgAlpha: Int = 100,//背景透明度
-        var bgType: Int = 0,//白天背景类型 0:颜色, 1:assets图片, 2其它图片
+        var bgType: Int = 1,//白天背景类型 0:颜色, 1:assets图片, 2其它图片
         var bgTypeNight: Int = 0,//夜间背景类型
         var bgTypeEInk: Int = 0,//EInk背景类型
         private var darkStatusIcon: Boolean = true,//白天是否暗色状态栏
@@ -639,7 +646,7 @@ object ReadBookConfig {
                     textColorIntEInk = color
                 }
 
-                AppConfig.isNightTheme -> {
+                ReadBookConfig.isNightTheme -> {
                     textColorNight = "#${color.hexString}"
                     textColorIntNight = color
                 }
@@ -657,7 +664,7 @@ object ReadBookConfig {
             }
             return when {
                 AppConfig.isEInkMode -> textColorIntEInk
-                AppConfig.isNightTheme -> textColorIntNight
+                ReadBookConfig.isNightTheme -> textColorIntNight
                 else -> textColorInt
             }
         }
@@ -669,7 +676,7 @@ object ReadBookConfig {
                     textAccentColorIntEInk = color
                 }
 
-                AppConfig.isNightTheme -> {
+                ReadBookConfig.isNightTheme -> {
                     textAccentColorNight = "#${color.hexString}"
                     textAccentColorIntNight = color
                 }
@@ -687,7 +694,7 @@ object ReadBookConfig {
             }
             return when {
                 AppConfig.isEInkMode -> textAccentColorIntEInk
-                AppConfig.isNightTheme -> textAccentColorIntNight
+                ReadBookConfig.isNightTheme -> textAccentColorIntNight
                 else -> textAccentColorInt
             }
         }
@@ -695,7 +702,7 @@ object ReadBookConfig {
         fun setCurStatusIconDark(isDark: Boolean) {
             when {
                 AppConfig.isEInkMode -> darkStatusIconEInk = isDark
-                AppConfig.isNightTheme -> darkStatusIconNight = isDark
+                ReadBookConfig.isNightTheme -> darkStatusIconNight = isDark
                 else -> darkStatusIcon = isDark
             }
         }
@@ -703,7 +710,7 @@ object ReadBookConfig {
         fun curStatusIconDark(): Boolean {
             return when {
                 AppConfig.isEInkMode -> darkStatusIconEInk
-                AppConfig.isNightTheme -> darkStatusIconNight
+                ReadBookConfig.isNightTheme -> darkStatusIconNight
                 else -> darkStatusIcon
             }
         }
@@ -729,7 +736,7 @@ object ReadBookConfig {
                     bgStrEInk = bg
                 }
 
-                AppConfig.isNightTheme -> {
+                ReadBookConfig.isNightTheme -> {
                     bgTypeNight = bgType
                     bgStrNight = bg
                 }
@@ -744,7 +751,7 @@ object ReadBookConfig {
         fun curBgStr(): String {
             return when {
                 AppConfig.isEInkMode -> bgStrEInk
-                AppConfig.isNightTheme -> bgStrNight
+                ReadBookConfig.isNightTheme -> bgStrNight
                 else -> bgStr
             }
         }
@@ -752,7 +759,7 @@ object ReadBookConfig {
         fun curBgType(): Int {
             return when {
                 AppConfig.isEInkMode -> bgTypeEInk
-                AppConfig.isNightTheme -> bgTypeNight
+                ReadBookConfig.isNightTheme -> bgTypeNight
                 else -> bgType
             }
         }

@@ -24,6 +24,7 @@ data class TextChapter(
     val title: String,
     val chaptersSize: Int,
     val sameTitleRemoved: Boolean,
+    val sourceParagraphs: List<String>,
     val isVip: Boolean,
     val isPay: Boolean,
     //起效的替换规则
@@ -312,6 +313,7 @@ data class TextChapter(
         val emptyTextChapter = TextChapter(
             BookChapter(), -1, "emptyTextChapter", -1,
             sameTitleRemoved = false,
+            sourceParagraphs = emptyList(),
             isVip = false,
             isPay = false,
             null

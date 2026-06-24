@@ -5,6 +5,7 @@ import android.text.TextUtils
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.help.book.ContentProcessor
 import io.legado.app.utils.splitNotBlank
 
 /**
@@ -16,12 +17,14 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
     fun update(vararg rule: ReplaceRule) {
         execute {
             appDb.replaceRuleDao.update(*rule)
+            ContentProcessor.upReplaceRules()
         }
     }
 
     fun delete(rule: ReplaceRule) {
         execute {
             appDb.replaceRuleDao.delete(rule)
+            ContentProcessor.upReplaceRules()
         }
     }
 
@@ -29,6 +32,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         execute {
             rule.order = appDb.replaceRuleDao.minOrder - 1
             appDb.replaceRuleDao.update(rule)
+            ContentProcessor.upReplaceRules()
         }
     }
 
@@ -39,6 +43,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
                 it.order = ++minOrder
             }
             appDb.replaceRuleDao.update(*rules.toTypedArray())
+            ContentProcessor.upReplaceRules()
         }
     }
 
@@ -46,6 +51,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         execute {
             rule.order = appDb.replaceRuleDao.maxOrder + 1
             appDb.replaceRuleDao.update(rule)
+            ContentProcessor.upReplaceRules()
         }
     }
 
@@ -56,6 +62,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
                 it.order = maxOrder++
             }
             appDb.replaceRuleDao.update(*rules.toTypedArray())
+            ContentProcessor.upReplaceRules()
         }
     }
 
@@ -66,6 +73,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
                 rule.order = index + 1
             }
             appDb.replaceRuleDao.update(*rules.toTypedArray())
+            ContentProcessor.upReplaceRules()
         }
     }
 
@@ -75,6 +83,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
                 rules[it].copy(isEnabled = true)
             }
             appDb.replaceRuleDao.update(*array)
+            ContentProcessor.upReplaceRules()
         }
     }
 
@@ -84,12 +93,14 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
                 rules[it].copy(isEnabled = false)
             }
             appDb.replaceRuleDao.update(*array)
+            ContentProcessor.upReplaceRules()
         }
     }
 
     fun delSelection(rules: List<ReplaceRule>) {
         execute {
             appDb.replaceRuleDao.delete(*rules.toTypedArray())
+            ContentProcessor.upReplaceRules()
         }
     }
 
@@ -100,6 +111,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
                 source.group = group
             }
             appDb.replaceRuleDao.update(*sources.toTypedArray())
+            ContentProcessor.upReplaceRules()
         }
     }
 
@@ -115,6 +127,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
                 }
             }
             appDb.replaceRuleDao.update(*sources.toTypedArray())
+            ContentProcessor.upReplaceRules()
         }
     }
 
@@ -129,6 +142,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
                     }
                 }
                 appDb.replaceRuleDao.update(*sources.toTypedArray())
+                ContentProcessor.upReplaceRules()
             }
         }
     }
