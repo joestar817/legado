@@ -69,6 +69,12 @@
         app:layout="@layout/view_preference_category">
 
         <io.legado.app.lib.prefs.Preference
+            android:key="localPassword"
+            android:summary="@string/set_local_password_summary"
+            android:title="@string/set_local_password"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:key="backupUri"
             android:summary="@string/select_backup_path"
             android:title="@string/backup_path"
