@@ -264,7 +264,7 @@
         \u3000\u3000 This is an open source reading software newly developed by Kotlin, welcome to join us.
     </string>
     <string name="app_share_description">
-        阅读NG download link：\n https://github.com/joestar817/legado/releases
+        阅读NG download link：\n https://github.com/joestar817/legado_NG/releases
     </string>
     <string name="version_name">Version %s</string>
     <string name="pt_background_verification">Background-verification</string>
@@ -1467,7 +1467,7 @@
     <string name="about_description_ng">　　阅读NG（Next Generation Legado），致力于打造下一代的阅读体验。</string>
     <string name="contributors_summary_ng">详情请在 GitHub 中查看</string>
     <string name="app_share_description_ng">
-        阅读NG 下载地址：\nhttps://github.com/joestar817/legado/releases
+        阅读NG 下载地址：\nhttps://github.com/joestar817/legado_NG/releases
     </string>
     <string name="sure_cache_book">是否确认开始缓存？</string>
     <string name="non_printable_set">不可视字符设定</string>

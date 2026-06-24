@@ -59,7 +59,7 @@
       </div>
       <div class="bottom-icons">
         <a
-          href="https://github.com/joestar817/legado"
+          href="https://github.com/joestar817/legado_NG"
           target="_blank"
         >
           <div class="bottom-icon">

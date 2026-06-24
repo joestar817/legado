@@ -99,7 +99,7 @@
         \u3000\u3000 This is an open source reading software newly developed by Kotlin, welcome to join us.
     </string>
     <string name="app_share_description">
-        阅读NG download link：\n https://github.com/joestar817/legado/releases
+        阅读NG download link：\n https://github.com/joestar817/legado_NG/releases
     </string>
     <string name="version_name">Version %s</string>
     <string name="pt_background_verification">Background-verification</string>

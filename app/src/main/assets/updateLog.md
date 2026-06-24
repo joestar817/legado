@@ -73,8 +73,8 @@
 
 
 ## **必读**
-阅读NG 当前维护仓库：[joestar817/legado](https://github.com/joestar817/legado)
-[查看实时详细日志](https://github.com/joestar817/legado/commits/main)　
+阅读NG 当前维护仓库：[joestar817/legado_NG](https://github.com/joestar817/legado_NG)
+[查看实时详细日志](https://github.com/joestar817/legado_NG/commits/main)　
 
 【温馨提醒】 *更新前一定要做好备份，以免数据丢失！*  
 * 阅读只是一个转码工具，不提供内容，第一次安装app，需要自己手动导入书源。

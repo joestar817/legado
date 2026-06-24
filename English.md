@@ -57,7 +57,7 @@ Compared with Reading Sigma, Reading NG currently adds and adjusts the following
 
 ## Links
 
-- [Releases](https://github.com/joestar817/legado/releases)
+- [Releases](https://github.com/joestar817/legado_NG/releases)
 - [Update log](app/src/main/assets/updateLog.md)
 - [Help document](app/src/main/assets/web/help/md/appHelp.md)
 

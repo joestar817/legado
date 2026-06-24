@@ -57,7 +57,7 @@
 
 ## 链接
 
-- [Releases](https://github.com/joestar817/legado/releases)
+- [Releases](https://github.com/joestar817/legado_NG/releases)
 - [更新日志](app/src/main/assets/updateLog.md)
 - [帮助文档](app/src/main/assets/web/help/md/appHelp.md)
 - [书源规则教程](https://mgz0227.github.io/The-tutorial-of-Legado/)
