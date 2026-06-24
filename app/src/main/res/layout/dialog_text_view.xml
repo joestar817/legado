@@ -1,39 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/background">
+    style="@style/Ng.DialogRoot"
+    android:layout_height="match_parent">
 
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/tool_bar"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:theme="?attr/actionBarStyle"
-        app:popupTheme="@style/AppTheme.PopupOverlay"
-        app:titleTextAppearance="@style/ToolbarTitle"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:layout_height="58dp">
 
-    <io.legado.app.ui.widget.text.ScrollTextView
-        android:id="@+id/text_view"
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/tool_bar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            app:popupTheme="@style/AppTheme.PopupOverlay"
+            app:titleTextAppearance="@style/ToolbarTitle"
+            app:titleTextColor="@color/ng_on_surface" />
+
+        <io.legado.app.ui.widget.text.BadgeView
+            android:id="@+id/badge_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|top"
+            android:layout_margin="3dp"
+            android:visibility="invisible" />
+
+    </FrameLayout>
+
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:padding="12dp"
-        android:textColor="@color/secondaryText"
-        android:scrollbarStyle="outsideOverlay"
-        android:textIsSelectable="true"
-        app:layout_constraintTop_toBottomOf="@+id/tool_bar"
-        app:layout_constraintBottom_toBottomOf="parent"/>
+        android:layout_marginStart="@dimen/ng_dialog_padding"
+        android:layout_marginEnd="@dimen/ng_dialog_padding"
+        android:layout_marginBottom="@dimen/ng_dialog_padding"
+        android:layout_weight="1"
+        android:background="@drawable/ng_bg_dialog_section"
+        android:padding="4dp">
 
-    <io.legado.app.ui.widget.text.BadgeView
-        android:id="@+id/badge_view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="3dp"
-        android:visibility="invisible"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        <io.legado.app.ui.widget.text.ScrollTextView
+            android:id="@+id/text_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="8dp"
+            android:scrollbarStyle="insideInset"
+            android:scrollbars="vertical"
+            android:textColor="@color/ng_on_surface"
+            android:textIsSelectable="true" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    </FrameLayout>
 
-
+</LinearLayout>

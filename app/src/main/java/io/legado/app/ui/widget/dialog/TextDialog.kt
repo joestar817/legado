@@ -2,8 +2,11 @@ package io.legado.app.ui.widget.dialog
 
 import android.os.Build
 import android.os.Bundle
+import android.graphics.Typeface
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StyleSpan
 import android.view.View
-import android.view.ViewGroup
 import android.view.textclassifier.TextClassifier
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
@@ -12,18 +15,19 @@ import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogTextViewBinding
 import io.legado.app.help.CacheManager
 import io.legado.app.help.IntentData
-import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.setHtml
-import io.legado.app.utils.setLayout
 import io.legado.app.utils.setMarkdown
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.tintTitle
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.noties.markwon.Markwon
 import io.noties.markwon.ext.tables.TablePlugin
 import io.noties.markwon.html.HtmlPlugin
+import io.noties.markwon.core.spans.EmphasisSpan
 import io.noties.markwon.image.glide.GlideImagesPlugin
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.delay
@@ -60,13 +64,14 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
 
     override fun onStart() {
         super.onStart()
-        setLayout(ViewGroup.LayoutParams.MATCH_PARENT, 0.9f)
+        applyNgDialogWindow(height = ngDialogMaxHeight())
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        binding.toolBar.setBackgroundColor(primaryColor)
+        view.setBackgroundResource(R.drawable.ng_bg_dialog)
         binding.toolBar.inflateMenu(R.menu.dialog_text)
         binding.toolBar.menu.applyTint(requireContext())
+        binding.toolBar.menu.tintTitle(R.id.menu_close, requireContext().accentColor)
         arguments?.let {
             val title = it.getString("title")
             binding.toolBar.title = title
@@ -84,7 +89,7 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
                             .usePlugin(HtmlPlugin.create())
                             .usePlugin(TablePlugin.create(requireContext()))
                             .build()
-                        markwon.toMarkdown(content)
+                        markwon.toMarkdown(content).withoutItalic()
                     }
                     binding.textView.setMarkdown(
                         markwon,
@@ -143,6 +148,28 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
                 dialog?.setCancelable(true)
             }
         }
+    }
+
+    private fun Spanned.withoutItalic(): Spanned {
+        val spannable = SpannableString(this)
+        getSpans(0, length, EmphasisSpan::class.java).forEach { span ->
+            spannable.removeSpan(span)
+        }
+        getSpans(0, length, StyleSpan::class.java).forEach { span ->
+            when (span.style) {
+                Typeface.ITALIC -> spannable.removeSpan(span)
+                Typeface.BOLD_ITALIC -> {
+                    val start = getSpanStart(span)
+                    val end = getSpanEnd(span)
+                    val flags = getSpanFlags(span)
+                    spannable.removeSpan(span)
+                    if (start >= 0 && end >= 0) {
+                        spannable.setSpan(StyleSpan(Typeface.BOLD), start, end, flags)
+                    }
+                }
+            }
+        }
+        return spannable
     }
 
 }
