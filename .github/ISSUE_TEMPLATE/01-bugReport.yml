@@ -50,7 +50,7 @@ body:
 
   - type: input
     attributes:
-      label: 阅读版本 / Legado version
+      label: 阅读NG版本 / Reading NG version
       placeholder: "3.22.110823"
     validations:
       required: true

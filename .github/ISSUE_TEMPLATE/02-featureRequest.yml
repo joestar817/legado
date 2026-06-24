@@ -21,12 +21,12 @@ body:
   - type: textarea
     attributes:
       label: 期望实现方式 / How to implement
-      placeholder: 阅读应该如何实现该功能
+      placeholder: 阅读NG应该如何实现该功能
     validations:
       required: true
   - type: input
     attributes:
-      label: 阅读版本 / Legado version
+      label: 阅读NG版本 / Reading NG version
       placeholder: "3.22.110823"
     validations:
       required: true

@@ -504,28 +504,32 @@ interface JsExtensions : JsEncodeUtils {
                     .execute()
             }
         } catch (e: Throwable) {
+            if (NetworkLog.isEnabled) {
+                NetworkLog.recordEvent(
+                    type = "JS",
+                    method = "GET",
+                    url = urlStr,
+                    requestHeaders = requestHeaders.formatNetworkHeaders(),
+                    tookMs = networkElapsedMs(start),
+                    error = e,
+                    source = getTag()
+                )
+            }
+            throw e
+        }
+        if (NetworkLog.isEnabled) {
             NetworkLog.recordEvent(
                 type = "JS",
                 method = "GET",
                 url = urlStr,
                 requestHeaders = requestHeaders.formatNetworkHeaders(),
+                statusCode = response.statusCode(),
                 tookMs = networkElapsedMs(start),
-                error = e,
+                responseHeaders = response.headers().formatNetworkHeaders(),
+                responseBody = response.body(),
                 source = getTag()
             )
-            throw e
         }
-        NetworkLog.recordEvent(
-            type = "JS",
-            method = "GET",
-            url = urlStr,
-            requestHeaders = requestHeaders.formatNetworkHeaders(),
-            statusCode = response.statusCode(),
-            tookMs = networkElapsedMs(start),
-            responseHeaders = response.headers().formatNetworkHeaders(),
-            responseBody = response.body(),
-            source = getTag()
-        )
         return response
     }
 
@@ -555,27 +559,31 @@ interface JsExtensions : JsEncodeUtils {
                     .execute()
             }
         } catch (e: Throwable) {
+            if (NetworkLog.isEnabled) {
+                NetworkLog.recordEvent(
+                    type = "JS",
+                    method = "HEAD",
+                    url = urlStr,
+                    requestHeaders = requestHeaders.formatNetworkHeaders(),
+                    tookMs = networkElapsedMs(start),
+                    error = e,
+                    source = getTag()
+                )
+            }
+            throw e
+        }
+        if (NetworkLog.isEnabled) {
             NetworkLog.recordEvent(
                 type = "JS",
                 method = "HEAD",
                 url = urlStr,
                 requestHeaders = requestHeaders.formatNetworkHeaders(),
+                statusCode = response.statusCode(),
                 tookMs = networkElapsedMs(start),
-                error = e,
+                responseHeaders = response.headers().formatNetworkHeaders(),
                 source = getTag()
             )
-            throw e
         }
-        NetworkLog.recordEvent(
-            type = "JS",
-            method = "HEAD",
-            url = urlStr,
-            requestHeaders = requestHeaders.formatNetworkHeaders(),
-            statusCode = response.statusCode(),
-            tookMs = networkElapsedMs(start),
-            responseHeaders = response.headers().formatNetworkHeaders(),
-            source = getTag()
-        )
         return response
     }
 
@@ -606,30 +614,34 @@ interface JsExtensions : JsEncodeUtils {
                     .execute()
             }
         } catch (e: Throwable) {
+            if (NetworkLog.isEnabled) {
+                NetworkLog.recordEvent(
+                    type = "JS",
+                    method = "POST",
+                    url = urlStr,
+                    requestHeaders = requestHeaders.formatNetworkHeaders(),
+                    requestBody = body,
+                    tookMs = networkElapsedMs(start),
+                    error = e,
+                    source = getTag()
+                )
+            }
+            throw e
+        }
+        if (NetworkLog.isEnabled) {
             NetworkLog.recordEvent(
                 type = "JS",
                 method = "POST",
                 url = urlStr,
                 requestHeaders = requestHeaders.formatNetworkHeaders(),
                 requestBody = body,
+                statusCode = response.statusCode(),
                 tookMs = networkElapsedMs(start),
-                error = e,
+                responseHeaders = response.headers().formatNetworkHeaders(),
+                responseBody = response.body(),
                 source = getTag()
             )
-            throw e
         }
-        NetworkLog.recordEvent(
-            type = "JS",
-            method = "POST",
-            url = urlStr,
-            requestHeaders = requestHeaders.formatNetworkHeaders(),
-            requestBody = body,
-            statusCode = response.statusCode(),
-            tookMs = networkElapsedMs(start),
-            responseHeaders = response.headers().formatNetworkHeaders(),
-            responseBody = response.body(),
-            source = getTag()
-        )
         return response
     }
 

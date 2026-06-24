@@ -24,6 +24,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
 
   prepare:
@@ -32,8 +35,6 @@ jobs:
     outputs:
       version: ${{ steps.set-ver.outputs.version }}
       versionL: ${{ steps.set-ver.outputs.versionL }}
-      lanzou: ${{ steps.check.outputs.lanzou }}
-      telegram: ${{ steps.check.outputs.telegram }}
       updateLog_updated: ${{ steps.updateLog.outputs.updated }}
       updateLog_content: ${{ steps.updateLog.outputs.body }}
       build_matrix: ${{ steps.set-matrix.outputs.build_matrix }}
@@ -45,14 +46,6 @@ jobs:
         run: |
           echo "version=$(date -d "8 hour" -u +3.%y.%m%d%H)" >> $GITHUB_OUTPUT
           echo "versionL=$(date -d "8 hour" -u +3.%y.%m%d%H%M)" >> $GITHUB_OUTPUT
-      - id: check
-        run: |
-          if [ -n "${{ secrets.LANZOU_ID }}" ]; then
-            echo "lanzou=yes" >> $GITHUB_OUTPUT
-          fi
-          if [ -n "${{ secrets.BOT_TOKEN }}" ]; then
-            echo "telegram=yes" >> $GITHUB_OUTPUT
-          fi
       - id: updateLog
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
@@ -128,11 +121,7 @@ jobs:
           echo "body=$CONTENT_JSON" >> $GITHUB_OUTPUT
       - id: set-matrix
         run: |
-          if [ "${{ steps.updateLog.outputs.updated }}" == "yes" ]; then
-            echo 'build_matrix={"product":["app"],"type":["release","releaseS"]}' >> $GITHUB_OUTPUT
-          else
-            echo 'build_matrix={"product":["app"],"type":["release"]}' >> $GITHUB_OUTPUT
-          fi
+          echo 'build_matrix={"product":["app"],"type":["release"]}' >> $GITHUB_OUTPUT
 
   build:
     needs: prepare
@@ -161,15 +150,35 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
+      - name: Release Apk Sign
+        env:
+          RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+        run: |
+          if [ -z "$RELEASE_KEY_STORE" ]; then
+            echo "RELEASE_KEY_STORE not configured, build will use unsigned release output."
+            exit 0
+          fi
+          if [ -z "$RELEASE_KEY_ALIAS" ] || [ -z "$RELEASE_KEY_PASSWORD" ] || [ -z "$RELEASE_STORE_PASSWORD" ]; then
+            echo "Release signing secrets are incomplete."
+            exit 1
+          fi
+          echo -e "\n" >> gradle.properties
+          echo RELEASE_KEY_ALIAS="$RELEASE_KEY_ALIAS" >> gradle.properties
+          echo RELEASE_KEY_PASSWORD="$RELEASE_KEY_PASSWORD" >> gradle.properties
+          echo RELEASE_STORE_PASSWORD="$RELEASE_STORE_PASSWORD" >> gradle.properties
+          echo RELEASE_STORE_FILE="./key.jks" >> gradle.properties
+          echo "$RELEASE_KEY_STORE" | base64 --decode > "$GITHUB_WORKSPACE/app/key.jks"
+
       - name: Build With Gradle
         continue-on-error: true
         run: |
-          if [ "${{ env.type }}" == 'release' ]; then
-            typeName="测试版"
+          if [ "${{ needs.prepare.outputs.updateLog_updated }}" == 'yes' ]; then
+            typeName="release"
           else
-            typeName="正式版"
-            sed "s/'.release'/'.releaseS'/" $GITHUB_WORKSPACE/app/build.gradle  -i
-            # sed 's/.release/.releaseS/'     $GITHUB_WORKSPACE/app/google-services.json -i
+            typeName="beta"
           fi
           echo "统一版本号"
           sed "/def version/c def version = \"${{ env.VERSION }}\"" $GITHUB_WORKSPACE/app/build.gradle  -i
@@ -179,11 +188,7 @@ jobs:
           echo "修改APK文件名"
           mkdir -p ${{ github.workspace }}/apk/
           for file in `ls ${{ github.workspace }}/app/build/outputs/apk/*/*/*.apk`; do
-            if [ "${{ env.type }}" == 'release' ]; then
-              mv "$file" ${{ github.workspace }}/apk/legado_NG_${{ env.VERSIONL }}_$typeName.apk
-            else
-              mv "$file" ${{ github.workspace }}/apk/legado_NG_${{ env.VERSIONL }}_$typeName.apk
-            fi
+            mv "$file" ${{ github.workspace }}/apk/legado_NG_${{ env.VERSIONL }}_$typeName.apk
           done
           echo "移动mapping文件"
           mkdir -p ${{ github.workspace }}/mapping/
@@ -251,14 +256,6 @@ jobs:
           mv */*.apk .
           rm -rf */
 
-          for file in `ls *.apk`; do
-            if [[ "$file" == *测试版* ]]; then
-              mv "$file" $(echo $file | sed s/测试版/beta/)
-            else
-              mv "$file" $(echo $file | sed s/正式版/plus/)
-            fi
-          done
-
       - name: Publish Official Release
         if: needs.prepare.outputs.updateLog_updated == 'yes'
         uses: softprops/action-gh-release@v2
@@ -301,72 +298,3 @@ jobs:
           prerelease: true
           files: ${{ github.workspace }}/apk/*.apk
           fail_on_unmatched_files: true
-
-  lanzou:
-    needs: [ prepare, build ]
-    if: ${{ github.event_name != 'pull_request' && needs.prepare.outputs.lanzou == 'yes' }}
-    runs-on: ubuntu-latest
-    env:
-      # 登录蓝奏云后在控制台运行document.cookie
-      ylogin: ${{ secrets.LANZOU_ID }}
-      phpdisk_info: ${{ secrets.LANZOU_PSD }}
-      # 蓝奏云里的文件夹ID（阅读3测试版:2670621）
-      LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
-      #蓝奏云分享链接
-      LANZOU_URL: ${{ secrets.LANZOU_URL }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v8
-        with:
-          path: apk/
-      - working-directory: apk/
-        run: mv */*.apk . ;rm -rf */
-      - name: Upload To Lanzou
-        continue-on-error: true
-        run: |
-          path="$GITHUB_WORKSPACE/apk/"
-          python3 $GITHUB_WORKSPACE/.github/scripts/lzy_web.py "$path" "$LANZOU_FOLDER_ID"
-          echo "[$(date -u -d '+8 hour' '+%Y.%m.%d %H:%M:%S')] 分享链接: $LANZOU_URL"
-
-  telegram:
-    needs: [prepare, build]
-    if: github.event_name != 'pull_request' && needs.prepare.outputs.telegram == 'yes'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          path: apk/
-      - id: set-tags
-        working-directory: apk/
-        run: |
-          mv */*.apk .
-          rm -rf */
-          has_plus=false
-          for file in `ls *.apk`; do
-            if [[ "$file" == *测试版* ]]; then
-              mv "$file" $(echo $file | sed s/测试版/beta/)
-            else
-              mv "$file" $(echo $file | sed s/正式版/plus/)
-              has_plus=true
-            fi
-          done
-          tags=""
-          if [ "$has_plus" = true ]; then
-            tags="#beta #plus"
-          else
-            tags="#beta"
-          fi
-          echo "TAGS=$tags" >> $GITHUB_OUTPUT
-      - name: Post to channel
-        continue-on-error: true
-        uses: xireiki/channel-post@v1
-        with:
-          chat_id: ${{ secrets.CHANNEL_ID }}
-          bot_token: ${{ secrets.BOT_TOKEN }}
-          context: |
-            版本号：${{ needs.prepare.outputs.versionL }}
-            更新内容：
-            ${{ fromJSON(needs.prepare.outputs.updateLog_content) }}
-            #阅读 #Legado #阅读NG ${{ steps.set-tags.outputs.TAGS }}
-          path: apk/*
-          method: sendFile

@@ -18,13 +18,11 @@ data class AppReleaseInfo(
 
 enum class AppVariant {
     OFFICIAL,
-    BETA_RELEASEA,
-    BETA_RELEASES,
     BETA_RELEASE,
     UNKNOWN;
 
     fun isBeta(): Boolean {
-        return this == BETA_RELEASE || this == BETA_RELEASEA
+        return this == BETA_RELEASE
     }
 
 }
@@ -66,8 +64,6 @@ data class Asset(
         val timestamp: Long = instant.toEpochMilli()
 
         val appVariant = when {
-            preRelease && name.contains("releaseA") -> AppVariant.BETA_RELEASEA
-            name.contains("releaseS") || name.contains("plus") -> AppVariant.BETA_RELEASES
             preRelease && (name.contains("release") || name.contains("beta")) -> AppVariant.BETA_RELEASE
             else -> AppVariant.OFFICIAL
         }

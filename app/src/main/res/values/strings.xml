@@ -2,8 +2,6 @@
 <resources>
     <!--App-->
     <string name="app_name">阅读</string>
-    <string name="app_name_a">阅读·A</string>
-    <string name="app_name_s" translatable="false">阅读NG</string>
     <string name="receiving_shared_label">Legado·search</string>
     <string name="tip_perm_request_storage">Legado needs storage access to find and read books. please go "App Settings" to allow "Storage permission".</string>
 
@@ -82,7 +80,6 @@
     <string name="network_request_log">Network requests</string>
     <string name="network_request_log_summary">View recent requests recorded by the app.</string>
     <string name="about">About</string>
-    <string name="donate">Donations</string>
     <string name="exit">Exit</string>
     <string name="exit_no_save">It has not been saved. Do you want to continue editing?</string>
     <string name="read_style">Book styles</string>
@@ -663,7 +660,6 @@
     <string name="theme">Theme</string>
     <string name="theme_mode">Theme mode</string>
     <string name="theme_mode_desc">Select a theme you want</string>
-    <string name="join_qq_group">Join QQ group</string>
     <string name="bg_image_per">Set the background image requires storage permission</string>
     <string name="input_book_source_url">Input book source address</string>
     <string name="del_file">Delete file</string>
@@ -1137,8 +1133,6 @@
     <string name="use_replace">Use replace</string>
     <string name="scope_title">Act on the title</string>
     <string name="scope_content">Act on the content</string>
-    <string name="join_qq_channel">Join QQ channel</string>
-    <string name="qq_channel_summary">点击加入阅读QQ频道</string>
     <string name="menu_refresh_dur">Refresh the current chapter</string>
     <string name="menu_refresh_after">Refresh the chapter after</string>
     <string name="menu_refresh_all">Refresh all chapters</string>
@@ -1362,8 +1356,6 @@
     <string name="default_version">当前</string>
     <string name="official_version">正式版</string>
     <string name="beta_release_version">测试版</string>
-    <string name="beta_releaseA_version">共存版</string>
-    <string name="beta_releaseS_version" translatable="false">正式版</string>
     <string name="stream_read_aloud_audio">流式播放音频</string>
     <string name="stream_read_aloud_audio_summary">即边下边播，网络不好时播放会断断续续，仅TTS源有效</string>
     <string name="pause_read_aloud_while_phone_calls_title">来电期间暂停朗读</string>

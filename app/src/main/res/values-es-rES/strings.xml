@@ -2,7 +2,6 @@
 <resources>
     <!--App-->
     <string name="app_name">Legado</string>
-    <string name="app_name_a">Legado·A</string>
     <string name="receiving_shared_label">Legado·buscador</string>
     <string name="tip_perm_request_storage">Legado necesita de acceso de almacenamineto para buscar y leer libros. Por favor, diríjase a los "Ajustes de la aplicación" para conceder el "Permiso de almacenamineto".</string>
 
@@ -75,7 +74,6 @@
     <string name="other_setting">Otros ajustes</string>
     <string name="other_setting_s">Algunas configuraciones relacionadas a su funcionamiento</string>
     <string name="about">Acerca de</string>
-    <string name="donate">Donaciones</string>
     <string name="exit">Sair</string>
     <string name="exit_no_save">Todavía se guardó. ¿Desea continuar editando?</string>
     <string name="read_style">Tipos de libros</string>
@@ -477,7 +475,6 @@
     <string name="theme">Tema</string>
     <string name="theme_mode">Tipo de tema</string>
     <string name="theme_mode_desc">Seleccione el tema que prefiera</string>
-    <string name="join_qq_group">Únase al grupo QQ</string>
     <string name="bg_image_per">Para establecer la imagen de fondo requiere del permiso de almacenamiento</string>
     <string name="input_book_source_url">Ingrese la dirección de origen del libro</string>
     <string name="del_file">Borrar archivo</string>
@@ -944,8 +941,6 @@
     <string name="use_replace">使用替换</string>
     <string name="scope_title">作用于标题</string>
     <string name="scope_content">作用于正文</string>
-    <string name="join_qq_channel">加入QQ频道</string>
-    <string name="qq_channel_summary">点击加入阅读QQ频道</string>
     <string name="menu_refresh_dur">刷新当前章节</string>
     <string name="menu_refresh_after">刷新之后章节</string>
     <string name="menu_refresh_all">刷新全部章节</string>
@@ -1166,7 +1161,6 @@
     <string name="default_version">当前</string>
     <string name="official_version">正式版</string>
     <string name="beta_release_version">测试版</string>
-    <string name="beta_releaseA_version">共存版</string>
     <string name="stream_read_aloud_audio">流式播放音频</string>
     <string name="stream_read_aloud_audio_summary">即边下边播，网络不好时播放会断断续续，仅TTS源有效</string>
     <string name="pause_read_aloud_while_phone_calls_title">来电期间暂停朗读</string>

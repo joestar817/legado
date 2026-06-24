@@ -20,7 +20,7 @@ http://设备IP:MCP端口/mcp
 示例：
 
 ```text
-http://192.168.11.13:1124/mcp
+http://192.0.2.10:1124/mcp
 ```
 
 说明：
@@ -36,7 +36,7 @@ http://192.168.11.13:1124/mcp
 仓库内提供了一个标准库 Python 测试脚本，用于覆盖 MCP P0 的 JSON-RPC 方法、资源接口和所有工具：
 
 ```powershell
-python scripts\test_mcp_api.py --endpoint http://192.168.11.13:1124/mcp
+python scripts\test_mcp_api.py --endpoint http://192.0.2.10:1124/mcp
 ```
 
 默认会执行：
@@ -61,11 +61,11 @@ python scripts\test_mcp_api.py --endpoint http://192.168.11.13:1124/mcp
 可选参数：
 
 ```powershell
-python scripts\test_mcp_api.py --endpoint http://192.168.11.13:1124/mcp --no-slow
-python scripts\test_mcp_api.py --endpoint http://192.168.11.13:1124/mcp --search-key 斗破苍穹 --debug-key 斗破苍穹
-python scripts\test_mcp_api.py --endpoint http://192.168.11.13:1124/mcp --allow-empty-search
-python scripts\test_mcp_api.py --endpoint http://192.168.11.13:1124/mcp --write
-python scripts\test_mcp_api.py --endpoint http://192.168.11.13:1124/mcp --clear-network-log
+python scripts\test_mcp_api.py --endpoint http://192.0.2.10:1124/mcp --no-slow
+python scripts\test_mcp_api.py --endpoint http://192.0.2.10:1124/mcp --search-key 斗破苍穹 --debug-key 斗破苍穹
+python scripts\test_mcp_api.py --endpoint http://192.0.2.10:1124/mcp --allow-empty-search
+python scripts\test_mcp_api.py --endpoint http://192.0.2.10:1124/mcp --write
+python scripts\test_mcp_api.py --endpoint http://192.0.2.10:1124/mcp --clear-network-log
 ```
 
 说明：
@@ -99,7 +99,7 @@ Windows PowerShell 建议使用 `curl.exe`，避免 PowerShell 自带 `curl` 别
 PowerShell：
 
 ```powershell
-curl.exe -s http://192.168.11.13:1124/mcp `
+curl.exe -s http://192.0.2.10:1124/mcp `
   -H "Content-Type: application/json" `
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"manual-test","version":"0.1"}}}'
 ```
@@ -109,7 +109,7 @@ PowerShell 里不要用 bash 风格的 `\"` 转义 JSON 双引号；推荐像上
 WSL / Linux / macOS：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"manual-test","version":"0.1"}}}'
 ```
@@ -133,7 +133,7 @@ curl -s http://192.168.11.13:1124/mcp \
 ## Ping
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":2,"method":"ping","params":{}}'
 ```
@@ -141,7 +141,7 @@ curl -s http://192.168.11.13:1124/mcp \
 ## 列出工具
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/list","params":{}}'
 ```
@@ -200,7 +200,7 @@ MCP 工具调用统一使用 `tools/call`：
 ### legado_ping
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"legado_ping","arguments":{}}}'
 ```
@@ -208,7 +208,7 @@ curl -s http://192.168.11.13:1124/mcp \
 ### legado_get_api_summary
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"legado_get_api_summary","arguments":{}}}'
 ```
@@ -218,7 +218,7 @@ curl -s http://192.168.11.13:1124/mcp \
 列出全部书源的基础字段。为了避免几百或几千个书源撑爆上下文，这个接口不会返回完整规则字段；需要完整书源内容时，再用 `book_source_get` 按 `bookSourceUrl` 获取单个书源。
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"book_source_list","arguments":{}}}'
 ```
@@ -228,10 +228,10 @@ curl -s http://192.168.11.13:1124/mcp \
 ```json
 {
   "bookSourceComment": "",
-  "bookSourceGroup": "NovelHub",
-  "bookSourceName": "NovelHub · 聚合",
+  "bookSourceGroup": "示例分组",
+  "bookSourceName": "示例书源",
   "bookSourceType": 0,
-  "bookSourceUrl": "https://novel-joestar.ccwu.cc#default"
+  "bookSourceUrl": "https://example.com/source#default"
 }
 ```
 
@@ -240,9 +240,9 @@ curl -s http://192.168.11.13:1124/mcp \
 按 `bookSourceUrl` 获取单个书源：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"book_source_get","arguments":{"url":"https://novel-joestar.ccwu.cc#default"}}}'
+  -d '{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"book_source_get","arguments":{"url":"https://example.com/source#default"}}}'
 ```
 
 ### book_source_save
@@ -250,9 +250,9 @@ curl -s http://192.168.11.13:1124/mcp \
 保存或覆盖单个书源。最小有效字段是 `bookSourceUrl` 和 `bookSourceName`：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"book_source_save","arguments":{"source":{"bookSourceUrl":"https://novel-joestar.ccwu.cc#default","bookSourceName":"测试书源","enabled":true,"enabledExplore":false}}}}'
+  -d '{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"book_source_save","arguments":{"source":{"bookSourceUrl":"https://example.com/source#default","bookSourceName":"测试书源","enabled":true,"enabledExplore":false}}}}'
 ```
 
 注意：这是写操作，当前 P0 不区分只读/写入权限。
@@ -264,41 +264,41 @@ curl -s http://192.168.11.13:1124/mcp \
 搜索模式：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"book_source_debug","arguments":{"tag":"https://novel-joestar.ccwu.cc#default","key":"斗破苍穹","mode":"search","timeout_seconds":30}}}'
+  -d '{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"book_source_debug","arguments":{"tag":"https://example.com/source#default","key":"斗破苍穹","mode":"search","timeout_seconds":30}}}'
 ```
 
 详情页模式：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"book_source_debug","arguments":{"tag":"https://novel-joestar.ccwu.cc#default","key":"https://example.com/book/1","mode":"detail","timeout_seconds":30}}}'
+  -d '{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"book_source_debug","arguments":{"tag":"https://example.com/source#default","key":"https://example.com/book/1","mode":"detail","timeout_seconds":30}}}'
 ```
 
 发现页模式：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"book_source_debug","arguments":{"tag":"https://novel-joestar.ccwu.cc#default","key":"https://example.com/list","mode":"explore","timeout_seconds":30}}}'
+  -d '{"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"book_source_debug","arguments":{"tag":"https://example.com/source#default","key":"https://example.com/list","mode":"explore","timeout_seconds":30}}}'
 ```
 
 目录页模式：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":18,"method":"tools/call","params":{"name":"book_source_debug","arguments":{"tag":"https://novel-joestar.ccwu.cc#default","key":"https://example.com/toc","mode":"toc","timeout_seconds":30}}}'
+  -d '{"jsonrpc":"2.0","id":18,"method":"tools/call","params":{"name":"book_source_debug","arguments":{"tag":"https://example.com/source#default","key":"https://example.com/toc","mode":"toc","timeout_seconds":30}}}'
 ```
 
 正文页模式：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":19,"method":"tools/call","params":{"name":"book_source_debug","arguments":{"tag":"https://novel-joestar.ccwu.cc#default","key":"https://example.com/chapter/1","mode":"content","timeout_seconds":30}}}'
+  -d '{"jsonrpc":"2.0","id":19,"method":"tools/call","params":{"name":"book_source_debug","arguments":{"tag":"https://example.com/source#default","key":"https://example.com/chapter/1","mode":"content","timeout_seconds":30}}}'
 ```
 
 返回的 `normalized_data.logs` 是调试日志数组。
@@ -323,13 +323,13 @@ curl -s http://192.168.11.13:1124/mcp \
 PowerShell：
 
 ```powershell
-curl.exe -s http://192.168.11.13:1124/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"book_search","arguments":{"key":"斗破苍穹","timeout_seconds":30}}}'
+curl.exe -s http://192.0.2.10:1124/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"book_search","arguments":{"key":"斗破苍穹","timeout_seconds":30}}}'
 ```
 
 WSL / Linux / macOS：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"book_search","arguments":{"key":"斗破苍穹","timeout_seconds":30}}}'
 ```
@@ -337,7 +337,7 @@ curl -s http://192.168.11.13:1124/mcp \
 等待全部书源完成：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"book_search","arguments":{"key":"斗破苍穹","wait_for_finish":true,"timeout_seconds":60}}}'
 ```
@@ -345,7 +345,7 @@ curl -s http://192.168.11.13:1124/mcp \
 指定搜索范围：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":"book_search","arguments":{"key":"斗破苍穹","scope":"玄幻","timeout_seconds":30}}}'
 ```
@@ -364,7 +364,7 @@ curl -s http://192.168.11.13:1124/mcp \
 4. 调用 `network_log_get` 按 `id` 获取单条详情。
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":23,"method":"tools/call","params":{"name":"network_log_list","arguments":{"limit":20}}}'
 ```
@@ -414,7 +414,7 @@ curl -s http://192.168.11.13:1124/mcp \
 按 `network_log_list` 返回的 `id` 获取单条日志详情。默认包含 headers 和 body，但 body 会被 MCP 二次限制，默认最多返回 `16KB`，最大 `64KB`。
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":24,"method":"tools/call","params":{"name":"network_log_get","arguments":{"id":12,"body_char_limit":16384}}}'
 ```
@@ -429,7 +429,7 @@ curl -s http://192.168.11.13:1124/mcp \
 如果只想看请求概况，不要 body：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":25,"method":"tools/call","params":{"name":"network_log_get","arguments":{"id":12,"include_headers":false,"include_body":false}}}'
 ```
@@ -446,7 +446,7 @@ curl -s http://192.168.11.13:1124/mcp \
 清空当前内存网络日志窗口，适合复现前清现场：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":26,"method":"tools/call","params":{"name":"network_log_clear","arguments":{}}}'
 ```
@@ -458,7 +458,7 @@ curl -s http://192.168.11.13:1124/mcp \
 ### resources/list
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":30,"method":"resources/list","params":{}}'
 ```
@@ -473,7 +473,7 @@ curl -s http://192.168.11.13:1124/mcp \
 读取 MCP 概要：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":31,"method":"resources/read","params":{"uri":"legado://api/mcp"}}'
 ```
@@ -481,7 +481,7 @@ curl -s http://192.168.11.13:1124/mcp \
 读取书源 schema：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":32,"method":"resources/read","params":{"uri":"legado://schema/book-source"}}'
 ```
@@ -491,7 +491,7 @@ curl -s http://192.168.11.13:1124/mcp \
 支持 JSON-RPC batch：
 
 ```bash
-curl -s http://192.168.11.13:1124/mcp \
+curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '[{"jsonrpc":"2.0","id":40,"method":"ping","params":{}},{"jsonrpc":"2.0","id":41,"method":"tools/list","params":{}}]'
 ```
