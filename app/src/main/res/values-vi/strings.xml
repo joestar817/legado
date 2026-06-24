@@ -642,8 +642,8 @@
     <string name="a10_permission_toast">Android 10+ không thể đọc và ghi tệp do hạn chế quyền</string>
     <string name="add_to_text_context_menu_s">Nhấn giữ để hiển thị Legado·Tìm kiếm trong menu thao tác</string>
     <string name="add_to_text_context_menu_t">Thao tác văn bản hiển thị Tìm kiếm</string>
-    <string name="record_log">Ghi nhật ký</string>
-    <string name="log">Nhật ký</string>
+    <string name="record_log">Ghi nhật ký gỡ lỗi</string>
+    <string name="log">Nhật ký gỡ lỗi</string>
     <string name="chinese_converter">Chuyển đổi Giản thể</string>
     <string name="change_icon_error">Biểu tượng là biểu tượng vector, không được hỗ trợ trước Android 8.0</string>
     <string name="aloud_config">Cài đặt đọc</string>

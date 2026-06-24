@@ -127,7 +127,7 @@ class AboutFragment : PreferenceFragmentCompat() {
                 return@async
             }
             if (!AppConfig.recordLog) {
-                appCtx.toastOnUi("未开启日志记录，请去其他设置里打开记录日志")
+                appCtx.toastOnUi("未开启调试日志记录，请去其他设置里打开记录调试日志")
                 delay(3000)
             }
             val doc = FileDoc.fromUri(Uri.parse(backupPath), true)

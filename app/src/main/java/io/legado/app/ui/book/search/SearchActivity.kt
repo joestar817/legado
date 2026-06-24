@@ -43,6 +43,7 @@ import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.about.NetworkLogDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.utils.ColorUtils
@@ -189,6 +190,7 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             R.id.menu_search_scope -> alertSearchScope()
             R.id.menu_source_manage -> startActivity<BookSourceActivity>()
             R.id.menu_log -> showDialogFragment(AppLogDialog())
+            R.id.menu_network_log -> showDialogFragment(NetworkLogDialog())
             R.id.menu_1 -> viewModel.searchScope.update("")
             else -> {
                 if (item.groupId == R.id.menu_group_1) {

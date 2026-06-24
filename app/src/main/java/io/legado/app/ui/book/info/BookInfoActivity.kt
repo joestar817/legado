@@ -66,6 +66,7 @@ import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.BookCover
 import io.legado.app.model.remote.RemoteBookWebDav
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.about.NetworkLogDialog
 import io.legado.app.ui.book.audio.AudioPlayActivity
 import io.legado.app.ui.book.changecover.ChangeCoverDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
@@ -385,6 +386,7 @@ class BookInfoActivity :
                     }
                 }
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
+            R.id.menu_network_log -> showDialogFragment<NetworkLogDialog>()
             R.id.menu_split_long_chapter -> {
                 upLoading(true)
                 viewModel.getBook()?.let {

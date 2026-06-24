@@ -28,6 +28,7 @@ import io.legado.app.model.AudioPlay
 import io.legado.app.model.BookCover
 import io.legado.app.service.AudioPlayService
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.about.NetworkLogDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
@@ -182,6 +183,7 @@ class AudioPlayActivity :
             }
 
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
+            R.id.menu_network_log -> showDialogFragment<NetworkLogDialog>()
         }
         return super.onCompatOptionsItemSelected(item)
     }

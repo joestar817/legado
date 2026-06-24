@@ -25,6 +25,7 @@ import io.legado.app.databinding.ItemSelectorSingleBinding
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.about.NetworkLogDialog
 import io.legado.app.utils.GSON
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.dpToPx
@@ -660,6 +661,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
 
                 R.id.menu_del_login_header -> source.removeLoginHeader()
                 R.id.menu_log -> showDialogFragment<AppLogDialog>()
+                R.id.menu_network_log -> showDialogFragment<NetworkLogDialog>()
             }
             return@setOnMenuItemClickListener true
         }

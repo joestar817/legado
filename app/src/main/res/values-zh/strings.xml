@@ -76,7 +76,7 @@
     <string name="other_setting_s">与功能相关的一些设置</string>
     <string name="record_network_log">记录网络请求</string>
     <string name="record_network_log_summary">记录阅读自身发出的请求，用于书源和运行时调试</string>
-    <string name="network_request_log">网络请求日志</string>
+    <string name="network_request_log">网络日志</string>
     <string name="network_request_log_summary">查看应用最近记录的请求</string>
     <string name="about">关于</string>
     <string name="exit">退出</string>
@@ -845,8 +845,8 @@
     <string name="a10_permission_toast">Android 10 以上因系统权限限制可能无法读写文件</string>
     <string name="add_to_text_context_menu_s">长按文字在操作菜单中显示阅读·搜索</string>
     <string name="add_to_text_context_menu_t">文字操作显示搜索</string>
-    <string name="record_log">记录日志</string>
-    <string name="log">日志</string>
+    <string name="record_log">记录调试日志</string>
+    <string name="log">调试日志</string>
     <string name="chinese_converter">中文简繁体转换</string>
     <string name="change_icon_error">图标为矢量图标，Android 8.0 以前不支持</string>
     <string name="aloud_config">朗读设置</string>

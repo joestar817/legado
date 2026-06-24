@@ -79,6 +79,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_network_log"
+        android:icon="@drawable/ic_cfg_about"
+        android:title="@string/network_request_log"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_help"
         android:title="@string/help"
         app:showAsAction="never" />

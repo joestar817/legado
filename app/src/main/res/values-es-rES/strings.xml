@@ -644,8 +644,8 @@
     <string name="a10_permission_toast">En Android 10+ no puede leer ni guardar archivos debido a restricciones de permisos</string>
     <string name="add_to_text_context_menu_s">Mantenga pulsado para mostrar Legado·Búsqueda en el menú de operaciones</string>
     <string name="add_to_text_context_menu_t">Buscar en pantalla de operación de texto</string>
-    <string name="record_log">Registro</string>
-    <string name="log">Registro</string>
+    <string name="record_log">Registro de depuración</string>
+    <string name="log">Registro de depuración</string>
     <string name="chinese_converter">Conversión a simplificada</string>
     <string name="change_icon_error">El ícono es un ícono vectorial, que no era compatible antes de Android 8.0</string>
     <string name="aloud_config">Speech settings</string>
