@@ -8,5 +8,42 @@
     "sourceIcon": "https://cdn.jsdelivr.net/gh/mgz0227/meowcloud/icon.png",
     "sourceName": "Meow云",
     "sourceUrl": "https://pan.miaogongzi.net"
+  },
+  {
+    "articleStyle": 0,
+    "cacheFirst": false,
+    "customOrder": 0,
+    "enableJs": true,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "lastUpdateTime": 0,
+    "loadWithBaseUrl": true,
+    "preload": false,
+    "showWebLog": false,
+    "singleUrl": true,
+    "sourceGroup": "1",
+    "sourceIcon": "",
+    "sourceName": "源仓库(官方纯净)",
+    "sourceUrl": "http://yckceo.vip",
+    "type": 0
+  },
+  {
+    "articleStyle": 0,
+    "cacheFirst": false,
+    "customOrder": 0,
+    "enableJs": true,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "lastUpdateTime": 0,
+    "loadWithBaseUrl": true,
+    "preload": false,
+    "showWebLog": false,
+    "singleUrl": true,
+    "sourceComment": "官网：www.yiove.com",
+    "sourceGroup": "书源",
+    "sourceIcon": "https://shuyuan.yiove.com/logo.jpeg",
+    "sourceName": "Yiove 书源仓库",
+    "sourceUrl": "https://shuyuan.yiove.com",
+    "type": 0
   }
 ]
