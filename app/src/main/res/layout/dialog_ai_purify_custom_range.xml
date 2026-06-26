@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Ng.DialogRoot">
+
+    <LinearLayout style="@style/Ng.DialogHeader">
+
+        <TextView
+            style="@style/Ng.DialogTitle"
+            android:text="@string/ai_purify_sample_custom_range" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        style="@style/Ng.DialogBody"
+        android:orientation="vertical"
+        android:paddingTop="0dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/text_hint"
+            style="@style/Ng.Summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/ng_on_surface_variant"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="66dp"
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/Ng.Body"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/ai_purify_sample_range_start"
+                android:textColor="@color/ng_on_surface"
+                android:textSize="17sp" />
+
+            <EditText
+                android:id="@+id/edit_start"
+                android:layout_width="112dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:inputType="number"
+                android:singleLine="true"
+                android:textColor="@color/ng_on_surface"
+                android:textSize="17sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="66dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/Ng.Body"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/ai_purify_sample_range_end"
+                android:textColor="@color/ng_on_surface"
+                android:textSize="17sp" />
+
+            <EditText
+                android:id="@+id/edit_end"
+                android:layout_width="112dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:inputType="number"
+                android:singleLine="true"
+                android:textColor="@color/ng_on_surface"
+                android:textSize="17sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout style="@style/Ng.DialogActionBar">
+
+        <TextView
+            android:id="@+id/button_cancel"
+            style="@style/Ng.DialogButton.Secondary"
+            android:text="@android:string/cancel" />
+
+        <TextView
+            android:id="@+id/button_confirm"
+            style="@style/Ng.DialogButton.Primary"
+            android:layout_marginStart="10dp"
+            android:text="@android:string/ok" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.read
 
 import android.annotation.SuppressLint
+import android.app.Dialog
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
@@ -8,7 +9,6 @@ import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
-import android.text.InputType
 import android.view.Gravity
 import android.view.InputDevice
 import android.view.KeyEvent
@@ -17,6 +17,7 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -123,6 +124,7 @@ import io.legado.app.ui.replace.edit.ReplaceEditActivity
 import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.ui.widget.dialog.WaitDialog
+import io.legado.app.ui.widget.dialog.applyNgWindow
 import io.legado.app.utils.ACache
 import io.legado.app.utils.Debounce
 import io.legado.app.utils.LogUtils
@@ -1217,20 +1219,20 @@ class ReadBookActivity : BaseReadBookActivity(),
             toastOnUi("当前书籍没有可采样章节")
             return
         }
-        val labels = arrayOf(
-            getString(R.string.ai_purify_sample_current_chapter),
-            getString(R.string.ai_purify_sample_custom_range)
-        )
-        AlertDialog.Builder(this)
-            .setTitle(R.string.ai_purify_chapter_sample_range)
-            .setItems(labels) { _, which ->
-                if (which == 0) {
-                    startAiPurifyChapterRange(ReadBook.durChapterIndex, ReadBook.durChapterIndex)
-                } else {
-                    showAiPurifyCustomChapterRangeDialog()
-                }
-            }
-            .show()
+        val view = layoutInflater.inflate(R.layout.dialog_ai_purify_sample_range, null)
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        view.findViewById<TextView>(R.id.text_current_chapter).setOnClickListener {
+            dialog.dismiss()
+            startAiPurifyChapterRange(ReadBook.durChapterIndex, ReadBook.durChapterIndex)
+        }
+        view.findViewById<TextView>(R.id.text_custom_range).setOnClickListener {
+            dialog.dismiss()
+            showAiPurifyCustomChapterRangeDialog()
+        }
+        dialog.show()
+        dialog.applyNgWindow()
     }
 
     private fun showAiPurifyCustomChapterRangeDialog() {
@@ -1238,72 +1240,39 @@ class ReadBookActivity : BaseReadBookActivity(),
         val limit = AiConfig.purifyChapterSampleLimit
         val currentChapter = (ReadBook.durChapterIndex + 1).coerceIn(1, total.coerceAtLeast(1))
         val defaultEnd = (currentChapter + limit - 1).coerceAtMost(total)
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(20.dpToPx(), 8.dpToPx(), 20.dpToPx(), 0)
-            addView(TextView(this@ReadBookActivity).apply {
-                text = getString(R.string.ai_purify_sample_range_hint, total, limit)
-                setTextColor(ContextCompat.getColor(this@ReadBookActivity, R.color.ng_on_surface_variant))
-                textSize = 13f
-            })
+        val view = layoutInflater.inflate(R.layout.dialog_ai_purify_custom_range, null)
+        val startEdit = view.findViewById<EditText>(R.id.edit_start)
+        val endEdit = view.findViewById<EditText>(R.id.edit_end)
+        view.findViewById<TextView>(R.id.text_hint).text =
+            getString(R.string.ai_purify_sample_range_hint, total, limit)
+        startEdit.setText(currentChapter.toString())
+        startEdit.setSelection(0, startEdit.text?.length ?: 0)
+        endEdit.setText(defaultEnd.toString())
+        endEdit.setSelection(0, endEdit.text?.length ?: 0)
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        view.findViewById<TextView>(R.id.button_cancel).setOnClickListener {
+            dialog.dismiss()
         }
-        val startEdit = createAiPurifyRangeEditText(
-            label = getString(R.string.ai_purify_sample_range_start),
-            value = currentChapter
-        ).also { content.addView(it.first) }.second
-        val endEdit = createAiPurifyRangeEditText(
-            label = getString(R.string.ai_purify_sample_range_end),
-            value = defaultEnd
-        ).also { content.addView(it.first) }.second
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.ai_purify_sample_custom_range)
-            .setView(content)
-            .setPositiveButton(android.R.string.ok, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val start = startEdit.text?.toString()?.toIntOrNull()
-                val end = endEdit.text?.toString()?.toIntOrNull()
-                when {
-                    start == null || end == null || start > end ->
-                        toastOnUi(getString(R.string.ai_purify_sample_range_invalid))
-                    start < 1 || end > total ->
-                        toastOnUi(getString(R.string.ai_purify_sample_range_out_of_bounds, total))
-                    end - start + 1 > limit ->
-                        toastOnUi(getString(R.string.ai_purify_sample_range_exceeded, limit))
-                    else -> {
-                        dialog.dismiss()
-                        startAiPurifyChapterRange(start - 1, end - 1)
-                    }
+        view.findViewById<TextView>(R.id.button_confirm).setOnClickListener {
+            val start = startEdit.text?.toString()?.toIntOrNull()
+            val end = endEdit.text?.toString()?.toIntOrNull()
+            when {
+                start == null || end == null || start > end ->
+                    toastOnUi(getString(R.string.ai_purify_sample_range_invalid))
+                start < 1 || end > total ->
+                    toastOnUi(getString(R.string.ai_purify_sample_range_out_of_bounds, total))
+                end - start + 1 > limit ->
+                    toastOnUi(getString(R.string.ai_purify_sample_range_exceeded, limit))
+                else -> {
+                    dialog.dismiss()
+                    startAiPurifyChapterRange(start - 1, end - 1)
                 }
             }
         }
         dialog.show()
-    }
-
-    private fun createAiPurifyRangeEditText(label: String, value: Int): Pair<LinearLayout, EditText> {
-        val editText = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER
-            setSingleLine(true)
-            gravity = Gravity.CENTER
-            setText(value.toString())
-            setSelection(0, text?.length ?: 0)
-            textSize = 16f
-        }
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 10.dpToPx(), 0, 0)
-            addView(TextView(this@ReadBookActivity).apply {
-                text = label
-                setTextColor(ContextCompat.getColor(this@ReadBookActivity, R.color.ng_on_surface))
-                textSize = 15f
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            })
-            addView(editText, LinearLayout.LayoutParams(96.dpToPx(), LinearLayout.LayoutParams.WRAP_CONTENT))
-        }
-        return row to editText
+        dialog.applyNgWindow()
     }
 
     private fun startAiPurifyChapter() {

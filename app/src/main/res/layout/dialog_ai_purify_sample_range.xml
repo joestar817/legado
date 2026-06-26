@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Ng.DialogRoot">
+
+    <LinearLayout style="@style/Ng.DialogHeader">
+
+        <TextView
+            style="@style/Ng.DialogTitle"
+            android:text="@string/ai_purify_chapter_sample_range" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        style="@style/Ng.DialogBody"
+        android:orientation="vertical"
+        android:paddingTop="0dp">
+
+        <TextView
+            android:id="@+id/text_current_chapter"
+            style="@style/Ng.Body"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:text="@string/ai_purify_sample_current_chapter"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/text_custom_range"
+            style="@style/Ng.Body"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:text="@string/ai_purify_sample_custom_range"
+            android:textSize="18sp" />
+
+    </LinearLayout>
+
+</LinearLayout>
