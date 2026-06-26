@@ -2,11 +2,7 @@ package io.legado.app.ui.book.search
 
 import android.content.Context
 import android.os.Bundle
-import android.view.Gravity
-import android.view.Menu
-import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import io.legado.app.R
@@ -85,7 +81,7 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
         }
         binding.root.setOnLongClickListener {
             getItem(holder.layoutPosition)?.let {
-                showMenu(binding.bvOriginCount, it)
+                callBack.showAllSources(it)
             }
             true
         }
@@ -126,23 +122,6 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
                     )
                 }
             }
-        }
-    }
-
-    private fun showMenu(view: View, searchBook: SearchBook) {
-        PopupMenu(context, view, Gravity.END).apply {
-            menu.add(Menu.NONE, R.id.menu_1, Menu.NONE, R.string.all_origin)
-            setOnMenuItemClickListener {
-                when (it.itemId) {
-                    R.id.menu_1 -> {
-                        callBack.showAllSources(searchBook)
-                        true
-                    }
-
-                    else -> false
-                }
-            }
-            show()
         }
     }
 
