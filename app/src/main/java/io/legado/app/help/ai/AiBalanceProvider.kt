@@ -25,6 +25,9 @@ object AiBalanceProvider {
 
     suspend fun query(setting: AiProviderSetting): AiBalanceResult {
         check(setting.apiKey.isNotBlank()) { "API key is empty" }
+        if (setting.useCustomBalanceUrl) {
+            return queryCustom(setting)
+        }
         val detected = BalanceProvider.detect(setting.baseUrl)
             ?: error("Current provider does not support balance query")
         val client = aiHttpClient(setting.timeoutSeconds)
@@ -45,6 +48,37 @@ object AiBalanceProvider {
         val items = detected.parse(json)
         check(items.isNotEmpty()) { "Balance response is empty" }
         return AiBalanceResult(detected.displayName, items)
+    }
+
+    private suspend fun queryCustom(setting: AiProviderSetting): AiBalanceResult {
+        val endpoint = buildAiApiEndpoint(setting.baseUrl, setting.balanceUrl)
+        val client = aiHttpClient(setting.timeoutSeconds)
+        val request = Request.Builder()
+            .url(endpoint)
+            .addHeader("Authorization", "Bearer ${setting.apiKey}")
+            .addHeader("Accept", "application/json")
+            .get()
+            .build()
+        val (response, body) = client.executeJsonOrThrow(request)
+        if (response.code == 401 || response.code == 403) {
+            error("Authentication failed (HTTP ${response.code})")
+        }
+        if (!response.isSuccessful) {
+            error("HTTP ${response.code}: ${body.take(500)}")
+        }
+        val json = JsonParser.parseString(body)
+        val amount = json.balanceAmountByPath(setting.balanceJsonPath.trim())
+            ?: error("Balance JSON path is empty, not found, or not numeric")
+        return AiBalanceResult(
+            providerName = "Custom",
+            items = listOf(
+                AiBalanceInfo(
+                    name = "Custom",
+                    remaining = amount,
+                    isValid = amount > 0.0
+                )
+            )
+        )
     }
 
     private enum class BalanceProvider(
@@ -111,6 +145,20 @@ object AiBalanceProvider {
                 )
             }
         },
+        MOONSHOT("Moonshot", "https://api.moonshot.cn/v1/users/me/balance") {
+            override fun parse(json: JsonObject): List<AiBalanceInfo> {
+                val data = json.objectOrNull("data") ?: json
+                val available = data.doubleOrNull("available_balance")
+                return listOf(
+                    AiBalanceInfo(
+                        name = "Moonshot",
+                        remaining = available,
+                        unit = "CNY",
+                        isValid = available?.let { it > 0.0 }
+                    )
+                )
+            }
+        },
         NOVITA("Novita AI", "https://api.novita.ai/v3/user/balance") {
             override fun parse(json: JsonObject): List<AiBalanceInfo> {
                 val available = (json.doubleOrNull("availableBalance") ?: 0.0) / 10000.0
@@ -137,6 +185,7 @@ object AiBalanceProvider {
                     "api.siliconflow.cn" in url -> SILICON_FLOW_CN
                     "api.siliconflow.com" in url -> SILICON_FLOW_EN
                     "openrouter.ai" in url -> OPEN_ROUTER
+                    "api.moonshot.cn" in url -> MOONSHOT
                     "api.novita.ai" in url -> NOVITA
                     else -> null
                 }
@@ -181,5 +230,50 @@ object AiBalanceProvider {
 
     private fun JsonElement.asObjectOrNull(): JsonObject? {
         return takeIf { it.isJsonObject }?.asJsonObject
+    }
+
+    private fun JsonElement.valueByPath(path: String): JsonElement? {
+        if (path.isBlank()) {
+            return this
+        }
+        return path.split('.')
+            .filter { it.isNotBlank() }
+            .fold(this as JsonElement?) { current, part ->
+                current?.childByPathPart(part)
+            }
+    }
+
+    private fun JsonElement.childByPathPart(part: String): JsonElement? {
+        val name = part.substringBefore('[')
+        var current = if (name.isBlank()) {
+            this
+        } else {
+            takeIf { it.isJsonObject }?.asJsonObject?.get(name)
+        }
+        Regex("""\[(\d+)]""").findAll(part).forEach { match ->
+            val index = match.groupValues[1].toIntOrNull() ?: return null
+            val array = current?.takeIf { it.isJsonArray }?.asJsonArray ?: return null
+            current = if (index in 0 until array.size()) array[index] else return null
+        }
+        return current
+    }
+
+    private fun JsonElement.balanceAmountByPath(path: String): Double? {
+        val subtractionParts = path.split(Regex("""\s+-\s+"""))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        if (subtractionParts.size > 1) {
+            val first = valueByPath(subtractionParts.first())?.doubleOrNull() ?: return null
+            return subtractionParts.drop(1).fold(first) { result, part ->
+                result - (valueByPath(part)?.doubleOrNull() ?: return null)
+            }
+        }
+        return valueByPath(path)?.doubleOrNull()
+    }
+
+    private fun JsonElement.asReadableString(): String {
+        return runCatching {
+            if (isJsonPrimitive) asJsonPrimitive.asString else toString()
+        }.getOrElse { toString() }
     }
 }

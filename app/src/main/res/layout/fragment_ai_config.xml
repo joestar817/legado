@@ -64,6 +64,47 @@
             <View style="@style/Ng.SettingsItemGap" />
 
             <LinearLayout
+                android:id="@+id/layout_model_entry"
+                style="@style/Ng.SettingsItem">
+
+                <ImageView
+                    android:id="@+id/image_model_entry_icon"
+                    style="@style/Ng.SettingsIconImage"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="@string/ai_model_settings"
+                    android:src="@drawable/ic_ai_tab_models" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/Ng.SettingsTitle"
+                        android:text="@string/ai_model_settings" />
+
+                    <TextView
+                        android:id="@+id/text_model_entry_summary"
+                        style="@style/Ng.SettingsSummary"
+                        android:layout_marginTop="4dp"
+                        android:maxLines="1" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="@color/ng_settings_arrow"
+                    android:textSize="30sp" />
+
+            </LinearLayout>
+
+            <View style="@style/Ng.SettingsItemGap" />
+
+            <LinearLayout
                 android:id="@+id/layout_prompt_entry"
                 style="@style/Ng.SettingsItem">
 
@@ -148,6 +189,191 @@
         </io.legado.app.ui.widget.NgGlassLayout>
 
     </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/layout_model_settings"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/ng_page_padding"
+            android:paddingTop="8dp"
+            android:paddingEnd="@dimen/ng_page_padding"
+            android:paddingBottom="20dp">
+
+            <TextView
+                android:id="@+id/text_model_settings_section_label"
+                style="@style/Ng.SettingsSectionLabel"
+                android:text="@string/ai_model_settings_section" />
+
+            <io.legado.app.ui.widget.NgGlassLayout style="@style/Ng.SettingsGroup">
+
+                <View style="@style/Ng.SettingsGroupEdgeSpace" />
+
+                <LinearLayout
+                    android:id="@+id/layout_purify_model_settings_entry"
+                    style="@style/Ng.SettingsItem">
+
+                    <ImageView
+                        android:id="@+id/image_purify_model_settings_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_purify"
+                        android:src="@drawable/ic_ai_purify" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_purify" />
+
+                        <TextView
+                            android:id="@+id/text_purify_model_settings_summary"
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="2" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="›"
+                        android:textColor="@color/ng_settings_arrow"
+                        android:textSize="30sp" />
+
+                </LinearLayout>
+
+                <View style="@style/Ng.SettingsGroupEdgeSpace" />
+
+            </io.legado.app.ui.widget.NgGlassLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <ScrollView
+        android:id="@+id/layout_purify_model_settings"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/ng_page_padding"
+            android:paddingTop="8dp"
+            android:paddingEnd="@dimen/ng_page_padding"
+            android:paddingBottom="20dp">
+
+            <TextView
+                android:id="@+id/text_purify_model_settings_section_label"
+                style="@style/Ng.SettingsSectionLabel"
+                android:text="@string/ai_purify" />
+
+            <io.legado.app.ui.widget.NgGlassLayout style="@style/Ng.SettingsGroup">
+
+                <View style="@style/Ng.SettingsGroupEdgeSpace" />
+
+                <LinearLayout
+                    android:id="@+id/layout_purify_model_entry"
+                    style="@style/Ng.SettingsItem">
+
+                    <ImageView
+                        android:id="@+id/image_purify_model_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_purify_model_setting"
+                        android:src="@drawable/ic_ai_purify" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_purify_model_setting" />
+
+                        <TextView
+                            android:id="@+id/text_purify_model_summary"
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="2" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="›"
+                        android:textColor="@color/ng_settings_arrow"
+                        android:textSize="30sp" />
+
+                </LinearLayout>
+
+                <View style="@style/Ng.SettingsItemGap" />
+
+                <LinearLayout
+                    android:id="@+id/layout_purify_reasoning_entry"
+                    style="@style/Ng.SettingsItem">
+
+                    <ImageView
+                        android:id="@+id/image_purify_reasoning_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_purify_reasoning_level"
+                        android:src="@drawable/ic_ai_capability_reasoning" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_purify_reasoning_level" />
+
+                        <TextView
+                            android:id="@+id/text_purify_reasoning_summary"
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="2" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="›"
+                        android:textColor="@color/ng_settings_arrow"
+                        android:textSize="30sp" />
+
+                </LinearLayout>
+
+                <View style="@style/Ng.SettingsGroupEdgeSpace" />
+
+            </io.legado.app.ui.widget.NgGlassLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
 
     <ScrollView
         android:id="@+id/layout_purify_settings"
@@ -752,7 +978,7 @@
                 <EditText
                     android:id="@+id/edit_search_provider"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
                     android:layout_marginStart="14dp"
                     android:layout_weight="1"
                     android:background="@android:color/transparent"
@@ -812,6 +1038,7 @@
                 android:paddingBottom="24dp">
 
                 <LinearLayout
+                    android:id="@+id/layout_detail_header"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:gravity="center_vertical"
@@ -864,6 +1091,7 @@
                         android:singleLine="true" />
 
                     <TextView
+                        android:id="@+id/text_provider_type_label"
                         style="@style/Ng.Label"
                         android:layout_marginTop="8dp"
                         android:layout_marginStart="12dp"
@@ -932,37 +1160,6 @@
                         android:singleLine="true" />
 
                     <TextView
-                        style="@style/Ng.Label"
-                        android:layout_marginTop="8dp"
-                        android:layout_marginStart="12dp"
-                        android:text="@string/ai_model" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="34dp"
-                        android:layout_marginTop="6dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <Spinner
-                            android:id="@+id/spinner_model"
-                            style="@style/Ng.Spinner.Compact"
-                            android:layout_width="0dp"
-                            android:layout_weight="1" />
-
-                        <ImageButton
-                            android:id="@+id/button_fetch_models"
-                            android:layout_width="34dp"
-                            android:layout_height="34dp"
-                            android:layout_marginStart="8dp"
-                            android:background="@drawable/ng_bg_button_secondary"
-                            android:contentDescription="@string/ai_fetch_models"
-                            android:src="@drawable/ic_refresh_black_24dp"
-                            android:tint="@color/ng_primary" />
-
-                    </LinearLayout>
-
-                    <TextView
                         android:id="@+id/text_openai_path_label"
                         style="@style/Ng.Label"
                         android:layout_marginTop="8dp"
@@ -973,6 +1170,19 @@
                         android:id="@+id/edit_chat_path"
                         style="@style/Ng.OutlinedField.Compact"
                         android:layout_marginTop="6dp"
+                        android:singleLine="true" />
+
+                    <TextView
+                        style="@style/Ng.Label"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginStart="12dp"
+                        android:text="@string/ai_timeout_seconds" />
+
+                    <EditText
+                        android:id="@+id/edit_timeout_seconds"
+                        style="@style/Ng.OutlinedField.Compact"
+                        android:layout_marginTop="6dp"
+                        android:inputType="number"
                         android:singleLine="true" />
 
                     <LinearLayout
@@ -997,6 +1207,79 @@
 
                     </LinearLayout>
 
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/ai_custom_balance_url"
+                            android:textColor="@color/ng_on_surface"
+                            android:textSize="17sp" />
+
+                        <Switch
+                            android:id="@+id/switch_custom_balance_url"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/text_balance_url_label"
+                        style="@style/Ng.Label"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginStart="12dp"
+                        android:text="@string/ai_balance_url" />
+
+                    <EditText
+                        android:id="@+id/edit_balance_url"
+                        style="@style/Ng.OutlinedField.Compact"
+                        android:layout_marginTop="6dp"
+                        android:hint="@string/ai_balance_url_summary"
+                        android:inputType="textUri"
+                        android:singleLine="true" />
+
+                    <TextView
+                        android:id="@+id/text_balance_json_path_label"
+                        style="@style/Ng.Label"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginStart="12dp"
+                        android:text="@string/ai_balance_json_path" />
+
+                    <EditText
+                        android:id="@+id/edit_balance_json_path"
+                        style="@style/Ng.OutlinedField.Compact"
+                        android:layout_marginTop="6dp"
+                        android:hint="@string/ai_balance_json_path_summary"
+                        android:singleLine="true" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/ai_custom_models_url"
+                            android:textColor="@color/ng_on_surface"
+                            android:textSize="17sp" />
+
+                        <Switch
+                            android:id="@+id/switch_custom_models_url"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+
+                    </LinearLayout>
+
                     <TextView
                         android:id="@+id/text_models_url_label"
                         style="@style/Ng.Label"
@@ -1010,19 +1293,6 @@
                         android:layout_marginTop="6dp"
                         android:hint="@string/ai_models_url_summary"
                         android:inputType="textUri"
-                        android:singleLine="true" />
-
-                    <TextView
-                        style="@style/Ng.Label"
-                        android:layout_marginTop="8dp"
-                        android:layout_marginStart="12dp"
-                        android:text="@string/ai_timeout_seconds" />
-
-                    <EditText
-                        android:id="@+id/edit_timeout_seconds"
-                        style="@style/Ng.OutlinedField.Compact"
-                        android:layout_marginTop="6dp"
-                        android:inputType="number"
                         android:singleLine="true" />
 
                     <LinearLayout
@@ -1064,6 +1334,373 @@
 
         </ScrollView>
 
+        <LinearLayout
+            android:id="@+id/layout_model_tab"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/ng_page_padding"
+            android:paddingTop="16dp"
+            android:paddingEnd="@dimen/ng_page_padding"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="2dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    style="@style/Ng.SearchPill"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_search"
+                        android:tint="@color/tv_text_summary" />
+
+                    <EditText
+                        android:id="@+id/edit_search_model"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:hint="@string/ai_search_model"
+                        android:singleLine="true"
+                        android:textColor="@color/tv_text_summary"
+                        android:textColorHint="@color/tv_text_summary"
+                        android:textSize="15sp" />
+
+                </LinearLayout>
+
+                <ImageButton
+                    android:id="@+id/button_fetch_models"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/ng_bg_button_secondary"
+                    android:contentDescription="@string/ai_fetch_models"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_refresh_black_24dp"
+                    android:tint="@color/ng_primary" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/text_available_models_title"
+                    style="@style/Ng.Title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/ai_available_models"
+                    android:textSize="17sp" />
+
+                <TextView
+                    android:id="@+id/button_toggle_model_selection"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:minWidth="66dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:text="@string/select_all"
+                    android:textColor="@color/ng_primary"
+                    android:textSize="15sp" />
+
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_models"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="6dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="true"
+                android:paddingBottom="12dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_provider_detail_tabs"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@android:color/transparent"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/ng_page_padding"
+            android:paddingEnd="@dimen/ng_page_padding">
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clipChildren="false"
+                android:clipToPadding="false">
+
+                <ImageButton
+                    android:id="@+id/button_provider_tab_config"
+                    android:layout_width="68dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="@string/ai_tab_config"
+                    android:padding="6dp"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_ai_tab_config"
+                    android:tint="@color/ng_on_surface" />
+
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clipChildren="false"
+                android:clipToPadding="false">
+
+                <ImageButton
+                    android:id="@+id/button_provider_tab_models"
+                    android:layout_width="68dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="@string/ai_tab_models"
+                    android:padding="6dp"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_ai_tab_models"
+                    android:tint="@color/ng_on_surface_variant" />
+
+            </FrameLayout>
+
+        </LinearLayout>
+
     </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/layout_model_detail"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/ng_page_padding"
+            android:paddingTop="8dp"
+            android:paddingEnd="@dimen/ng_page_padding"
+            android:paddingBottom="24dp">
+
+            <TextView
+                style="@style/Ng.Label"
+                android:layout_marginStart="12dp"
+                android:text="@string/ai_model_id" />
+
+            <EditText
+                android:id="@+id/edit_model_id"
+                style="@style/Ng.OutlinedField.Compact"
+                android:layout_marginTop="6dp"
+                android:enabled="false"
+                android:singleLine="true" />
+
+            <TextView
+                style="@style/Ng.Label"
+                android:layout_marginTop="14dp"
+                android:layout_marginStart="12dp"
+                android:text="@string/ai_model_display_name" />
+
+            <EditText
+                android:id="@+id/edit_model_display_name"
+                style="@style/Ng.OutlinedField.Compact"
+                android:layout_marginTop="6dp"
+                android:singleLine="true" />
+
+            <TextView
+                style="@style/Ng.Label"
+                android:layout_marginTop="18dp"
+                android:layout_marginStart="12dp"
+                android:text="@string/ai_model_type" />
+
+            <LinearLayout
+                android:id="@+id/layout_model_type"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/segment_model_type_chat"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_type_chat" />
+
+                <TextView
+                    android:id="@+id/segment_model_type_image"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_type_image" />
+
+                <TextView
+                    android:id="@+id/segment_model_type_embedding"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_type_embedding" />
+
+                <TextView
+                    android:id="@+id/segment_model_type_asr"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_type_asr" />
+
+                <TextView
+                    android:id="@+id/segment_model_type_tts"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_type_tts" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/text_model_input_modalities_label"
+                style="@style/Ng.Label"
+                android:layout_marginTop="18dp"
+                android:layout_marginStart="12dp"
+                android:text="@string/ai_model_input_modalities" />
+
+            <LinearLayout
+                android:id="@+id/layout_model_input_modalities"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/segment_model_input_text"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_modality_text" />
+
+                <TextView
+                    android:id="@+id/segment_model_input_image"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_modality_image" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/text_model_output_modalities_label"
+                style="@style/Ng.Label"
+                android:layout_marginTop="18dp"
+                android:layout_marginStart="12dp"
+                android:text="@string/ai_model_output_modalities" />
+
+            <LinearLayout
+                android:id="@+id/layout_model_output_modalities"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/segment_model_output_text"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_modality_text" />
+
+                <TextView
+                    android:id="@+id/segment_model_output_image"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_modality_image" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/text_model_abilities_label"
+                style="@style/Ng.Label"
+                android:layout_marginTop="18dp"
+                android:layout_marginStart="12dp"
+                android:text="@string/ai_model_abilities" />
+
+            <LinearLayout
+                android:id="@+id/layout_model_abilities"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/segment_model_ability_tool"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_ability_tool" />
+
+                <TextView
+                    android:id="@+id/segment_model_ability_reasoning"
+                    style="@style/Ng.SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/ai_model_ability_reasoning" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
 
 </FrameLayout>

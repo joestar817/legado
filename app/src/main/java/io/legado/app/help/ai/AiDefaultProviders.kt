@@ -8,6 +8,7 @@ object AiDefaultProviders {
             type = AiProviderType.OPENAI,
             name = "OpenAI",
             baseUrl = "https://api.openai.com/v1",
+            modelsUrl = "/models",
             enabled = true
         ),
         AiProviderSetting(
@@ -15,6 +16,7 @@ object AiDefaultProviders {
             type = AiProviderType.CLAUDE,
             name = "Claude",
             baseUrl = "https://api.anthropic.com/v1",
+            modelsUrl = "/models",
             enabled = true
         ),
         AiProviderSetting(
@@ -22,6 +24,7 @@ object AiDefaultProviders {
             type = AiProviderType.GOOGLE,
             name = "Gemini",
             baseUrl = "https://generativelanguage.googleapis.com/v1beta",
+            modelsUrl = "/models?pageSize=100",
             enabled = true
         ),
         AiProviderSetting(
@@ -30,12 +33,29 @@ object AiDefaultProviders {
             name = "DeepSeek",
             baseUrl = "https://api.deepseek.com",
             model = "deepseek-v4-flash",
-            modelsUrl = "https://api.deepseek.com/models",
-            supportsThinking = true,
-            supportsEffort = true,
-            thinkingParam = "thinking",
-            effortParam = "reasoning_effort",
-            reasoningOutputField = "reasoning_content",
+            modelsUrl = "/models",
+            balanceUrl = "/user/balance",
+            balanceJsonPath = "balance_infos[0].total_balance",
+            enabled = true
+        ),
+        AiProviderSetting(
+            id = "siliconflow",
+            type = AiProviderType.OPENAI,
+            name = "硅基流动",
+            baseUrl = "https://api.siliconflow.cn/v1",
+            modelsUrl = "/models",
+            balanceUrl = "/user/info",
+            balanceJsonPath = "data.totalBalance",
+            enabled = true
+        ),
+        AiProviderSetting(
+            id = "openrouter",
+            type = AiProviderType.OPENAI,
+            name = "OpenRouter",
+            baseUrl = "https://openrouter.ai/api/v1",
+            modelsUrl = "/models",
+            balanceUrl = "/credits",
+            balanceJsonPath = "data.total_credits - data.total_usage",
             enabled = true
         ),
         AiProviderSetting(
@@ -44,11 +64,42 @@ object AiDefaultProviders {
             name = "Xiaomi MiMo",
             baseUrl = "https://api.xiaomimimo.com/v1",
             model = "mimo-v2.5-pro",
-            supportsThinking = true,
-            supportsEffort = false,
-            thinkingParam = "thinking",
-            reasoningOutputField = "reasoning_content",
+            modelsUrl = "/models",
             enabled = true
+        ),
+        AiProviderSetting(
+            id = "aliyun_bailian",
+            type = AiProviderType.OPENAI,
+            name = "阿里云百炼",
+            baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            modelsUrl = "/models",
+            enabled = false
+        ),
+        AiProviderSetting(
+            id = "volcengine",
+            type = AiProviderType.OPENAI,
+            name = "火山引擎",
+            baseUrl = "https://ark.cn-beijing.volces.com/api/v3",
+            modelsUrl = "/models",
+            enabled = false
+        ),
+        AiProviderSetting(
+            id = "moonshot",
+            type = AiProviderType.OPENAI,
+            name = "月之暗面",
+            baseUrl = "https://api.moonshot.cn/v1",
+            modelsUrl = "/models",
+            balanceUrl = "/users/me/balance",
+            balanceJsonPath = "data.available_balance",
+            enabled = false
+        ),
+        AiProviderSetting(
+            id = "zhipu",
+            type = AiProviderType.OPENAI,
+            name = "智谱",
+            baseUrl = "https://open.bigmodel.cn/api/paas/v4",
+            modelsUrl = "/models",
+            enabled = false
         )
     )
 

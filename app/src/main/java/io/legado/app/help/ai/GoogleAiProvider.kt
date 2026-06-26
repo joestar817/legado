@@ -7,8 +7,14 @@ import okhttp3.Request
 class GoogleAiProvider : AiProvider {
 
     override suspend fun listModels(setting: AiProviderSetting): List<AiModel> {
+        val modelsApi = if (setting.useCustomModelsUrl) {
+            setting.modelsUrl
+        } else {
+            "/models?pageSize=100"
+        }
+        val modelsUrl = buildAiApiEndpoint(setting.baseUrl, modelsApi)
         val request = Request.Builder()
-            .url("${setting.baseUrl.trimEndSlash()}/models?pageSize=100")
+            .url(modelsUrl)
             .addHeader("x-goog-api-key", setting.apiKey)
             .get()
             .build()
@@ -20,7 +26,12 @@ class GoogleAiProvider : AiProvider {
             if (methods != null && methods.none { it.asString == "generateContent" }) {
                 return@mapNotNull null
             }
-            AiModel(id = name, name = obj.stringOrNull("displayName") ?: name, ownedBy = "Google")
+            AiModel(
+                id = name,
+                name = name,
+                displayName = obj.stringOrNull("displayName").orEmpty(),
+                ownedBy = "Google"
+            )
         } ?: emptyList()
     }
 

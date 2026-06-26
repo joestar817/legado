@@ -9,18 +9,21 @@ object AiManager {
     suspend fun generateText(
         messages: List<AiMessage>,
         params: AiTextParams = AiTextParams(temperature = AiConfig.temperature),
-        providerId: String = AiProviderStore.activeProviderId()
+        providerId: String = AiProviderStore.activeProviderId(),
+        modelId: String? = null
     ): AiTextResult {
         val setting = AiProviderStore.provider(providerId) ?: error("AI provider not found: $providerId")
+        val requestModel = modelId ?: setting.model
         check(setting.enabled) { "AI provider is disabled" }
-        check(setting.model.isNotBlank()) { "AI model is empty" }
-        return providerFor(setting).generateText(setting, messages, params)
+        check(requestModel.isNotBlank()) { "AI model is empty" }
+        return providerFor(setting).generateText(setting.copy(model = requestModel), messages, params)
     }
 
     suspend fun listModels(providerId: String): List<AiModel> {
         val setting = AiProviderStore.provider(providerId) ?: error("AI provider not found: $providerId")
         return providerFor(setting).listModels(setting)
             .filter { it.id.isNotBlank() }
+            .map { AiModelRegistry.enrich(it) }
             .distinctBy { it.id }
             .sortedBy { it.id.lowercase() }
     }
@@ -28,7 +31,19 @@ object AiManager {
     suspend fun fetchAndSaveModels(providerId: String): List<AiModel> {
         val models = listModels(providerId)
         val setting = AiProviderStore.provider(providerId) ?: error("AI provider not found: $providerId")
-        AiProviderStore.saveProvider(setting.copy(models = models))
+        val modelIds = models.map { it.id }.toSet()
+        val availableModelIds = if (setting.availableModelSelectionInitialized) {
+            setting.availableModelIds.filter { it in modelIds }
+        } else {
+            models.map { it.id }
+        }
+        AiProviderStore.saveProvider(
+            setting.copy(
+                models = models,
+                availableModelIds = availableModelIds,
+                availableModelSelectionInitialized = true
+            )
+        )
         return models
     }
 
@@ -50,6 +65,15 @@ object AiManager {
             }
         }
         return result
+    }
+
+    suspend fun testConnectivity(providerId: String): Int {
+        val setting = AiProviderStore.provider(providerId) ?: error("AI provider not found: $providerId")
+        check(setting.apiKey.isNotBlank()) { "API key is empty" }
+        return providerFor(setting).listModels(setting)
+            .filter { it.id.isNotBlank() }
+            .distinctBy { it.id }
+            .size
     }
 
     suspend fun queryBalance(providerId: String): AiBalanceResult {

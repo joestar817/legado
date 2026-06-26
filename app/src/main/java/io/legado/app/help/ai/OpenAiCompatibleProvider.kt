@@ -10,7 +10,7 @@ class OpenAiCompatibleProvider : AiProvider {
     override suspend fun listModels(setting: AiProviderSetting): List<AiModel> {
         val client = aiHttpClient(setting.timeoutSeconds)
         var lastError: Throwable? = null
-        AiModelEndpointResolver.candidates(setting.baseUrl, setting.modelsUrl).forEach { url ->
+        AiModelEndpointResolver.candidates(setting).forEach { url ->
             try {
                 val request = Request.Builder()
                     .url(url)
@@ -42,6 +42,7 @@ class OpenAiCompatibleProvider : AiProvider {
         messages: List<AiMessage>,
         params: AiTextParams
     ): AiTextResult {
+        val reasoningOptions = AiModelRegistry.capabilities(setting.model).reasoning
         val requestBody = JsonObject().apply {
             addProperty("model", setting.model)
             add("messages", JsonArray().apply {
@@ -54,17 +55,17 @@ class OpenAiCompatibleProvider : AiProvider {
             })
             params.temperature?.let { addProperty("temperature", it) }
             params.maxTokens?.let { addProperty("max_tokens", it) }
-            if (params.enableThinking && setting.supportsThinking && setting.thinkingParam.isNotBlank()) {
-                add(setting.thinkingParam, JsonObject().apply {
+            if (params.enableThinking && reasoningOptions.thinkingParam.isNotBlank()) {
+                add(reasoningOptions.thinkingParam, JsonObject().apply {
                     addProperty("type", "enabled")
                 })
-            } else if (params.disableThinking && setting.supportsThinking && setting.thinkingParam.isNotBlank()) {
-                add(setting.thinkingParam, JsonObject().apply {
+            } else if (params.disableThinking && reasoningOptions.thinkingParam.isNotBlank()) {
+                add(reasoningOptions.thinkingParam, JsonObject().apply {
                     addProperty("type", "disabled")
                 })
             }
-            if (params.enableThinking && setting.supportsEffort && setting.effortParam.isNotBlank()) {
-                addProperty(setting.effortParam, params.reasoningEffort ?: "high")
+            if (params.enableThinking && reasoningOptions.effortParam.isNotBlank()) {
+                addProperty(reasoningOptions.effortParam, params.reasoningEffort ?: "high")
             }
             addProperty("stream", false)
         }
@@ -94,7 +95,7 @@ class OpenAiCompatibleProvider : AiProvider {
         val message = choice.objectOrNull("message")
         val content = message?.get("content").contentText()
             .ifBlank { choice.objectOrNull("delta")?.get("content").contentText() }
-        val reasoningKey = setting.reasoningOutputField.ifBlank { "reasoning_content" }
+        val reasoningKey = reasoningOptions.reasoningOutputField.ifBlank { "reasoning_content" }
         val reasoning = message?.stringOrNull(reasoningKey)
             ?: message?.stringOrNull("reasoning")
         val usage = json.objectOrNull("usage")

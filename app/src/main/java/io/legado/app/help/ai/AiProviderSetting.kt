@@ -21,6 +21,10 @@ data class AiProviderSetting(
     val model: String = "",
     @SerializedName(value = "models", alternate = ["i"])
     val models: List<AiModel> = emptyList(),
+    @SerializedName(value = "availableModelIds", alternate = ["v"])
+    val availableModelIds: List<String> = emptyList(),
+    @SerializedName(value = "availableModelSelectionInitialized", alternate = ["w"])
+    val availableModelSelectionInitialized: Boolean = false,
     @SerializedName(value = "timeoutSeconds", alternate = ["j"])
     val timeoutSeconds: Int = 60,
     @SerializedName(value = "chatCompletionsPath", alternate = ["k"])
@@ -36,7 +40,15 @@ data class AiProviderSetting(
     @SerializedName(value = "effortParam", alternate = ["p"])
     val effortParam: String = "",
     @SerializedName(value = "reasoningOutputField", alternate = ["q"])
-    val reasoningOutputField: String = ""
+    val reasoningOutputField: String = "",
+    @SerializedName(value = "useCustomModelsUrl", alternate = ["r"])
+    val useCustomModelsUrl: Boolean = false,
+    @SerializedName(value = "balanceUrl", alternate = ["s"])
+    val balanceUrl: String = "",
+    @SerializedName(value = "balanceJsonPath", alternate = ["t"])
+    val balanceJsonPath: String = "",
+    @SerializedName(value = "useCustomBalanceUrl", alternate = ["u"])
+    val useCustomBalanceUrl: Boolean = false
 )
 
 enum class AiProviderType(val prefValue: String, val displayName: String) {

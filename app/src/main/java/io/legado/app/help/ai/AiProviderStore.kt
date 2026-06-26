@@ -131,18 +131,32 @@ object AiProviderStore {
         default: AiProviderSetting,
         savedProvider: AiProviderSetting
     ): AiProviderSetting {
+        val baseUrl = savedProvider.baseUrl.ifBlank { default.baseUrl }
         return default.copy(
             enabled = savedProvider.enabled,
             name = savedProvider.name.ifBlank { default.name },
             apiKey = savedProvider.apiKey,
-            baseUrl = savedProvider.baseUrl.ifBlank { default.baseUrl },
+            baseUrl = baseUrl,
             model = savedProvider.model.ifBlank { default.model },
             models = normalizeModels(savedProvider.models.ifEmpty { default.models }),
+            availableModelIds = normalizeModelIds(savedProvider.availableModelIds),
+            availableModelSelectionInitialized =
+                savedProvider.availableModelSelectionInitialized,
             timeoutSeconds = savedProvider.timeoutSeconds.coerceIn(5, 600),
             chatCompletionsPath = savedProvider.chatCompletionsPath.ifBlank {
                 default.chatCompletionsPath
             },
-            modelsUrl = savedProvider.modelsUrl.ifBlank { default.modelsUrl }
+            modelsUrl = normalizeAiApiPath(
+                baseUrl,
+                savedProvider.modelsUrl.ifBlank { default.modelsUrl }
+            ),
+            useCustomModelsUrl = savedProvider.useCustomModelsUrl,
+            balanceUrl = normalizeAiApiPath(
+                baseUrl,
+                savedProvider.balanceUrl.ifBlank { default.balanceUrl }
+            ),
+            balanceJsonPath = savedProvider.balanceJsonPath.ifBlank { default.balanceJsonPath },
+            useCustomBalanceUrl = savedProvider.useCustomBalanceUrl
         )
     }
 
@@ -183,7 +197,10 @@ object AiProviderStore {
     private fun normalize(provider: AiProviderSetting): AiProviderSetting {
         return provider.copy(
             timeoutSeconds = provider.timeoutSeconds.coerceIn(5, 600),
-            models = normalizeModels(provider.models)
+            models = normalizeModels(provider.models),
+            availableModelIds = normalizeModelIds(provider.availableModelIds),
+            modelsUrl = normalizeAiApiPath(provider.baseUrl, provider.modelsUrl),
+            balanceUrl = normalizeAiApiPath(provider.baseUrl, provider.balanceUrl)
         )
     }
 
@@ -201,13 +218,18 @@ object AiProviderStore {
                 baseUrl = baseUrl,
                 model = nullableString(provider.model),
                 models = normalizeModels(nullableModels(provider.models)),
+                availableModelIds = normalizeModelIds(provider.availableModelIds),
+                availableModelSelectionInitialized =
+                    provider.availableModelSelectionInitialized,
                 timeoutSeconds = provider.timeoutSeconds.coerceIn(5, 600),
                 chatCompletionsPath = nullableString(provider.chatCompletionsPath)
                     .ifBlank { "/chat/completions" },
-                modelsUrl = nullableString(provider.modelsUrl),
+                modelsUrl = normalizeAiApiPath(baseUrl, nullableString(provider.modelsUrl)),
                 thinkingParam = nullableString(provider.thinkingParam),
                 effortParam = nullableString(provider.effortParam),
-                reasoningOutputField = nullableString(provider.reasoningOutputField)
+                reasoningOutputField = nullableString(provider.reasoningOutputField),
+                balanceUrl = normalizeAiApiPath(baseUrl, nullableString(provider.balanceUrl)),
+                balanceJsonPath = nullableString(provider.balanceJsonPath)
             )
         }.getOrNull()
     }
@@ -220,6 +242,7 @@ object AiProviderStore {
                 builtIn = false,
                 name = "Custom Anthropic",
                 baseUrl = "https://api.anthropic.com/v1",
+                modelsUrl = "/models",
                 enabled = true
             )
             AiProviderType.OPENAI,
@@ -229,6 +252,7 @@ object AiProviderStore {
                 builtIn = false,
                 name = "Custom OpenAI",
                 baseUrl = "https://api.openai.com/v1",
+                modelsUrl = "/models",
                 enabled = true
             )
         }
@@ -260,13 +284,19 @@ object AiProviderStore {
         return value ?: emptyList<Any>()
     }
 
+    private fun normalizeModelIds(ids: List<String>?): List<String> {
+        return ids.orEmpty().map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+
     private fun normalizeModels(models: List<*>): List<AiModel> {
         return models.mapNotNull { model ->
             when (model) {
-                is AiModel -> model
+                is AiModel -> model.normalizedModel()
                 is Map<*, *> -> model.toAiModel()
                 is JsonObject -> model.toAiModel()
-                is String -> AiModel(id = model)
+                is String -> AiModelRegistry.enrich(AiModel(id = model))
                 else -> null
             }
         }.filter { it.id.isNotBlank() }
@@ -274,12 +304,34 @@ object AiProviderStore {
             .sortedBy { it.id.lowercase() }
     }
 
+    private fun AiModel.normalizedModel(): AiModel? {
+        val id = runCatching { id }.getOrNull().orEmpty().trim()
+        if (id.isBlank()) {
+            return null
+        }
+        return copy(
+            id = id,
+            name = runCatching { name }.getOrNull().orEmpty().ifBlank { id },
+            displayName = runCatching { displayName }.getOrNull().orEmpty(),
+            ownedBy = runCatching { ownedBy }.getOrNull().orEmpty(),
+            type = runCatching { type }.getOrNull() ?: AiModelType.CHAT,
+            inputModalities = runCatching { inputModalities }.getOrNull().orEmpty(),
+            outputModalities = runCatching { outputModalities }.getOrNull().orEmpty(),
+            abilities = runCatching { abilities }.getOrNull().orEmpty()
+        )
+    }
+
     private fun Map<*, *>.toAiModel(): AiModel {
         val id = stringValue("id")
         return AiModel(
             id = id,
             name = stringValue("name").ifBlank { id },
-            ownedBy = stringValue("ownedBy").ifBlank { stringValue("owned_by") }
+            displayName = stringValue("displayName"),
+            ownedBy = stringValue("ownedBy").ifBlank { stringValue("owned_by") },
+            type = aiModelTypeValue(),
+            inputModalities = aiModelModalitiesValue("inputModalities", "d"),
+            outputModalities = aiModelModalitiesValue("outputModalities", "e"),
+            abilities = aiModelAbilitiesValue()
         )
     }
 
@@ -288,7 +340,12 @@ object AiProviderStore {
         return AiModel(
             id = id,
             name = stringValue("name").ifBlank { id },
-            ownedBy = stringValue("ownedBy").ifBlank { stringValue("owned_by") }
+            displayName = stringValue("displayName"),
+            ownedBy = stringValue("ownedBy").ifBlank { stringValue("owned_by") },
+            type = aiModelTypeValue(),
+            inputModalities = aiModelModalitiesValue("inputModalities", "d"),
+            outputModalities = aiModelModalitiesValue("outputModalities", "e"),
+            abilities = aiModelAbilitiesValue()
         )
     }
 
@@ -298,6 +355,91 @@ object AiProviderStore {
 
     private fun JsonObject.stringValue(key: String): String {
         return get(key)?.takeIf { !it.isJsonNull }?.asString.orEmpty()
+    }
+
+    private fun Map<*, *>.aiModelTypeValue(): AiModelType {
+        return parseAiModelType(stringValue("type").ifBlank { stringValue("modelType") })
+    }
+
+    private fun JsonObject.aiModelTypeValue(): AiModelType {
+        return parseAiModelType(stringValue("type").ifBlank { stringValue("modelType") })
+    }
+
+    private fun Map<*, *>.aiModelModalitiesValue(
+        stableKey: String,
+        obfuscatedKey: String
+    ): List<AiModelModality> {
+        return parseAiModelModalities(this[stableKey] ?: this[obfuscatedKey])
+    }
+
+    private fun JsonObject.aiModelModalitiesValue(
+        stableKey: String,
+        obfuscatedKey: String
+    ): List<AiModelModality> {
+        return parseAiModelModalities(get(stableKey) ?: get(obfuscatedKey))
+    }
+
+    private fun Map<*, *>.aiModelAbilitiesValue(): List<AiModelAbility> {
+        return parseAiModelAbilities(this["abilities"] ?: this["f"])
+    }
+
+    private fun JsonObject.aiModelAbilitiesValue(): List<AiModelAbility> {
+        return parseAiModelAbilities(get("abilities") ?: get("f"))
+    }
+
+    private fun parseAiModelType(value: String): AiModelType {
+        return when (value.lowercase()) {
+            "image" -> AiModelType.IMAGE
+            "embedding" -> AiModelType.EMBEDDING
+            "asr", "speech_to_text", "stt" -> AiModelType.ASR
+            "tts", "text_to_speech", "voice" -> AiModelType.TTS
+            else -> AiModelType.CHAT
+        }
+    }
+
+    private fun parseAiModelModalities(value: Any?): List<AiModelModality> {
+        val values = modelValueList(value)
+        return buildList {
+            if (values.any { it.equals("text", ignoreCase = true) }) {
+                add(AiModelModality.TEXT)
+            }
+            if (values.any { it.equals("image", ignoreCase = true) }) {
+                add(AiModelModality.IMAGE)
+            }
+            if (values.any { it.equals("audio", ignoreCase = true) }) {
+                add(AiModelModality.AUDIO)
+            }
+        }
+    }
+
+    private fun parseAiModelAbilities(value: Any?): List<AiModelAbility> {
+        val values = modelValueList(value)
+        return buildList {
+            if (values.any { it.equals("asr", ignoreCase = true) }) {
+                add(AiModelAbility.ASR)
+            }
+            if (values.any { it.equals("tts", ignoreCase = true) }) {
+                add(AiModelAbility.TTS)
+            }
+            if (values.any { it.equals("tool", ignoreCase = true) }) {
+                add(AiModelAbility.TOOL)
+            }
+            if (values.any { it.equals("reasoning", ignoreCase = true) }) {
+                add(AiModelAbility.REASONING)
+            }
+        }
+    }
+
+    private fun modelValueList(value: Any?): List<String> {
+        return when (value) {
+            is JsonArray -> value.mapNotNull { element ->
+                element.takeIf { !it.isJsonNull }?.asString
+            }
+            is Iterable<*> -> value.mapNotNull { it?.toString() }
+            is Array<*> -> value.mapNotNull { it?.toString() }
+            is String -> value.split(',', '|').map { it.trim() }.filter { it.isNotBlank() }
+            else -> emptyList()
+        }
     }
 
 }

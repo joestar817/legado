@@ -127,10 +127,14 @@ abstract class BaseActivity<VB : ViewBinding>(
 
     final override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
-            supportFinishAfterTransition()
+            onHomeNavigationSelected()
             return true
         }
         return onCompatOptionsItemSelected(item)
+    }
+
+    open fun onHomeNavigationSelected() {
+        supportFinishAfterTransition()
     }
 
     open fun onCompatOptionsItemSelected(item: MenuItem) = super.onOptionsItemSelected(item)

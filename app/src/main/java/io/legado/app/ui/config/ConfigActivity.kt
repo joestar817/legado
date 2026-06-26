@@ -41,11 +41,16 @@ class ConfigActivity : VMBaseActivity<ActivityConfigBinding, ConfigViewModel>() 
 
     private fun handleConfigBackPressed() {
         val configTag = intent.getStringExtra("configTag")
-        val fragment = configTag?.let { supportFragmentManager.findFragmentByTag(it) }
+        val fragment = supportFragmentManager.findFragmentById(R.id.configFrameLayout)
+            ?: configTag?.let { supportFragmentManager.findFragmentByTag(it) }
         if ((fragment as? ConfigBackHandler)?.onConfigBackPressed() == true) {
             return
         }
         finish()
+    }
+
+    override fun onHomeNavigationSelected() {
+        handleConfigBackPressed()
     }
 
     override fun setTitle(resId: Int) {

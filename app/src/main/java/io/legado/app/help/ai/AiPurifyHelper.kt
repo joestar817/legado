@@ -29,7 +29,10 @@ object AiPurifyHelper {
                 lengthError ?: "文本过长，当前上限 ${maxInputLength} 字"
             }
         }
+        val selection = AiConfig.requirePurifyModel()
         val result = AiManager.generateText(
+            providerId = selection.providerId,
+            modelId = selection.modelId,
             messages = listOf(
                 AiMessage(
                     AiMessage.Role.SYSTEM,
@@ -44,14 +47,13 @@ object AiPurifyHelper {
                 ),
                 AiMessage(AiMessage.Role.USER, source)
             ),
-            params = AiTextParams(
-                temperature = 0f,
-                maxTokens = (source.length * 2 + 64).coerceIn(256, 4096),
-                disableThinking = true
+            params = AiConfig.purifyParagraphParams(
+                inputLength = source.length,
+                supportsReasoning = selection.supportsReasoning()
             )
         )
         val cleaned = normalizeModelOutput(result.content)
-        check(cleaned.isNotBlank()) { "AI 返回空内容" }
+        check(cleaned.isNotBlank()) { result.emptyContentMessage() }
         val validation = validate(source, cleaned)
         return AiPurifyResult(
             original = source,
@@ -117,10 +119,26 @@ object AiPurifyHelper {
         return output
     }
 
+    private fun AiTextResult.emptyContentMessage(): String {
+        val reasoning = reasoning.orEmpty().trim()
+        return if (reasoning.isNotBlank()) {
+            if (finishReason == "length") {
+                "AI 仅返回思考过程，未返回正文。请调低或关闭思考深度后重试"
+            } else {
+                "AI 仅返回思考过程，未返回正文"
+            }
+        } else {
+            "AI 返回空内容"
+        }
+    }
+
     private suspend fun generateRuleBatch(inputs: List<BatchInput>): AiPurifyRuleGenerateResult {
         val payload = GSON.toJson(inputs)
         val sourceLength = inputs.sumOf { it.input.length }
+        val selection = AiConfig.requirePurifyModel()
         val result = AiManager.generateText(
+            providerId = selection.providerId,
+            modelId = selection.modelId,
             messages = listOf(
                 AiMessage(
                     AiMessage.Role.SYSTEM,
@@ -145,12 +163,13 @@ object AiPurifyHelper {
                 ),
                 AiMessage(AiMessage.Role.USER, payload)
             ),
-            params = AiTextParams(
-                temperature = 0f,
-                maxTokens = (sourceLength + inputs.size * 64 + 512).coerceIn(1024, 8192),
-                disableThinking = true
+            params = AiConfig.purifyChapterRuleParams(
+                sourceLength = sourceLength,
+                paragraphCount = inputs.size,
+                supportsReasoning = selection.supportsReasoning()
             )
         )
+        check(result.content.isNotBlank()) { result.emptyContentMessage() }
         val parsedRules = parseRuleOutput(result.content).rules
         val inputMap = inputs.associateBy { it.id }
         val validRules = parsedRules
@@ -585,6 +604,14 @@ object AiPurifyHelper {
         val canAutoApply: Boolean,
         val riskReason: String?
     )
+
+    private fun AiModelSelection.supportsReasoning(): Boolean {
+        return AiProviderStore.provider(providerId)
+            ?.models
+            ?.firstOrNull { it.id == modelId }
+            ?.abilities
+            ?.contains(AiModelAbility.REASONING) == true
+    }
 
     private data class BatchInput(
         @SerializedName("id")

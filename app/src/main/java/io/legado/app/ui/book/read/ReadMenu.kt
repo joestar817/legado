@@ -778,10 +778,8 @@ class ReadMenu @JvmOverloads constructor(
         aiFabExpanded = expanded
         if (expanded) {
             fabAiPurifyChapter.visible()
-            fabAi.rotation = 45f
         } else {
             fabAiPurifyChapter.gone()
-            fabAi.rotation = 0f
         }
     }
 

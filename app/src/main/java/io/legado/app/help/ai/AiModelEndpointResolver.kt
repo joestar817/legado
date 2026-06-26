@@ -14,25 +14,38 @@ object AiModelEndpointResolver {
         "/claude"
     )
 
-    fun candidates(baseUrl: String, modelsUrl: String = ""): List<String> {
-        val explicit = modelsUrl.trim()
-        if (explicit.isNotBlank()) {
-            return listOf(explicit)
+    fun candidates(setting: AiProviderSetting): List<String> {
+        if (setting.useCustomModelsUrl) {
+            return runCatching {
+                listOf(buildAiApiEndpoint(setting.baseUrl, setting.modelsUrl))
+            }.getOrDefault(emptyList())
         }
+        return candidates(setting.baseUrl, setting.type)
+    }
 
+    fun candidates(baseUrl: String, type: AiProviderType = AiProviderType.OPENAI): List<String> {
         val base = baseUrl.trimEndSlash()
         if (base.isBlank()) {
             return emptyList()
         }
 
         val candidates = linkedSetOf<String>()
-        if (base.endsWithVersionSegment()) {
-            candidates += "$base/models"
-            if (!base.endsWith("/v1", ignoreCase = true)) {
+        when {
+            type == AiProviderType.CLAUDE -> {
+                candidates += "$base/models"
+            }
+            base.contains("api.deepseek.com", ignoreCase = true) -> {
+                candidates += "https://api.deepseek.com/models"
+            }
+            base.endsWithVersionSegment() -> {
+                candidates += "$base/models"
+                if (!base.endsWith("/v1", ignoreCase = true)) {
+                    candidates += "$base/v1/models"
+                }
+            }
+            else -> {
                 candidates += "$base/v1/models"
             }
-        } else {
-            candidates += "$base/v1/models"
         }
 
         knownCompatSuffixes.forEach { suffix ->

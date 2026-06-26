@@ -6,6 +6,7 @@ import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.putPrefInt
+import io.legado.app.utils.putPrefString
 import splitties.init.appCtx
 
 object AiConfig {
@@ -25,6 +26,26 @@ object AiConfig {
     const val DEFAULT_PURIFY_CHAPTER_RETRY_COUNT = 3
     const val MIN_PURIFY_CHAPTER_RETRY_COUNT = 0
     const val MAX_PURIFY_CHAPTER_RETRY_COUNT = 10
+    private const val PARAGRAPH_OUTPUT_BUDGET_LIMIT = 6144
+    private const val CHAPTER_OUTPUT_BUDGET_LIMIT = 12288
+
+    var purifyProviderId: String
+        get() = appCtx.getPrefString(PreferKey.aiPurifyProviderId).orEmpty()
+        set(value) {
+            appCtx.putPrefString(PreferKey.aiPurifyProviderId, value.trim())
+        }
+
+    var purifyModelId: String
+        get() = appCtx.getPrefString(PreferKey.aiPurifyModelId).orEmpty()
+        set(value) {
+            appCtx.putPrefString(PreferKey.aiPurifyModelId, value.trim())
+        }
+
+    var purifyReasoningLevel: AiReasoningLevel
+        get() = AiReasoningLevel.from(appCtx.getPrefString(PreferKey.aiPurifyReasoningLevel))
+        set(value) {
+            appCtx.putPrefString(PreferKey.aiPurifyReasoningLevel, value.prefValue)
+        }
 
     val temperature: Float?
         get() = appCtx.getPrefString(PreferKey.aiTemperature, "0.2")
@@ -145,21 +166,129 @@ object AiConfig {
         }
     }
 
+    fun requirePurifyModel(): AiModelSelection {
+        val providerId = purifyProviderId
+        val modelId = purifyModelId
+        check(providerId.isNotBlank() && modelId.isNotBlank()) {
+            "请先在 AI 设置 > 模型设置 > 净化模型 中选择模型"
+        }
+        return AiModelSelection(providerId, modelId)
+    }
+
+    fun savePurifyModel(providerId: String, modelId: String) {
+        purifyProviderId = providerId
+        purifyModelId = modelId
+    }
+
+    fun purifyParagraphParams(
+        inputLength: Int,
+        supportsReasoning: Boolean
+    ): AiTextParams {
+        val baseBudget = (inputLength * 2 + 256).coerceIn(512, 4096)
+        return purifyTextParams(
+            baseOutputBudget = baseBudget,
+            outputBudgetLimit = PARAGRAPH_OUTPUT_BUDGET_LIMIT,
+            supportsReasoning = supportsReasoning
+        )
+    }
+
+    fun purifyChapterRuleParams(
+        sourceLength: Int,
+        paragraphCount: Int,
+        supportsReasoning: Boolean
+    ): AiTextParams {
+        val baseBudget = (sourceLength + paragraphCount * 64 + 512).coerceIn(1024, 8192)
+        return purifyTextParams(
+            baseOutputBudget = baseBudget,
+            outputBudgetLimit = CHAPTER_OUTPUT_BUDGET_LIMIT,
+            supportsReasoning = supportsReasoning
+        )
+    }
+
+    private fun purifyTextParams(
+        baseOutputBudget: Int,
+        outputBudgetLimit: Int,
+        supportsReasoning: Boolean
+    ): AiTextParams {
+        val level = purifyReasoningLevel.takeIf { supportsReasoning } ?: AiReasoningLevel.OFF
+        val outputBudget = (baseOutputBudget + level.reasoningReserve(baseOutputBudget))
+            .coerceIn(baseOutputBudget, outputBudgetLimit)
+        return AiTextParams(
+            temperature = 0f,
+            maxTokens = outputBudget,
+            enableThinking = level != AiReasoningLevel.OFF && level != AiReasoningLevel.AUTO,
+            disableThinking = level == AiReasoningLevel.OFF,
+            reasoningEffort = level.reasoningEffort
+        )
+    }
+
     fun currentSetting(): AiProviderSetting {
         return AiProviderStore.activeProvider()
     }
 
     fun savedModels(): List<AiModel> {
-        return currentSetting().models
+        val setting = currentSetting()
+        val availableIds = if (setting.availableModelSelectionInitialized) {
+            setting.availableModelIds.toSet()
+        } else {
+            setting.models.map { it.id }.toSet()
+        }
+        return setting.models.filter { it.id in availableIds }
     }
 
     fun saveModels(models: List<AiModel>) {
         val setting = currentSetting()
-        AiProviderStore.saveProvider(setting.copy(models = models))
+        AiProviderStore.saveProvider(
+            setting.copy(
+                models = models,
+                availableModelIds = models.map { it.id },
+                availableModelSelectionInitialized = true
+            )
+        )
     }
 
     fun clearModels() {
         val setting = currentSetting()
-        AiProviderStore.saveProvider(setting.copy(models = emptyList()))
+        AiProviderStore.saveProvider(
+            setting.copy(
+                models = emptyList(),
+                availableModelIds = emptyList(),
+                availableModelSelectionInitialized = true
+            )
+        )
+    }
+}
+
+data class AiModelSelection(
+    val providerId: String,
+    val modelId: String
+)
+
+enum class AiReasoningLevel(
+    val prefValue: String,
+    val reasoningEffort: String?
+) {
+    OFF("off", null),
+    AUTO("auto", null),
+    LOW("low", "low"),
+    MEDIUM("medium", "medium"),
+    HIGH("high", "high"),
+    ULTRA("ultra", "high");
+
+    fun reasoningReserve(baseOutputBudget: Int): Int {
+        return when (this) {
+            OFF -> 0
+            AUTO -> baseOutputBudget / 2 + 256
+            LOW -> baseOutputBudget * 3 / 4 + 256
+            MEDIUM -> baseOutputBudget + 256
+            HIGH -> baseOutputBudget * 3 / 2 + 512
+            ULTRA -> baseOutputBudget * 2 + 512
+        }
+    }
+
+    companion object {
+        fun from(value: String?): AiReasoningLevel {
+            return entries.firstOrNull { it.prefValue == value } ?: OFF
+        }
     }
 }

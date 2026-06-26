@@ -33,6 +33,40 @@ internal fun String.ensureStartSlash(): String {
     return if (startsWith("/")) this else "/$this"
 }
 
+internal fun buildAiApiEndpoint(baseUrl: String, apiPath: String): String {
+    val api = apiPath.trim()
+    check(api.isNotBlank()) { "API path is empty" }
+    if (api.startsWith("http://", ignoreCase = true) ||
+        api.startsWith("https://", ignoreCase = true)
+    ) {
+        return api
+    }
+    return "${baseUrl.trimEndSlash()}${api.ensureStartSlash()}"
+}
+
+internal fun normalizeAiApiPath(baseUrl: String, apiPath: String): String {
+    val api = apiPath.trim()
+    if (api.isBlank()) {
+        return ""
+    }
+    if (!api.startsWith("http://", ignoreCase = true) &&
+        !api.startsWith("https://", ignoreCase = true)
+    ) {
+        return api.ensureStartSlash()
+    }
+    val base = baseUrl.trimEndSlash()
+    if (base.isBlank()) {
+        return api
+    }
+    if (api.equals(base, ignoreCase = true)) {
+        return "/"
+    }
+    if (api.startsWith("$base/", ignoreCase = true)) {
+        return api.substring(base.length).ensureStartSlash()
+    }
+    return api
+}
+
 internal suspend fun OkHttpClient.executeJson(request: Request): JsonObject {
     return withContext(IO) {
         val response = newCall(request).await()
