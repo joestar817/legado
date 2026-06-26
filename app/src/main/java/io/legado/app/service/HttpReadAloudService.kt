@@ -118,6 +118,11 @@ class HttpReadAloudService : BaseReadAloudService(),
             AppLog.putDebug("朗读列表为空")
             ReadBook.readAloud()
         } else {
+            while (nowSpeak in contentList.indices && isReadAloudTextSilent()) {
+                if (!skipCurrentReadAloudTextIfNeeded()) {
+                    return
+                }
+            }
             super.play()
             if (AppConfig.streamReadAloudAudio) {
                 downloadAndPlayAudiosStream()
@@ -152,14 +157,11 @@ class HttpReadAloudService : BaseReadAloudService(),
                 contentList.forEachIndexed { index, content ->
                     ensureActive()
                     if (index < nowSpeak) return@forEachIndexed
-                    var text = content
-                    if (paragraphStartPos > 0 && index == nowSpeak) {
-                        text = text.substring(paragraphStartPos)
-                    }
+                    val text = getReadAloudText(index)
                     val fileName = md5SpeakFileName(text)
                     val speakText = text.replace(AppPattern.notReadAloudRegex, "")
                     if (speakText.isEmpty()) {
-                        AppLog.put("阅读段落内容为空，使用无声音频代替。\n朗读文本：$text")
+                        AppLog.put("阅读段落内容为空，使用无声音频代替。\n朗读文本：$content")
                         createSilentSound(fileName)
                     } else if (!hasSpeakFile(fileName)) {
                         runCatching {
@@ -232,13 +234,10 @@ class HttpReadAloudService : BaseReadAloudService(),
                 contentList.forEachIndexed { index, content ->
                     ensureActive()
                     if (index < nowSpeak) return@forEachIndexed
-                    var text = content
-                    if (paragraphStartPos > 0 && index == nowSpeak) {
-                        text = text.substring(paragraphStartPos)
-                    }
+                    val text = getReadAloudText(index)
                     val speakText = text.replace(AppPattern.notReadAloudRegex, "")
                     if (speakText.isEmpty()) {
-                        AppLog.put("阅读段落内容为空，使用无声音频代替。\n朗读文本：$speakText")
+                        AppLog.put("阅读段落内容为空，使用无声音频代替。\n朗读文本：$content")
                     }
                     val fileName = md5SpeakFileName(text)
                     val dataSourceFactory = createDataSourceFactory(httpTts, speakText)

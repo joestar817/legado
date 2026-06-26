@@ -35,6 +35,7 @@ object PreferKey {
     const val hideNavigationBar = "hideNavigationBar"
     const val precisionSearch = "precisionSearch"
     const val readAloudByPage = "readAloudByPage"
+    const val skipReadAloudChapterTitle = "skipReadAloudChapterTitle"
     const val ttsEngine = "appTtsEngine"
     const val ttsFollowSys = "ttsFollowSys"
     const val ttsSpeechRate = "ttsSpeechRate"

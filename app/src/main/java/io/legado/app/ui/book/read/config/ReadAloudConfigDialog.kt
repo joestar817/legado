@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.read.config
 
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -18,16 +19,15 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.prefs.SwitchPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
-import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.ReadAloud
 import io.legado.app.service.BaseReadAloudService
+import io.legado.app.ui.widget.dialog.applyNgWindow
 import io.legado.app.utils.GSON
 import io.legado.app.utils.StringUtils
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.setEdgeEffectColor
-import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
 
 class ReadAloudConfigDialog : BasePrefDialogFragment() {
@@ -35,10 +35,7 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
 
     override fun onStart() {
         super.onStart()
-        dialog?.window?.run {
-            setBackgroundDrawableResource(R.color.transparent)
-            setLayout(0.9f, ViewGroup.LayoutParams.WRAP_CONTENT)
-        }
+        dialog?.applyNgWindow(height = ViewGroup.LayoutParams.WRAP_CONTENT)
     }
 
     override fun onCreateView(
@@ -47,7 +44,7 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
         savedInstanceState: Bundle?
     ): View {
         val view = LinearLayout(requireContext())
-        view.setBackgroundColor(requireContext().backgroundColor)
+        view.setBackgroundResource(R.drawable.ng_bg_dialog)
         view.id = R.id.tag1
         container?.addView(view)
         return view
@@ -88,6 +85,8 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
 
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
             super.onViewCreated(view, savedInstanceState)
+            view.setBackgroundColor(Color.TRANSPARENT)
+            listView.setBackgroundColor(Color.TRANSPARENT)
             listView.setEdgeEffectColor(primaryColor)
         }
 
@@ -114,7 +113,9 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
             key: String?
         ) {
             when (key) {
-                PreferKey.readAloudByPage, PreferKey.streamReadAloudAudio -> {
+                PreferKey.readAloudByPage,
+                PreferKey.skipReadAloudChapterTitle,
+                PreferKey.streamReadAloudAudio -> {
                     if (BaseReadAloudService.isRun) {
                         postEvent(EventBus.MEDIA_BUTTON, false)
                     }

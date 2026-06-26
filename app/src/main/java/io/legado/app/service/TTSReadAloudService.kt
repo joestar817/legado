@@ -102,11 +102,8 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
             var isAddedText = false
             for (i in nowSpeak until contentList.size) {
                 ensureActive()
-                var text = contentList[i]
-                if (paragraphStartPos > 0 && i == nowSpeak) {
-                    text = text.substring(paragraphStartPos)
-                }
-                if (text.matches(AppPattern.notReadAloudRegex)) {
+                val text = getReadAloudText(i)
+                if (text.isBlank() || text.matches(AppPattern.notReadAloudRegex)) {
                     continue
                 }
                 if (!isAddedText) {
@@ -196,7 +193,7 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         override fun onStart(s: String) {
             LogUtils.d(TAG, "onStart nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$s")
             textChapter?.let {
-                if (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex)) {
+                if (isReadAloudTextSilent()) {
                     nextParagraph()
                 }
                 if (pageIndex + 1 < it.pageSize
@@ -241,14 +238,10 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         private fun nextParagraph() {
             //跳过全标点段落
             do {
-                readAloudNumber += contentList[nowSpeak].length + 1 - paragraphStartPos
-                paragraphStartPos = 0
-                nowSpeak++
-                if (nowSpeak >= contentList.size) {
-                    nextChapter()
+                if (!advanceReadAloudPosition()) {
                     return
                 }
-            } while (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex))
+            } while (isReadAloudTextSilent())
         }
 
         @Deprecated("Deprecated in Java")

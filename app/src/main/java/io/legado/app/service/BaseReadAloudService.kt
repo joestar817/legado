@@ -274,6 +274,108 @@ abstract class BaseReadAloudService : BaseService(),
         }
     }
 
+    internal fun getReadAloudText(index: Int): String {
+        var text = contentList.getOrNull(index) ?: return ""
+        if (paragraphStartPos > 0 && index == nowSpeak) {
+            text = text.substring(paragraphStartPos.coerceAtMost(text.length))
+        }
+        return removeLeadingChapterTitle(text, index)
+    }
+
+    internal fun isReadAloudTextSilent(index: Int = nowSpeak): Boolean {
+        val text = getReadAloudText(index)
+        return text.isBlank() || text.matches(AppPattern.notReadAloudRegex)
+    }
+
+    internal fun skipCurrentReadAloudTextIfNeeded(): Boolean {
+        if (!isReadAloudTextSilent()) {
+            return true
+        }
+        return advanceReadAloudPosition()
+    }
+
+    internal fun advanceReadAloudPosition(): Boolean {
+        if (nowSpeak !in contentList.indices) {
+            nextChapter()
+            return false
+        }
+        readAloudNumber += contentList[nowSpeak].length + 1 - paragraphStartPos
+        paragraphStartPos = 0
+        if (nowSpeak < contentList.lastIndex) {
+            nowSpeak++
+        } else {
+            nextChapter()
+            return false
+        }
+        textChapter?.let {
+            if (readAloudByPage) {
+                val paragraphs = it.getParagraphs(true)
+                if (paragraphs.getOrNull(nowSpeak)?.isParagraphEnd == false) {
+                    readAloudNumber--
+                }
+            }
+            if (pageIndex + 1 < it.pageSize
+                && readAloudNumber >= it.getReadLength(pageIndex + 1)
+            ) {
+                pageIndex++
+                ReadBook.moveToNextPage()
+            }
+        }
+        upTtsProgress(readAloudNumber + 1)
+        return true
+    }
+
+    private fun removeLeadingChapterTitle(text: String, index: Int): String {
+        if (!AppConfig.skipReadAloudChapterTitle || index != 0 || paragraphStartPos > 0) {
+            return text
+        }
+        val trimStartIndex = text.indexOfFirst { !it.isWhitespace() && it != '　' }
+        if (trimStartIndex < 0) {
+            return text
+        }
+        val content = text.substring(trimStartIndex)
+        readAloudChapterTitleCandidates().forEach { title ->
+            if (content == title) {
+                return ""
+            }
+            if (content.startsWith(title)) {
+                val remaining = content.substring(title.length)
+                if (remaining.firstOrNull()?.isReadAloudTitleSeparator() == true) {
+                    return text.substring(0, trimStartIndex) + remaining.trimStart()
+                }
+            }
+        }
+        return text
+    }
+
+    private fun readAloudChapterTitleCandidates(): List<String> {
+        val displayTitle = textChapter?.title.orEmpty()
+        val rawTitle = textChapter?.chapter?.title.orEmpty()
+        return sequenceOf(displayTitle, rawTitle)
+            .flatMap { it.splitToSequence('\n') }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sortedByDescending { it.length }
+            .toList()
+    }
+
+    private fun Char.isReadAloudTitleSeparator(): Boolean {
+        if (isWhitespace() || this == '　') {
+            return true
+        }
+        return when (Character.getType(this)) {
+            Character.CONNECTOR_PUNCTUATION.toInt(),
+            Character.DASH_PUNCTUATION.toInt(),
+            Character.START_PUNCTUATION.toInt(),
+            Character.END_PUNCTUATION.toInt(),
+            Character.INITIAL_QUOTE_PUNCTUATION.toInt(),
+            Character.FINAL_QUOTE_PUNCTUATION.toInt(),
+            Character.OTHER_PUNCTUATION.toInt() -> true
+            else -> false
+        }
+    }
+
     @SuppressLint("WakelockTimeout")
     open fun play() {
         if (useWakeLock) {
