@@ -19,13 +19,12 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.DialogBookGroupPickerBinding
 import io.legado.app.databinding.ItemGroupSelectBinding
-import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
-import io.legado.app.lib.theme.primaryColor
+import io.legado.app.ui.widget.dialog.applyNgDialogWindow
+import io.legado.app.ui.widget.dialog.ngDialogMaxHeight
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.applyTint
-import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.flow.conflate
@@ -51,11 +50,11 @@ class GroupSelectDialog() : BaseDialogFragment(R.layout.dialog_book_group_picker
 
     override fun onStart() {
         super.onStart()
-        setLayout(0.9f, 0.9f)
+        applyNgDialogWindow(height = ngDialogMaxHeight(0.88f))
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        binding.toolBar.setBackgroundColor(primaryColor)
+        view.setBackgroundResource(R.drawable.ng_bg_dialog)
         arguments?.let {
             groupId = it.getLong("groupId")
             requestCode = it.getInt("requestCode", -1)
@@ -78,7 +77,6 @@ class GroupSelectDialog() : BaseDialogFragment(R.layout.dialog_book_group_picker
         binding.tvCancel.setOnClickListener {
             dismissAllowingStateLoss()
         }
-        binding.tvOk.setTextColor(requireContext().accentColor)
         binding.tvOk.setOnClickListener {
             callBack?.upGroup(requestCode, groupId)
             dismissAllowingStateLoss()

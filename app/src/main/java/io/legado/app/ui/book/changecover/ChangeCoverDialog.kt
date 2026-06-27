@@ -3,7 +3,6 @@ package io.legado.app.ui.book.changecover
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
-import android.view.ViewGroup
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle.State.STARTED
@@ -12,9 +11,9 @@ import androidx.recyclerview.widget.GridLayoutManager
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogChangeCoverBinding
-import io.legado.app.lib.theme.primaryColor
+import io.legado.app.ui.widget.dialog.applyNgDialogWindow
+import io.legado.app.ui.widget.dialog.ngDialogMaxHeight
 import io.legado.app.utils.applyTint
-import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
@@ -45,11 +44,11 @@ class ChangeCoverDialog() : BaseDialogFragment(R.layout.dialog_change_cover),
 
     override fun onStart() {
         super.onStart()
-        setLayout(1f, ViewGroup.LayoutParams.MATCH_PARENT)
+        applyNgDialogWindow(height = ngDialogMaxHeight(0.92f))
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        binding.toolBar.setBackgroundColor(primaryColor)
+        view.setBackgroundResource(R.drawable.ng_bg_dialog)
         binding.toolBar.setTitle(R.string.change_cover_source)
         viewModel.initData(arguments)
         initMenu()

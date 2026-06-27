@@ -1,29 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:orientation="vertical"
-    android:layout_width="match_parent"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Ng.DialogRoot"
     android:layout_height="match_parent">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/tool_bar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:elevation="5dp"
-        android:theme="?attr/actionBarStyle"
-        app:titleTextAppearance="@style/ToolbarTitle"
+        android:layout_height="58dp"
+        android:background="@android:color/transparent"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
         app:popupTheme="@style/AppTheme.PopupOverlay"
         app:displayHomeAsUp="false"
-        app:fitStatusBar="false" />
+        app:fitStatusBar="false"
+        app:titleTextAppearance="@style/ToolbarTitle"
+        app:titleTextColor="@color/ng_on_surface" />
 
-    <io.legado.app.ui.widget.anima.RefreshProgressBar
-        android:id="@+id/refresh_progress_bar"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="2dp" />
+        android:layout_height="0dp"
+        android:layout_marginStart="@dimen/ng_dialog_padding"
+        android:layout_marginEnd="@dimen/ng_dialog_padding"
+        android:layout_marginBottom="@dimen/ng_dialog_padding"
+        android:layout_weight="1"
+        android:background="@drawable/ng_bg_dialog_section">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_view"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        <io.legado.app.ui.widget.anima.RefreshProgressBar
+            android:id="@+id/refresh_progress_bar"
+            android:layout_width="match_parent"
+            android:layout_height="2dp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"
+            android:scrollbars="none"
+            tools:ignore="SpeakableTextPresentCheck" />
+
+    </FrameLayout>
 
 </LinearLayout>
