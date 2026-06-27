@@ -104,7 +104,7 @@
                             android:layout_marginBottom="12dp"
                             android:scrollbars="none">
 
-                            <io.legado.app.ui.widget.LabelsBar
+                            <io.legado.app.ui.widget.WrapLabelsBar
                                 android:id="@+id/lb_kind"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
@@ -170,15 +170,16 @@
                                 tools:ignore="RtlSymmetry"
                                 tools:text="@string/origin_format" />
 
-                            <io.legado.app.ui.widget.text.AccentBgTextView
+                            <ImageButton
                                 android:id="@+id/tv_change_source"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:layout_marginStart="8dp"
-                                android:paddingHorizontal="6dp"
-                                android:text="@string/change_origin"
-                                android:textSize="13sp"
-                                app:radius="2dp" />
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/change_origin"
+                                android:padding="5dp"
+                                android:src="@drawable/ic_exchange"
+                                app:tint="@color/tv_text_summary" />
                         </LinearLayout>
 
                         <LinearLayout
@@ -240,15 +241,16 @@
                                 tools:ignore="RtlSymmetry"
                                 tools:text="@string/group_s" />
 
-                            <io.legado.app.ui.widget.text.AccentBgTextView
+                            <ImageButton
                                 android:id="@+id/tv_change_group"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:layout_marginStart="8dp"
-                                android:paddingHorizontal="6dp"
-                                android:text="@string/change_group"
-                                android:textSize="13sp"
-                                app:radius="2dp" />
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/change_group"
+                                android:padding="5dp"
+                                android:src="@drawable/ic_groups"
+                                app:tint="@color/tv_text_summary" />
                         </LinearLayout>
 
                         <LinearLayout
@@ -280,15 +282,16 @@
                                 tools:ignore="RtlSymmetry"
                                 tools:text="@string/toc_s" />
 
-                            <io.legado.app.ui.widget.text.AccentBgTextView
+                            <ImageButton
                                 android:id="@+id/tv_toc_view"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:layout_marginStart="8dp"
-                                android:paddingHorizontal="6dp"
-                                android:text="@string/view_toc"
-                                android:textSize="13sp"
-                                app:radius="2dp" />
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/view_toc"
+                                android:padding="5dp"
+                                android:src="@drawable/ic_folder_open"
+                                app:tint="@color/tv_text_summary" />
                         </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>

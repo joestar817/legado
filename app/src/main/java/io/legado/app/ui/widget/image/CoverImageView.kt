@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Outline
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.text.TextPaint
@@ -30,6 +32,7 @@ import io.legado.app.utils.toStringArray
 import android.view.ViewOutlineProvider
 import androidx.collection.LruCache
 import androidx.core.graphics.createBitmap
+import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.lib.theme.backgroundColor
@@ -68,6 +71,15 @@ class CoverImageView @JvmOverloads constructor(
     private var authorHeight = 0f
     private val drawBookName = BookCover.drawBookName
     private val drawBookAuthor by lazy { BookCover.drawBookAuthor }
+    private val coverRadius: Float
+    private val clipRect = RectF()
+    private val clipPath = Path()
+
+    init {
+        val typedArray = context.obtainStyledAttributes(attrs, R.styleable.CoverImageView)
+        coverRadius = typedArray.getDimension(R.styleable.CoverImageView_radius, 12f)
+        typedArray.recycle()
+    }
 
     override fun setLayoutParams(params: ViewGroup.LayoutParams?) {
         if (params != null) {
@@ -94,29 +106,40 @@ class CoverImageView @JvmOverloads constructor(
         super.onSizeChanged(w, h, oldw, oldh)
         outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) {
-                outline.setRoundRect(0, 0, w, h, 12f)
+                outline.setRoundRect(0, 0, w, h, coverRadius)
             }
         }
         clipToOutline = true
     }
 
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        if (!drawBookName) return
-        val currentName = this.name ?: return
-        if (AppConfig.useDefaultCover || needNameBitmap[bitmapPath.toString()] == true) {
-            val currentAuthor = this.author
-            val pathName = if (drawBookAuthor){
-                currentName + currentAuthor
-            } else {
-                currentName
+        val saveCount = canvas.save()
+        if (coverRadius > 0f && width > 0 && height > 0) {
+            clipRect.set(0f, 0f, width.toFloat(), height.toFloat())
+            clipPath.reset()
+            clipPath.addRoundRect(clipRect, coverRadius, coverRadius, Path.Direction.CW)
+            canvas.clipPath(clipPath)
+        }
+        try {
+            super.onDraw(canvas)
+            if (!drawBookName) return
+            val currentName = this.name ?: return
+            if (AppConfig.useDefaultCover || needNameBitmap[bitmapPath.toString()] == true) {
+                val currentAuthor = this.author
+                val pathName = if (drawBookAuthor) {
+                    currentName + currentAuthor
+                } else {
+                    currentName
+                }
+                val cacheBitmap = nameBitmapCache[pathName + width]
+                if (cacheBitmap != null) {
+                    canvas.drawBitmap(cacheBitmap, 0f, 0f, null)
+                    return
+                }
+                drawNameAuthor(pathName, currentName, currentAuthor, false)
             }
-            val cacheBitmap =  nameBitmapCache[pathName + width]
-            if (cacheBitmap != null) {
-                canvas.drawBitmap(cacheBitmap, 0f, 0f, null)
-                return
-            }
-            drawNameAuthor(pathName, currentName, currentAuthor, false)
+        } finally {
+            canvas.restoreToCount(saveCount)
         }
     }
 

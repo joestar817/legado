@@ -129,6 +129,10 @@
         <attr name="left_bottom_radius" format="dimension" />
     </declare-styleable>
 
+    <declare-styleable name="CoverImageView">
+        <attr name="radius" />
+    </declare-styleable>
+
     <declare-styleable name="IconListPreference">
         <attr name="icons" format="reference" />
     </declare-styleable>

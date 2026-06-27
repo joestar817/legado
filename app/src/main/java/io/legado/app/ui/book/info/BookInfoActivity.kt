@@ -63,7 +63,6 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
-import io.legado.app.model.BookCover
 import io.legado.app.model.remote.RemoteBookWebDav
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.about.NetworkLogDialog
@@ -236,13 +235,24 @@ class BookInfoActivity :
     @SuppressLint("PrivateResource")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.titleBar.setBackgroundResource(R.color.transparent)
+        binding.bgBook.setImageDrawable(null)
         binding.refreshLayout?.setColorSchemeColors(accentColor)
         binding.arcView?.setBgColor(backgroundColor)
-        binding.llInfo.setBackgroundColor(backgroundColor)
-        binding.ivCoverC.setCardBackgroundColor(backgroundColor)
-        binding.flAction.setBackgroundColor(bottomBackground)
+        val isPortrait =
+            resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+        binding.llInfo.setBackgroundColor(
+            if (isPortrait) android.graphics.Color.TRANSPARENT else backgroundColor
+        )
+        binding.ivCoverC?.setCardBackgroundColor(
+            if (isPortrait) android.graphics.Color.TRANSPARENT else backgroundColor
+        )
+        binding.flAction.setBackgroundColor(
+            if (isPortrait) android.graphics.Color.TRANSPARENT else bottomBackground
+        )
         binding.vwBg.applyNavigationBarPadding()
-        binding.tvShelf.setTextColor(getPrimaryTextColor(ColorUtils.isColorLight(bottomBackground)))
+        binding.tvShelf.setTextColor(
+            if (isPortrait) accentColor else getPrimaryTextColor(ColorUtils.isColorLight(bottomBackground))
+        )
         binding.tvToc.text = getString(R.string.toc_s, getString(R.string.loading))
         viewModel.bookData.observe(this) { showBook(it) }
         viewModel.chapterListData.observe(this) { upLoading(false, it) }
@@ -485,7 +495,7 @@ class BookInfoActivity :
 
     private fun showBook(book: Book) = binding.run {
         showCover(book)
-        tvName.text = book.name
+        (tvName as android.widget.TextView).text = book.name
         tvAuthor.text = getString(R.string.author_show, book.getRealAuthor())
         tvOrigin.text = getString(R.string.origin_show, book.originName)
         tvLasted.text = getString(R.string.lasted_show, book.latestChapterTitle)
@@ -698,12 +708,7 @@ class BookInfoActivity :
     }
 
     private fun showCover(book: Book) {
-        binding.ivCover.load(book, false) {
-            if (!AppConfig.isEInkMode) {
-                BookCover.loadBlur(this, book.getDisplayCover(), false, book.origin)
-                    .into(binding.bgBook)
-            }
-        }
+        binding.ivCover.load(book, false)
     }
 
     private fun upLoading(isLoading: Boolean, chapterList: List<BookChapter>? = null) {
