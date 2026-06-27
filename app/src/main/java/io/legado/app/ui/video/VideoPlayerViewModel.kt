@@ -18,7 +18,7 @@ class VideoPlayerViewModel(application: Application) : BaseViewModel(application
     fun removeFromBookshelf(success: (() -> Unit)?) {
         execute {
             VideoPlay.book?.let {
-                appDb.bookDao.delete(it)
+                it.delete()
             }
         }.onSuccess {
             success?.invoke()

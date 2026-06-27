@@ -20,7 +20,7 @@ object DatabaseMigrations {
             migration_31_32, migration_32_33, migration_33_34, migration_34_35,
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
-            migration_89_90,
+            migration_89_90, migration_90_91,
         )
     }
 
@@ -338,6 +338,53 @@ object DatabaseMigrations {
                     "eventListener, bookSourceType\n" +
                     "    from book_sources"
             )
+        }
+    }
+
+    private val migration_90_91 = object : Migration(90, 91) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `bookCharacterProfiles` (
+                    `workKey` TEXT NOT NULL,
+                    `bookName` TEXT NOT NULL DEFAULT '',
+                    `bookAuthor` TEXT NOT NULL DEFAULT '',
+                    `latestBookUrl` TEXT,
+                    `characterCount` INTEGER NOT NULL DEFAULT 0,
+                    `enabled` INTEGER NOT NULL DEFAULT 1,
+                    `createdAt` INTEGER NOT NULL DEFAULT 0,
+                    `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(`workKey`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `bookCharacters` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `workKey` TEXT NOT NULL DEFAULT '',
+                    `name` TEXT NOT NULL DEFAULT '',
+                    `gender` TEXT NOT NULL DEFAULT 'unknown',
+                    `roleTag` TEXT NOT NULL DEFAULT 'unknown',
+                    `identity` TEXT,
+                    `aliasesJson` TEXT,
+                    `intro` TEXT,
+                    `shortIntro` TEXT,
+                    `avatarUri` TEXT,
+                    `portraitUri` TEXT,
+                    `imagePrompt` TEXT,
+                    `enabled` INTEGER NOT NULL DEFAULT 1,
+                    `sortOrder` INTEGER NOT NULL DEFAULT 0,
+                    `source` TEXT NOT NULL DEFAULT 'manual',
+                    `confidence` REAL NOT NULL DEFAULT 1,
+                    `createdAt` INTEGER NOT NULL DEFAULT 0,
+                    `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY(`workKey`) REFERENCES `bookCharacterProfiles`(`workKey`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_bookCharacters_workKey` ON `bookCharacters` (`workKey`)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_bookCharacters_workKey_name` ON `bookCharacters` (`workKey`, `name`)")
         }
     }
 

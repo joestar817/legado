@@ -140,6 +140,9 @@ interface BookDao {
     @Query("select exists(select 1 from books where name = :name and author = :author)")
     fun has(name: String, author: String): Boolean
 
+    @Query("select count(*) from books where name = :name and author = :author")
+    fun countByNameAuthor(name: String, author: String): Int
+
     @Query(
         """select exists(select 1 from books where type & ${BookType.local} > 0 
         and (originName = :fileName or (origin != '${BookType.localTag}' and origin like '%' || :fileName)))"""

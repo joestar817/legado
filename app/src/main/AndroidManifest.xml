@@ -169,6 +169,13 @@
         <activity
             android:name=".ui.book.info.edit.BookInfoEditActivity"
             android:launchMode="singleTask" />
+        <!-- 书籍角色卡 -->
+        <activity
+            android:name=".ui.book.character.BookCharacterActivity"
+            android:launchMode="singleTop" />
+        <activity
+            android:name=".ui.book.character.BookCharacterEditActivity"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
         <!-- 音频播放界面 -->
         <activity
             android:name="io.legado.app.ui.book.audio.AudioPlayActivity"

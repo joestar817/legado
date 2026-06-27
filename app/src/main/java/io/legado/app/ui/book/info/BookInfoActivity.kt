@@ -17,6 +17,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.CheckBox
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.lifecycle.Lifecycle
@@ -25,12 +26,15 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.Theme
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookCharacter
+import io.legado.app.data.entities.BookCharacterProfile
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ActivityBookInfoBinding
@@ -68,6 +72,8 @@ import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.about.NetworkLogDialog
 import io.legado.app.ui.book.audio.AudioPlayActivity
 import io.legado.app.ui.book.changecover.ChangeCoverDialog
+import io.legado.app.ui.book.character.BookCharacterActivity
+import io.legado.app.ui.book.character.BookCharacterLabels
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.group.GroupSelectDialog
 import io.legado.app.ui.book.info.edit.BookInfoEditActivity
@@ -111,6 +117,9 @@ import io.noties.markwon.ext.tables.TablePlugin
 import io.noties.markwon.html.HtmlPlugin
 import io.noties.markwon.image.glide.GlideImagesPlugin
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -191,6 +200,7 @@ class BookInfoActivity :
     private val waitDialog by lazy { WaitDialog(this) }
     private var editMenuItem: MenuItem? = null
     private var menuCustomBtn: MenuItem? = null
+    private var characterPreviewJob: Job? = null
     private val book get() = viewModel.getBook(false)
 
     override val binding by viewBinding(ActivityBookInfoBinding::inflate)
@@ -510,6 +520,129 @@ class BookInfoActivity :
         upTvBookshelf()
         upKinds(book)
         upGroup(book.group)
+        observeCharacterPreview(book)
+    }
+
+    private fun observeCharacterPreview(book: Book) {
+        val workKey = BookCharacterProfile.workKey(book.name, book.author)
+        characterPreviewJob?.cancel()
+        binding.llCharacterHeader?.setOnClickListener {
+            openCharacterActivity(book, workKey)
+        }
+        characterPreviewJob = lifecycleScope.launch {
+            appDb.bookCharacterDao.flowCharacters(workKey)
+                .catch {
+                    AppLog.put("角色卡预览加载失败\n${it.localizedMessage}", it)
+                }
+                .flowOn(IO)
+                .collect { characters ->
+                    showCharacterPreview(book, workKey, characters)
+                }
+        }
+    }
+
+    private fun showCharacterPreview(book: Book, workKey: String, characters: List<BookCharacter>) {
+        binding.llCharacters?.visible() ?: return
+        binding.tvCharacterCount?.text = getString(R.string.character_count_format, characters.size)
+        binding.llCharacterPreview?.removeAllViews()
+        if (characters.isEmpty()) {
+            val emptyView = TextView(this).apply {
+                text = getString(R.string.book_character_empty)
+                setTextColor(getColor(R.color.tv_text_summary))
+                textSize = 13f
+                includeFontPadding = false
+                setPadding(0, 6.dpToPx(), 0, 6.dpToPx())
+                setOnClickListener { openCharacterActivity(book, workKey) }
+            }
+            binding.llCharacterPreview?.addView(emptyView)
+            return
+        }
+        characters.take(6).forEach { character ->
+            binding.llCharacterPreview?.addView(createCharacterPreviewView(character))
+        }
+    }
+
+    private fun createCharacterPreviewView(character: BookCharacter): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            background = getDrawable(R.drawable.ng_bg_book_detail_card)
+            setPadding(10.dpToPx(), 8.dpToPx(), 12.dpToPx(), 8.dpToPx())
+            layoutParams = LinearLayout.LayoutParams(154.dpToPx(), 64.dpToPx()).apply {
+                marginEnd = 10.dpToPx()
+            }
+            setOnClickListener {
+                book?.let { openCharacterActivity(it, BookCharacterProfile.workKey(it.name, it.author)) }
+            }
+            addView(TextView(this@BookInfoActivity).apply {
+                text = character.name.firstOrNull()?.toString().orEmpty()
+                gravity = android.view.Gravity.CENTER
+                includeFontPadding = false
+                textSize = 16f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setTextColor(android.graphics.Color.WHITE)
+                setBackgroundResource(character.avatarBackground())
+                layoutParams = LinearLayout.LayoutParams(38.dpToPx(), 38.dpToPx()).apply {
+                    marginEnd = 10.dpToPx()
+                }
+            })
+            addView(LinearLayout(this@BookInfoActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    1f
+                )
+                addView(TextView(this@BookInfoActivity).apply {
+                    text = character.name
+                    includeFontPadding = false
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setTextColor(getColor(R.color.primaryText))
+                    textSize = 13f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                })
+                val intro = character.shortIntro?.takeIf { it.isNotBlank() }
+                    ?: character.identity?.takeIf { it.isNotBlank() }
+                    ?: BookCharacterLabels.roleLabel(this@BookInfoActivity, character.roleTag)
+                addView(TextView(this@BookInfoActivity).apply {
+                    text = intro
+                    includeFontPadding = false
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setTextColor(getColor(R.color.tv_text_summary))
+                    textSize = 11f
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        topMargin = 5.dpToPx()
+                    }
+                })
+            })
+        }
+    }
+
+    private fun BookCharacter.avatarBackground(): Int {
+        return when (gender) {
+            BookCharacter.Gender.MALE -> R.drawable.bg_character_avatar_male
+            BookCharacter.Gender.FEMALE -> R.drawable.bg_character_avatar_female
+            else -> R.drawable.bg_character_avatar_unknown
+        }
+    }
+
+    private fun openCharacterActivity(book: Book, workKey: String) {
+        startActivity<BookCharacterActivity> {
+            putExtra(BookCharacterActivity.EXTRA_WORK_KEY, workKey)
+            putExtra(BookCharacterActivity.EXTRA_BOOK_NAME, book.name)
+            putExtra(BookCharacterActivity.EXTRA_BOOK_AUTHOR, book.author)
+            putExtra(BookCharacterActivity.EXTRA_BOOK_URL, book.bookUrl)
+        }
     }
 
     inner class CustomWebViewClient : WebViewClient() {

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".ui.book.character.BookCharacterEditActivity">
+
+    <io.legado.app.ui.widget.TitleBar
+        android:id="@+id/title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:title="@string/edit_character" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:overScrollMode="never">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/ng_page_padding">
+
+            <EditText
+                android:id="@+id/edit_name"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:hint="@string/character_name"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <Spinner
+                android:id="@+id/spinner_gender"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="@dimen/ng_space_m" />
+
+            <Spinner
+                android:id="@+id/spinner_role"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="@dimen/ng_space_m" />
+
+            <EditText
+                android:id="@+id/edit_identity"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="@dimen/ng_space_m"
+                android:hint="@string/character_identity"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <EditText
+                android:id="@+id/edit_aliases"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="@dimen/ng_space_m"
+                android:hint="@string/character_aliases"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <EditText
+                android:id="@+id/edit_short_intro"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="@dimen/ng_space_m"
+                android:hint="@string/character_short_intro"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <EditText
+                android:id="@+id/edit_intro"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:layout_marginTop="@dimen/ng_space_m"
+                android:gravity="top"
+                android:hint="@string/character_intro"
+                android:inputType="textMultiLine"
+                android:minLines="4" />
+
+            <EditText
+                android:id="@+id/edit_avatar_uri"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="@dimen/ng_space_m"
+                android:hint="@string/character_avatar_uri"
+                android:inputType="textUri"
+                android:singleLine="true" />
+
+            <EditText
+                android:id="@+id/edit_portrait_uri"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="@dimen/ng_space_m"
+                android:hint="@string/character_portrait_uri"
+                android:inputType="textUri"
+                android:singleLine="true" />
+
+            <EditText
+                android:id="@+id/edit_image_prompt"
+                android:layout_width="match_parent"
+                android:layout_height="96dp"
+                android:layout_marginTop="@dimen/ng_space_m"
+                android:gravity="top"
+                android:hint="@string/character_image_prompt"
+                android:inputType="textMultiLine"
+                android:minLines="3" />
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <io.legado.app.ui.widget.text.AccentBgTextView
+        android:id="@+id/tv_save"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginStart="@dimen/ng_page_padding"
+        android:layout_marginEnd="@dimen/ng_page_padding"
+        android:layout_marginBottom="@dimen/ng_space_m"
+        android:gravity="center"
+        android:text="@string/save"
+        android:textSize="16sp"
+        app:radius="@dimen/ng_radius_m" />
+
+</LinearLayout>
