@@ -330,18 +330,18 @@
         android:gravity="end|center_vertical"
         android:orientation="horizontal">
 
-        <TextView
+        <io.legado.app.ui.widget.text.AccentStrokeTextView
             android:id="@+id/btn_retry"
             style="@style/Ng.SmallButton.Secondary"
             android:text="@string/ai_purify_retry" />
 
-        <TextView
+        <io.legado.app.ui.widget.text.AccentStrokeTextView
             android:id="@+id/btn_cancel"
             style="@style/Ng.SmallButton.Secondary"
             android:layout_marginStart="8dp"
             android:text="@string/cancel" />
 
-        <TextView
+        <io.legado.app.ui.widget.text.AccentBgTextView
             android:id="@+id/btn_apply"
             style="@style/Ng.SmallButton.Primary"
             android:layout_marginStart="8dp"

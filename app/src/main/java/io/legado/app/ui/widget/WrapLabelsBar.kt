@@ -2,6 +2,7 @@ package io.legado.app.ui.widget
 
 import android.content.Context
 import android.util.AttributeSet
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -19,6 +20,9 @@ class WrapLabelsBar @JvmOverloads constructor(
     var textSize = 11f
     var maxRows = 2
     private val rowGap = 4.dpToPx()
+    private val labelHeight = 18.dpToPx()
+    private val labelMinWidth = 28.dpToPx()
+    private val labelPaddingHorizontal = 4.dpToPx()
 
     fun setLabels(
         labels: List<String>,
@@ -40,11 +44,15 @@ class WrapLabelsBar @JvmOverloads constructor(
     fun addLabel(label: String, onClick: ((String) -> Unit)?, onLongClick: ((String) -> Boolean)?) {
         val tv = if (unUsedViews.isEmpty()) {
             AccentBgTextView(context, null).apply {
-                setPadding(3.dpToPx(), 0, 3.dpToPx(), 0)
+                setPadding(labelPaddingHorizontal, 0, labelPaddingHorizontal, 0)
                 setRadius(2)
+                minWidth = labelMinWidth
+                minHeight = labelHeight
+                gravity = Gravity.CENTER
+                includeFontPadding = false
                 layoutParams = MarginLayoutParams(
                     LayoutParams.WRAP_CONTENT,
-                    LayoutParams.WRAP_CONTENT
+                    labelHeight
                 ).apply {
                     rightMargin = 2.dpToPx()
                     bottomMargin = rowGap

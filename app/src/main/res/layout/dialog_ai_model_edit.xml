@@ -82,6 +82,7 @@
         android:paddingEnd="16dp">
 
         <View
+            android:id="@+id/view_model_edit_tab_basic_indicator"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
@@ -354,18 +355,16 @@
         android:paddingStart="24dp"
         android:paddingEnd="24dp">
 
-        <TextView
+        <io.legado.app.ui.widget.text.AccentTextView
             android:id="@+id/button_cancel"
             style="@style/Ng.DialogButton"
-            android:text="@string/cancel"
-            android:textColor="@color/ng_primary" />
+            android:text="@string/cancel" />
 
-        <TextView
+        <io.legado.app.ui.widget.text.AccentTextView
             android:id="@+id/button_confirm"
             style="@style/Ng.DialogButton"
             android:layout_marginStart="12dp"
-            android:text="@string/sure"
-            android:textColor="@color/ng_primary" />
+            android:text="@string/sure" />
 
     </LinearLayout>
 

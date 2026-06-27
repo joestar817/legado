@@ -44,7 +44,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1" />
 
-        <TextView
+        <io.legado.app.ui.widget.text.AccentStrokeTextView
             android:id="@+id/tv_cancel"
             style="@style/Ng.DialogButton.Secondary"
             android:layout_height="42dp"
@@ -55,7 +55,7 @@
             android:textSize="15sp"
             tools:ignore="RtlHardcoded" />
 
-        <TextView
+        <io.legado.app.ui.widget.text.AccentBgTextView
             android:id="@+id/tv_ok"
             style="@style/Ng.DialogButton.Primary"
             android:layout_height="42dp"

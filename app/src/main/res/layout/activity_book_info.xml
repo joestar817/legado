@@ -374,18 +374,16 @@
             android:paddingBottom="@dimen/ng_space_s"
             app:layout_constraintBottom_toBottomOf="parent">
 
-            <TextView
+            <io.legado.app.ui.widget.text.AccentStrokeTextView
                 android:id="@+id/tv_shelf"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_weight="1"
-                android:background="@drawable/ng_bg_button_secondary"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:text="@string/remove_from_bookshelf"
-                android:textColor="@color/ng_primary"
                 android:textSize="15sp" />
 
             <io.legado.app.ui.widget.text.AccentBgTextView

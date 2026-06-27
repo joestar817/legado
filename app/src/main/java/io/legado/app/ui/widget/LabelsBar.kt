@@ -2,6 +2,7 @@ package io.legado.app.ui.widget
 
 import android.content.Context
 import android.util.AttributeSet
+import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
 import io.legado.app.ui.widget.text.AccentBgTextView
@@ -16,6 +17,9 @@ class LabelsBar @JvmOverloads constructor(
     private val unUsedViews = arrayListOf<TextView>()
     private val usedViews = arrayListOf<TextView>()
     var textSize = 12f
+    private val labelHeight = 18.dpToPx()
+    private val labelMinWidth = 28.dpToPx()
+    private val labelPaddingHorizontal = 4.dpToPx()
 
     fun setLabels(labels: List<String>, onClick: ((String) -> Unit)? = null, onLongClick: ((String) -> Boolean)? = null) {
         clear()
@@ -33,9 +37,13 @@ class LabelsBar @JvmOverloads constructor(
     fun addLabel(label: String, onClick: ((String) -> Unit)?, onLongClick: ((String) -> Boolean)?) {
         val tv = if (unUsedViews.isEmpty()) {
             AccentBgTextView(context, null).apply {
-                setPadding(3.dpToPx(), 0, 3.dpToPx(), 0)
+                setPadding(labelPaddingHorizontal, 0, labelPaddingHorizontal, 0)
                 setRadius(2)
-                val lp = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+                minWidth = labelMinWidth
+                minHeight = labelHeight
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                val lp = LayoutParams(LayoutParams.WRAP_CONTENT, labelHeight)
                 lp.setMargins(0, 0, 2.dpToPx(), 0)
                 layoutParams = lp
                 text = label

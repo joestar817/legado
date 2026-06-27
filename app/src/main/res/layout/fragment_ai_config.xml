@@ -434,7 +434,7 @@
 
                 </LinearLayout>
 
-                <Switch
+                <io.legado.app.lib.theme.view.ThemeSwitch
                     android:id="@+id/switch_ai_purify_auto"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
@@ -476,7 +476,7 @@
 
                 </LinearLayout>
 
-                <Switch
+                <io.legado.app.lib.theme.view.ThemeSwitch
                     android:id="@+id/switch_ai_purify_intercept"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
@@ -576,7 +576,7 @@
 
                     </LinearLayout>
 
-                    <Switch
+                    <io.legado.app.lib.theme.view.ThemeSwitch
                         android:id="@+id/switch_ai_purify_chapter_auto"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />
@@ -618,7 +618,7 @@
 
                     </LinearLayout>
 
-                    <Switch
+                    <io.legado.app.lib.theme.view.ThemeSwitch
                         android:id="@+id/switch_ai_purify_chapter_intercept"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />
@@ -928,12 +928,12 @@
             android:gravity="center_vertical|end"
             android:orientation="horizontal">
 
-            <Button
+            <io.legado.app.ui.widget.text.AccentStrokeTextView
                 android:id="@+id/button_reset_prompt"
                 style="@style/Ng.SmallButton.Secondary"
                 android:text="@string/ai_prompt_reset" />
 
-            <Button
+            <io.legado.app.ui.widget.text.AccentBgTextView
                 android:id="@+id/button_save_prompt"
                 style="@style/Ng.SmallButton.Primary"
                 android:layout_marginStart="16dp"
@@ -990,16 +990,14 @@
 
             </LinearLayout>
 
-            <ImageButton
+            <io.legado.app.ui.widget.image.AccentStrokeImageButton
                 android:id="@+id/button_add_provider"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:layout_marginStart="10dp"
-                android:background="@drawable/ng_bg_button_secondary"
                 android:contentDescription="@string/ai_add_provider"
                 android:padding="8dp"
-                android:src="@drawable/ic_add"
-                android:tint="@color/ng_primary" />
+                android:src="@drawable/ic_add" />
 
         </LinearLayout>
 
@@ -1200,7 +1198,7 @@
                             android:textColor="@color/ng_on_surface"
                             android:textSize="17sp" />
 
-                        <Switch
+                        <io.legado.app.lib.theme.view.ThemeSwitch
                             android:id="@+id/switch_enabled"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content" />
@@ -1222,7 +1220,7 @@
                             android:textColor="@color/ng_on_surface"
                             android:textSize="17sp" />
 
-                        <Switch
+                        <io.legado.app.lib.theme.view.ThemeSwitch
                             android:id="@+id/switch_custom_balance_url"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content" />
@@ -1273,7 +1271,7 @@
                             android:textColor="@color/ng_on_surface"
                             android:textSize="17sp" />
 
-                        <Switch
+                        <io.legado.app.lib.theme.view.ThemeSwitch
                             android:id="@+id/switch_custom_models_url"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content" />
@@ -1302,14 +1300,14 @@
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
-                        <Button
+                        <io.legado.app.ui.widget.text.AccentStrokeTextView
                             android:id="@+id/button_test_connection"
                             style="@style/Ng.SmallButton.Secondary"
                             android:layout_width="0dp"
                             android:layout_weight="1"
                             android:text="@string/ai_test_connection" />
 
-                        <Button
+                        <io.legado.app.ui.widget.text.AccentStrokeTextView
                             android:id="@+id/button_query_balance"
                             style="@style/Ng.SmallButton.Secondary"
                             android:layout_width="0dp"
@@ -1319,7 +1317,7 @@
 
                     </LinearLayout>
 
-                    <Button
+                    <io.legado.app.ui.widget.text.AccentStrokeTextView
                         android:id="@+id/button_delete_provider"
                         style="@style/Ng.SmallButton.Secondary"
                         android:layout_width="match_parent"
@@ -1382,16 +1380,14 @@
 
                 </LinearLayout>
 
-                <ImageButton
+                <io.legado.app.ui.widget.image.AccentStrokeImageButton
                     android:id="@+id/button_fetch_models"
                     android:layout_width="38dp"
                     android:layout_height="38dp"
                     android:layout_marginStart="8dp"
-                    android:background="@drawable/ng_bg_button_secondary"
                     android:contentDescription="@string/ai_fetch_models"
                     android:padding="8dp"
-                    android:src="@drawable/ic_refresh_black_24dp"
-                    android:tint="@color/ng_primary" />
+                    android:src="@drawable/ic_refresh_black_24dp" />
 
             </LinearLayout>
 
@@ -1411,7 +1407,7 @@
                     android:text="@string/ai_available_models"
                     android:textSize="17sp" />
 
-                <TextView
+                <io.legado.app.ui.widget.text.AccentTextView
                     android:id="@+id/button_toggle_model_selection"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
@@ -1420,7 +1416,6 @@
                     android:paddingStart="10dp"
                     android:paddingEnd="10dp"
                     android:text="@string/select_all"
-                    android:textColor="@color/ng_primary"
                     android:textSize="15sp" />
 
             </LinearLayout>

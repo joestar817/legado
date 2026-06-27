@@ -57,6 +57,7 @@ import io.legado.app.help.ai.AiProviderType
 import io.legado.app.help.ai.AiReasoningLevel
 import io.legado.app.help.ai.normalizeAiApiPath
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.databinding.ItemAiPromptBinding
 import io.legado.app.ui.widget.TitleBar
@@ -562,6 +563,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         binding.layoutModelSettings.isVisible = false
         binding.layoutPurifyModelSettings.isVisible = false
         binding.layoutPurifySettings.isVisible = false
+        refreshAccentControls()
         refreshProviders()
     }
 
@@ -583,6 +585,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         binding.layoutModelSettings.isVisible = false
         binding.layoutPurifyModelSettings.isVisible = false
         binding.layoutPurifySettings.isVisible = false
+        refreshAccentControls()
         refreshCurrentDetail()
     }
 
@@ -683,6 +686,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
     }
 
     private fun refreshCurrentPage() {
+        refreshAccentControls()
         when (currentPage) {
             Page.MAIN -> refreshMain()
             Page.PROVIDERS -> refreshProviders()
@@ -694,6 +698,22 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             Page.PURIFY_MODEL_SETTINGS -> refreshModelSettings()
             Page.PURIFY_SETTINGS -> refreshPurifySettings()
         }
+    }
+
+    private fun refreshAccentControls() {
+        val color = accentColor
+        applyAccentIconButton(binding.buttonAddProvider, color)
+        applyAccentIconButton(binding.buttonFetchModels, color)
+    }
+
+    private fun applyAccentIconButton(button: ImageView, color: Int) {
+        button.imageTintList = ColorStateList.valueOf(color)
+        button.background = Selector.shapeBuild()
+            .setCornerRadius(12.dpToPx())
+            .setStrokeWidth(1.dpToPx())
+            .setDefaultStrokeColor(color)
+            .setPressedBgColor(ColorUtils.setAlphaComponent(color, 24))
+            .create()
     }
 
     private fun refreshMain() {
@@ -836,6 +856,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
     private fun bindModelEditTabs(sheetBinding: DialogAiModelEditBinding) {
         val activeColor = accentColor
         val inactiveColor = ContextCompat.getColor(requireContext(), R.color.ng_on_surface_variant)
+        sheetBinding.viewModelEditTabBasicIndicator.setBackgroundColor(activeColor)
         sheetBinding.tabBasic.setTextColor(activeColor)
         sheetBinding.tabBasic.typeface = Typeface.DEFAULT_BOLD
         sheetBinding.tabBasic.background = GradientDrawable().apply {
@@ -1394,6 +1415,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
     ): Switch {
         val switchView = Switch(requireContext()).apply {
             isChecked = checked
+            applyTint(accentColor)
         }
         val row = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.HORIZONTAL

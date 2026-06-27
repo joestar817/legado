@@ -223,6 +223,7 @@
         <item name="android:includeFontPadding">false</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
+        <item name="radius">@dimen/ng_radius_m</item>
     </style>
 
     <style name="Ng.DialogButton.Primary" parent="@style/Ng.DialogButton">
@@ -377,6 +378,7 @@
         <item name="android:includeFontPadding">false</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
+        <item name="radius">@dimen/ng_radius_m</item>
     </style>
 
     <style name="Ng.SmallButton.Primary" parent="@style/Ng.SmallButton">

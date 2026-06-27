@@ -83,12 +83,12 @@
 
     <LinearLayout style="@style/Ng.DialogActionBar">
 
-        <TextView
+        <io.legado.app.ui.widget.text.AccentStrokeTextView
             android:id="@+id/button_cancel"
             style="@style/Ng.DialogButton.Secondary"
             android:text="@android:string/cancel" />
 
-        <TextView
+        <io.legado.app.ui.widget.text.AccentBgTextView
             android:id="@+id/button_confirm"
             style="@style/Ng.DialogButton.Primary"
             android:layout_marginStart="10dp"

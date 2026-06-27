@@ -52,7 +52,7 @@
 
     </LinearLayout>
 
-    <Switch
+    <io.legado.app.lib.theme.view.ThemeSwitch
         android:id="@+id/check_selected"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"

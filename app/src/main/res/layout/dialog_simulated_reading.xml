@@ -32,12 +32,11 @@
             android:layout_height="match_parent"
             android:gravity="center_vertical">
 
-            <androidx.appcompat.widget.SwitchCompat
+            <io.legado.app.lib.theme.view.ThemeSwitch
                 android:layout_height="wrap_content"
                 android:id="@+id/sr_enabled"
                 android:layout_weight="1"
                 android:gravity="start|center_vertical"
-                style="@style/Widget.AppCompat.CompoundButton.Switch"
                 android:layout_width="match_parent"
                 android:width="20dp" />
         </LinearLayout>

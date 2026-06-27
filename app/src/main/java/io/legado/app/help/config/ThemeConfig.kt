@@ -101,7 +101,8 @@ object ThemeConfig {
 
     private fun getReadingNgBuiltInTheme(themeMode: String): Config? {
         val themeName = readingNgBuiltInThemeNames[themeMode] ?: return null
-        return configList.firstOrNull { it.themeName == themeName && !it.isNightTheme }
+        return DefaultData.themeConfigs.firstOrNull { it.themeName == themeName && !it.isNightTheme }
+            ?: configList.firstOrNull { it.themeName == themeName && !it.isNightTheme }
     }
 
     private fun ensureThemeModePrefs(context: Context) {
