@@ -29,17 +29,14 @@
 
     </LinearLayout>
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
+    <io.legado.app.ui.main.AiChatButtonView
         android:id="@+id/fab_ai_chat"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
         android:layout_gravity="end|bottom"
         android:layout_marginEnd="20dp"
         android:layout_marginBottom="84dp"
         android:contentDescription="@string/ai_chat"
-        android:src="@drawable/ic_ai"
-        android:visibility="gone"
-        app:fabSize="normal"
-        app:tint="@color/white" />
+        android:visibility="gone" />
 
 </FrameLayout>

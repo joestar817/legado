@@ -4,13 +4,11 @@ package io.legado.app.ui.main
 
 import android.os.Bundle
 import android.text.format.DateUtils
-import android.content.res.ColorStateList
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.activity.addCallback
 import androidx.activity.viewModels
-import androidx.core.content.ContextCompat
 import androidx.core.view.get
 import androidx.core.view.postDelayed
 import androidx.fragment.app.Fragment
@@ -269,8 +267,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         } else {
             android.view.View.GONE
         }
-        fabAiChat.backgroundTintList = ColorStateList.valueOf(accentColor)
-        fabAiChat.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.white))
+        fabAiChat.updateAccentColor(accentColor)
     }
 
     /**
