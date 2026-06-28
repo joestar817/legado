@@ -47,6 +47,13 @@ object BookshelfMcpTools {
                 properties = emptyMap()
             ),
             tool(
+                name = "bookshelf_stats_get",
+                description = "Return lightweight bookshelf book counts and group counts without listing books.",
+                properties = mapOf(
+                    "include_not_shelf" to booleanSchema("Include temporary books not formally added to shelf")
+                )
+            ),
+            tool(
                 name = "bookshelf_book_list",
                 description = "List bookshelf books with optional group and keyword filters.",
                 properties = mapOf(
@@ -341,6 +348,7 @@ object BookshelfMcpTools {
     fun call(name: String, arguments: JsonObject): Map<String, Any?>? {
         return when (name) {
             "bookshelf_group_list" -> listGroups()
+            "bookshelf_stats_get" -> getStats(arguments)
             "bookshelf_book_list" -> listBooks(arguments)
             "bookshelf_book_get" -> getBook(arguments)
             "bookshelf_current_book_get" -> getCurrentBook()
@@ -382,6 +390,35 @@ object BookshelfMcpTools {
             normalizedData = mapOf(
                 "groups" to groups,
                 "total" to groups.size
+            )
+        )
+    }
+
+    private fun getStats(arguments: JsonObject): Map<String, Any?> {
+        val includeNotShelf = arguments.get("include_not_shelf").asBooleanOrNull() ?: false
+        val books = booksForGroup(null, includeNotShelf)
+        val allBooks = appDb.bookDao.all
+        val groups = appDb.bookGroupDao.all.map { group ->
+            group.toMcpMap(bookCount = booksForGroup(group.groupId, includeNotShelf).size)
+        }
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookshelf/stats",
+            normalizedData = mapOf(
+                "total" to books.size,
+                "include_not_shelf" to includeNotShelf,
+                "not_shelf" to allBooks.count { it.isNotShelf },
+                "type_counts" to mapOf(
+                    "text" to books.count { it.type and BookType.text > 0 },
+                    "image" to books.count { it.isImage },
+                    "audio" to books.count { it.isAudio },
+                    "video" to books.count { it.isVideo },
+                    "local" to books.count { it.isLocal },
+                    "network_text" to books.count { !it.isLocal && !it.isAudio && !it.isVideo },
+                    "update_error" to books.count { it.isUpError }
+                ),
+                "group_total" to groups.size,
+                "groups" to groups
             )
         )
     }

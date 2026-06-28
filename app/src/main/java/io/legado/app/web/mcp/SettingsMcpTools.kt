@@ -16,6 +16,11 @@ object SettingsMcpTools {
     fun tools(): List<Map<String, Any>> {
         return listOf(
             tool(
+                name = "settings_rule_stats_get",
+                description = "Return lightweight counts for TXT TOC, replacement/purify, and dictionary rules.",
+                properties = emptyMap()
+            ),
+            tool(
                 name = "settings_txt_toc_rule_list",
                 description = "List TXT local-book table-of-contents rules.",
                 properties = listProperties()
@@ -146,6 +151,7 @@ object SettingsMcpTools {
 
     fun call(name: String, arguments: JsonObject): Map<String, Any?>? {
         return when (name) {
+            "settings_rule_stats_get" -> getRuleStats()
             "settings_txt_toc_rule_list" -> listTxtTocRules(arguments)
             "settings_txt_toc_rule_get" -> getTxtTocRule(arguments)
             "settings_txt_toc_rule_upsert" -> upsertTxtTocRule(arguments)
@@ -163,6 +169,47 @@ object SettingsMcpTools {
             "settings_dict_rule_set_enabled" -> setDictRulesEnabled(arguments)
             else -> null
         }
+    }
+
+    private fun getRuleStats(): Map<String, Any?> {
+        val tocRules = appDb.txtTocRuleDao.all
+        val replaceRules = appDb.replaceRuleDao.all
+        val dictRules = appDb.dictRuleDao.all
+        val validReplaceCount = replaceRules.count { it.isValid() }
+        return toolResult(
+            true,
+            "native://settings/ruleStats",
+            mapOf(
+                "txt_toc_rules" to mapOf(
+                    "total" to tocRules.size,
+                    "enabled" to tocRules.count { it.enable },
+                    "disabled" to tocRules.count { !it.enable },
+                    "default" to tocRules.count { it.id < 0 },
+                    "custom" to tocRules.count { it.id >= 0 },
+                    "with_replacement" to tocRules.count { it.replacement.isNotBlank() }
+                ),
+                "replace_rules" to mapOf(
+                    "total" to replaceRules.size,
+                    "enabled" to replaceRules.count { it.isEnabled },
+                    "disabled" to replaceRules.count { !it.isEnabled },
+                    "regex" to replaceRules.count { it.isRegex },
+                    "plain_text" to replaceRules.count { !it.isRegex },
+                    "valid" to validReplaceCount,
+                    "invalid" to (replaceRules.size - validReplaceCount),
+                    "scope_title" to replaceRules.count { it.scopeTitle },
+                    "scope_content" to replaceRules.count { it.scopeContent },
+                    "scoped" to replaceRules.count { !it.scope.isNullOrBlank() },
+                    "exclude_scoped" to replaceRules.count { !it.excludeScope.isNullOrBlank() },
+                    "group_counts" to ruleGroupCounts(replaceRules.map { it.group })
+                ),
+                "dict_rules" to mapOf(
+                    "total" to dictRules.size,
+                    "enabled" to dictRules.count { it.enabled },
+                    "disabled" to dictRules.count { !it.enabled },
+                    "with_show_rule" to dictRules.count { it.showRule.isNotBlank() }
+                )
+            )
+        )
     }
 
     private fun listTxtTocRules(arguments: JsonObject): Map<String, Any?> {
@@ -445,6 +492,26 @@ object SettingsMcpTools {
         val limit = (arguments.get("limit").asIntOrNull() ?: DEFAULT_LIST_LIMIT)
             .coerceIn(1, MAX_LIST_LIMIT)
         return offset to limit
+    }
+
+    private fun ruleGroupCounts(groups: List<String?>): List<Map<String, Any>> {
+        val counts = linkedMapOf<String, Int>()
+        groups.forEach { value ->
+            val names = splitRuleGroupNames(value).ifEmpty { listOf("未分组") }
+            names.forEach { name ->
+                counts[name] = (counts[name] ?: 0) + 1
+            }
+        }
+        return counts
+            .map { (group, count) -> mapOf("group" to group, "count" to count) }
+            .sortedWith(compareByDescending<Map<String, Any>> { it["count"] as Int }.thenBy { it["group"] as String })
+    }
+
+    private fun splitRuleGroupNames(value: String?): List<String> {
+        return value.orEmpty()
+            .split(',', '，')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
     }
 
     private fun pageResult(

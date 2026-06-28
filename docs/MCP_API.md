@@ -2,7 +2,91 @@
 
 本文档说明阅读 NG 原生 MCP P0 接口的手动测试方式。当前 MCP 是开发调试功能，未加入 token、配对码、只读/写入分级和 SSE 流式会话。
 
+MCP 现在有两条通道：
+
+- 外部 HTTP 通道：在 `我的 -> 服务管理` 中开启 `MCP 服务` 后，供局域网 PC agent 调试连接。
+- 内置通道：在 `我的 -> AI 设置` 中开启 `内置 MCP` 后，供 App 内置 AI 直接调用同一套 MCP 工具；这个通道不启动 HTTP 服务，也不开放局域网端口。
+
+## 接口总览
+
+| 模块 | 接口 | 类型 | 说明 |
+| --- | --- | --- | --- |
+| 基础协议 | `initialize` | JSON-RPC method | 初始化 MCP 会话，返回服务端信息和能力声明。 |
+| 基础协议 | `ping` | JSON-RPC method | 检查 MCP 服务是否可用。 |
+| 基础协议 | `tools/list` | JSON-RPC method | 列出当前可调用工具。 |
+| 基础协议 | `tools/call` | JSON-RPC method | 调用指定 MCP 工具。 |
+| 基础协议 | `resources/list` | JSON-RPC method | 列出当前资源 URI。 |
+| 基础协议 | `resources/templates/list` | JSON-RPC method | 列出资源模板；当前返回空模板列表。 |
+| 基础协议 | `resources/read` | JSON-RPC method | 读取指定资源内容。 |
+| 基础协议 | `prompts/list` | JSON-RPC method | 列出 prompt；当前返回空列表。 |
+| 资源 | `legado://api/mcp` | resource | 返回 MCP 接口摘要。 |
+| 资源 | `legado://schema/book-source` | resource | 返回书源工具相关字段说明。 |
+| 资源 | `legado://schema/bookshelf` | resource | 返回书架、章节、角色卡、替换规则工具字段说明。 |
+| 资源 | `legado://schema/settings` | resource | 返回设置规则工具字段说明。 |
+| 通用 | `legado_ping` | tool | 返回 Legado MCP 服务状态。 |
+| 通用 | `legado_get_api_summary` | tool | 返回 MCP 工具和资源摘要。 |
+| 书源 | `book_source_list` | tool | 分页列出书源基础信息。 |
+| 书源 | `book_source_stats_get` | tool | 获取书源数量、分组、类型和能力统计。 |
+| 书源 | `book_source_get` | tool | 按 `bookSourceUrl` 获取完整书源规则。 |
+| 书源 | `book_source_save` | tool | 新增或覆盖保存书源规则；写接口，测试脚本默认跳过。 |
+| 书源 | `book_source_debug` | tool | 运行书源搜索调试并返回调试日志。 |
+| 书源 | `book_search` | tool | 跨书源搜索书籍。 |
+| 书架 | `bookshelf_group_list` | tool | 列出书架分组。 |
+| 书架 | `bookshelf_stats_get` | tool | 获取书架图书数量、类型和分组统计。 |
+| 书架 | `bookshelf_book_list` | tool | 分页列出书架书籍，可按分组过滤。 |
+| 书架 | `bookshelf_book_get` | tool | 按 `book_url` 获取书籍详情。 |
+| 书架 | `bookshelf_current_book_get` | tool | 获取当前阅读书籍。 |
+| 书架 | `bookshelf_chapter_list` | tool | 获取书籍目录列表。 |
+| 书架 | `bookshelf_chapter_content_get` | tool | 读取本地或已缓存章节正文，不主动联网抓取。 |
+| 书架 | `bookshelf_text_window_get` | tool | 按当前位置读取章节正文窗口。 |
+| 书架 | `bookshelf_cache_status_get` | tool | 获取书籍章节缓存状态。 |
+| 书架/书签 | `bookshelf_bookmark_list` | tool | 分页列出全局或指定书籍的书签。 |
+| 书架/书签 | `bookshelf_bookmark_get` | tool | 按书签时间主键获取书签详情。 |
+| 书架/书签 | `bookshelf_bookmark_upsert` | tool | 新增或更新书签；写接口。 |
+| 书架/书签 | `bookshelf_bookmark_delete` | tool | 按时间主键删除书签；写接口。 |
+| 书架/阅读记录 | `bookshelf_read_record_list` | tool | 分页列出按书名聚合的阅读记录。 |
+| 书架/阅读记录 | `bookshelf_read_record_get` | tool | 按书名获取阅读记录聚合和设备明细。 |
+| 书架/阅读记录 | `bookshelf_read_record_upsert` | tool | 新增或更新阅读记录；写接口。 |
+| 书架/阅读记录 | `bookshelf_read_record_delete` | tool | 按书名删除阅读记录；写接口。 |
+| 书架 | `bookshelf_search` | tool | 书架模块下的跨源搜索别名，等价于 `book_search`。 |
+| 书架 | `bookshelf_book_sources_get` | tool | 获取当前书名/作者的可用来源候选。 |
+| 书架 | `bookshelf_change_source_preview` | tool | 预览换源候选，不直接应用换源。 |
+| 书架/角色卡 | `bookshelf_character_profile_get` | tool | 获取当前书籍角色资料集信息。 |
+| 书架/角色卡 | `bookshelf_character_list` | tool | 列出当前书籍角色。 |
+| 书架/角色卡 | `bookshelf_character_get` | tool | 按角色 ID 获取角色详情。 |
+| 书架/角色卡 | `bookshelf_character_draft_upsert` | tool | 新增或更新角色草稿；写接口。 |
+| 书架/角色卡 | `bookshelf_character_draft_apply` | tool | 应用角色草稿。 |
+| 书架/角色卡 | `bookshelf_character_draft_rollback` | tool | 回滚角色草稿，供外部验证后清理。 |
+| 书架/替换规则 | `bookshelf_replace_rule_list` | tool | 列出当前书籍相关替换规则。 |
+| 书架/替换规则 | `bookshelf_replace_rule_draft_upsert` | tool | 新增或更新替换规则草稿；写接口。 |
+| 书架/替换规则 | `bookshelf_replace_rule_draft_apply` | tool | 应用替换规则草稿。 |
+| 书架/替换规则 | `bookshelf_replace_rule_rollback` | tool | 回滚替换规则草稿，供外部验证后清理。 |
+| 设置/规则统计 | `settings_rule_stats_get` | tool | 获取目录规则、净化规则、字典规则的轻量统计。 |
+| 设置/目录规则 | `settings_txt_toc_rule_list` | tool | 分页列出 TXT 本地书目录识别规则。 |
+| 设置/目录规则 | `settings_txt_toc_rule_get` | tool | 按 ID 获取目录规则详情。 |
+| 设置/目录规则 | `settings_txt_toc_rule_upsert` | tool | 新增或更新目录规则；写接口。 |
+| 设置/目录规则 | `settings_txt_toc_rule_delete` | tool | 按 ID 删除目录规则；写接口。 |
+| 设置/目录规则 | `settings_txt_toc_rule_set_enabled` | tool | 按 ID 启用或停用目录规则；写接口。 |
+| 设置/净化规则 | `settings_replace_rule_list` | tool | 分页列出全局替换净化规则。 |
+| 设置/净化规则 | `settings_replace_rule_get` | tool | 按 ID 获取净化规则详情。 |
+| 设置/净化规则 | `settings_replace_rule_upsert` | tool | 新增或更新净化规则；写接口。 |
+| 设置/净化规则 | `settings_replace_rule_delete` | tool | 按 ID 删除净化规则；写接口。 |
+| 设置/净化规则 | `settings_replace_rule_set_enabled` | tool | 按 ID 启用或停用净化规则；写接口。 |
+| 设置/字典规则 | `settings_dict_rule_list` | tool | 分页列出字典查询规则。 |
+| 设置/字典规则 | `settings_dict_rule_get` | tool | 按名称获取字典规则详情。 |
+| 设置/字典规则 | `settings_dict_rule_upsert` | tool | 新增或更新字典规则；写接口。 |
+| 设置/字典规则 | `settings_dict_rule_delete` | tool | 按名称删除字典规则；写接口。 |
+| 设置/字典规则 | `settings_dict_rule_set_enabled` | tool | 按名称启用或停用字典规则；写接口。 |
+| 网络日志 | `network_log_list` | tool | 分页列出内存网络请求日志摘要。 |
+| 网络日志 | `network_log_get` | tool | 按 ID 获取单条网络请求日志详情。 |
+| 网络日志 | `network_log_clear` | tool | 清空当前内存网络日志窗口；测试脚本默认跳过。 |
+| 调试日志 | `debug_log_list` | tool | 分页列出 App 内存调试日志摘要。 |
+| 调试日志 | `debug_log_get` | tool | 按 ID 获取单条调试日志详情。 |
+| 调试日志 | `debug_log_clear` | tool | 清空当前内存调试日志窗口。 |
+
 ## 启动方式
+
+### 外部 HTTP 通道
 
 在 App 中打开：
 
@@ -31,6 +115,21 @@ http://192.0.2.10:1124/mcp
 - 当前只实现 JSON 响应，不实现 SSE 流式响应；`GET /mcp` 会返回不支持。
 - 如果关闭 `MCP 服务`，接口返回 disabled。
 
+### 内置通道
+
+在 App 中打开：
+
+1. `我的`
+2. `AI 设置`
+3. 开启 `内置 MCP`
+
+说明：
+
+- 内置通道不依赖 `服务管理 -> MCP 服务`，关闭外部 MCP 服务后仍可被 App 内 AI 调用。
+- 内置通道复用外部 HTTP MCP 的同一套 `initialize`、`tools/list`、`tools/call`、`resources/read` 处理代码。
+- 当前只提供 App 内代码入口 `McpInternalChannel`，后续 AI 功能调用工具时接入该入口。
+- 当前 P0 暂不做 token、配对码和读写权限分级；内置通道由 AI 设置页开关控制。
+
 ## 自动测试脚本
 
 仓库内提供了一个标准库 Python 测试脚本，用于覆盖 MCP P0 的 JSON-RPC 方法、资源接口和所有工具：
@@ -49,9 +148,13 @@ python scripts\test_mcp_api.py --endpoint http://192.0.2.10:1124/mcp
 - `legado_ping`
 - `legado_get_api_summary`
 - `book_source_list`
+- `book_source_stats_get`
 - `book_source_get`
 - `book_search`
 - `book_source_debug`
+- 书架只读工具：`bookshelf_group_list`、`bookshelf_stats_get`、`bookshelf_book_list`、`bookshelf_book_get`、`bookshelf_current_book_get`、`bookshelf_chapter_list`、`bookshelf_chapter_content_get`、`bookshelf_text_window_get`、`bookshelf_cache_status_get`、`bookshelf_bookmark_list/get`、`bookshelf_read_record_list/get`、`bookshelf_book_sources_get`、`bookshelf_change_source_preview`、`bookshelf_character_profile_get`、`bookshelf_character_list`、`bookshelf_replace_rule_list`
+- 设置只读工具：`settings_rule_stats_get`、`settings_txt_toc_rule_list/get`、`settings_replace_rule_list/get`、`settings_dict_rule_list/get`
+- 调试日志只读工具：`debug_log_list/get`
 - 未知 method 错误返回
 
 其中 `book_search` 默认会要求至少返回 1 条结果，并校验搜索结果中包含搜索关键词；`book_source_debug` 会校验调试日志包含搜索关键词和“获取书籍列表”。这能覆盖中文 POST body 编码、搜索结果为空、调试未真正进入搜索解析等问题。
@@ -71,7 +174,9 @@ python scripts\test_mcp_api.py --endpoint http://192.0.2.10:1124/mcp --clear-net
 说明：
 
 - 默认不执行 `book_source_save`，避免测试脚本覆盖真实书源数据。
-- `--write` 会先取第一个完整书源，再原样保存回去，用于显式验证写接口。
+- 默认不执行角色卡/替换规则草稿写入，避免测试脚本污染真实书架数据。
+- 默认不执行设置类规则写入，避免测试脚本污染目录规则、净化规则和字典规则。
+- `--write` 会先取第一个完整书源并原样保存回去，还会创建临时角色草稿、书架替换规则草稿、书签、阅读记录、目录规则、净化规则和字典规则；临时数据都会通过 rollback 或 delete 接口清理。
 - `--no-slow` 会跳过 `book_search` 和 `book_source_debug`。
 - `--allow-empty-search` 会关闭搜索非空断言，只保留协议和字段结构验证。
 - 也可以通过环境变量 `LEGADO_MCP_ENDPOINT` 指定默认 endpoint。
@@ -151,13 +256,63 @@ curl -s http://192.0.2.10:1124/mcp \
 - `legado_ping`
 - `legado_get_api_summary`
 - `book_source_list`
+- `book_source_stats_get`
 - `book_source_get`
 - `book_source_save`
 - `book_source_debug`
 - `book_search`
+- `bookshelf_group_list`
+- `bookshelf_stats_get`
+- `bookshelf_book_list`
+- `bookshelf_book_get`
+- `bookshelf_current_book_get`
+- `bookshelf_chapter_list`
+- `bookshelf_chapter_content_get`
+- `bookshelf_text_window_get`
+- `bookshelf_cache_status_get`
+- `bookshelf_bookmark_list`
+- `bookshelf_bookmark_get`
+- `bookshelf_bookmark_upsert`
+- `bookshelf_bookmark_delete`
+- `bookshelf_read_record_list`
+- `bookshelf_read_record_get`
+- `bookshelf_read_record_upsert`
+- `bookshelf_read_record_delete`
+- `bookshelf_search`
+- `bookshelf_book_sources_get`
+- `bookshelf_change_source_preview`
+- `bookshelf_character_profile_get`
+- `bookshelf_character_list`
+- `bookshelf_character_get`
+- `bookshelf_character_draft_upsert`
+- `bookshelf_character_draft_apply`
+- `bookshelf_character_draft_rollback`
+- `bookshelf_replace_rule_list`
+- `bookshelf_replace_rule_draft_upsert`
+- `bookshelf_replace_rule_draft_apply`
+- `bookshelf_replace_rule_rollback`
+- `settings_rule_stats_get`
+- `settings_txt_toc_rule_list`
+- `settings_txt_toc_rule_get`
+- `settings_txt_toc_rule_upsert`
+- `settings_txt_toc_rule_delete`
+- `settings_txt_toc_rule_set_enabled`
+- `settings_replace_rule_list`
+- `settings_replace_rule_get`
+- `settings_replace_rule_upsert`
+- `settings_replace_rule_delete`
+- `settings_replace_rule_set_enabled`
+- `settings_dict_rule_list`
+- `settings_dict_rule_get`
+- `settings_dict_rule_upsert`
+- `settings_dict_rule_delete`
+- `settings_dict_rule_set_enabled`
 - `network_log_list`
 - `network_log_get`
 - `network_log_clear`
+- `debug_log_list`
+- `debug_log_get`
+- `debug_log_clear`
 
 ## 调用工具
 
@@ -234,6 +389,24 @@ curl -s http://192.0.2.10:1124/mcp \
   "bookSourceUrl": "https://example.com/source#default"
 }
 ```
+
+### book_source_stats_get
+
+获取书源轻量统计。回答“当前有多少书源、多少分组、各类型/能力数量”这类问题时应优先调用该接口，不要拉取 `book_source_list` 后让模型自行计数。
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"book_source_stats_get","arguments":{}}}'
+```
+
+返回字段包括：
+
+- `total/enabled/disabled`：书源总数和启用状态统计。
+- `enabled_explore/disabled_explore`：发现页启用状态统计。
+- `type_counts`：按 `bookSourceType` 聚合。
+- `group_counts`：按书源分组聚合；多分组书源会计入多个分组，空分组归入 `未分组`。
+- `capability_counts`：搜索、发现、登录、事件监听、启用文本源等能力数量。
 
 ### book_source_get
 
@@ -352,6 +525,194 @@ curl -s http://192.0.2.10:1124/mcp \
 
 返回的 `normalized_data.books` 是搜索结果数组。
 
+### 书架模块工具
+
+书架模块按子模块拆成：书籍/分组、目录/正文/缓存、书签、阅读记录、搜索/换源预览、角色卡、替换规则。所有正文类接口只读取本地书籍或已缓存正文，不会通过 MCP 主动联网抓取章节。
+
+#### 书籍/分组
+
+- `bookshelf_group_list`：列出书架分组和每个分组当前书籍数。
+- `bookshelf_stats_get`：获取书架图书总数、类型数量、未入书架数量和分组统计；回答“书架上有多少本书、多少个分组”时优先使用。
+- `bookshelf_book_list`：分页列出书架书籍，支持 `group_id`、`keyword`、`offset`、`limit`、`include_not_shelf`。
+- `bookshelf_book_get`：按 `book_url`，或 `name` + `author` 获取单本书详情。
+- `bookshelf_current_book_get`：获取当前阅读书籍；没有活动阅读状态时返回最近阅读文本书。
+
+示例：
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":40,"method":"tools/call","params":{"name":"bookshelf_book_list","arguments":{"limit":10}}}'
+```
+
+统计示例：
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":401,"method":"tools/call","params":{"name":"bookshelf_stats_get","arguments":{}}}'
+```
+
+`bookshelf_stats_get` 返回 `total`、`not_shelf`、`type_counts`、`group_total` 和 `groups`，不会返回书籍明细。
+
+#### 目录/正文/缓存
+
+- `bookshelf_chapter_list`：列出目录，支持 `start`、`end`、`keyword`、`include_cache_status`。
+- `bookshelf_chapter_content_get`：读取单章已缓存/本地正文，支持 `char_limit`。
+- `bookshelf_text_window_get`：读取连续章节窗口，适合给 AI 取上下文。
+- `bookshelf_cache_status_get`：检查章节范围的正文缓存状态。
+
+示例：
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":41,"method":"tools/call","params":{"name":"bookshelf_chapter_list","arguments":{"book_url":"BOOK_URL","start":0,"end":20,"include_cache_status":true}}}'
+```
+
+#### 书签
+
+- `bookshelf_bookmark_list`：列出全局或指定书籍书签，支持 `book_url`、`name`、`author`、`keyword`、`offset`、`limit`。
+- `bookshelf_bookmark_get`：按 `time` 获取单条书签。
+- `bookshelf_bookmark_upsert`：新增或更新书签；传 `book_url` 时可自动补 `book_name/book_author`。
+- `bookshelf_bookmark_delete`：按 `times` 删除书签。
+
+示例：
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":42,"method":"tools/call","params":{"name":"bookshelf_bookmark_list","arguments":{"book_url":"BOOK_URL","limit":20}}}'
+```
+
+#### 阅读记录
+
+- `bookshelf_read_record_list`：列出按书名聚合的阅读记录，支持 `keyword`、`sort=name/read_time/last_read`、`offset`、`limit`。
+- `bookshelf_read_record_get`：按 `book_name` 获取聚合阅读时长、最近阅读时间和设备明细。
+- `bookshelf_read_record_upsert`：新增或更新阅读记录；未传 `device_id` 时使用当前设备 ID。
+- `bookshelf_read_record_delete`：按 `book_name` 删除阅读记录。
+
+#### 搜索/换源预览
+
+- `bookshelf_search`：`book_search` 的书架模块别名。
+- `bookshelf_book_sources_get`：获取某本书当前缓存的可用候选源。
+- `bookshelf_change_source_preview`：只预览候选源，不执行换源迁移。
+
+说明：真正换源应用需要复用阅读页现有确认和迁移流程，当前 MCP 不直接绕过 UI 修改书籍来源。
+
+#### 角色卡
+
+- `bookshelf_character_profile_get`：获取角色档案；传 `create=true` 且提供书籍身份时可创建档案。
+- `bookshelf_character_list`：列出一本书的角色卡。
+- `bookshelf_character_get`：按角色 `id` 获取单张角色卡。
+- `bookshelf_character_draft_upsert`：创建或更新 AI/导入来源的角色草稿。
+- `bookshelf_character_draft_apply`：按 `ids` 启用或禁用已存在的角色草稿。
+- `bookshelf_character_draft_rollback`：删除指定角色草稿，主要用于回滚 MCP 创建的临时草稿。
+
+#### 替换规则
+
+- `bookshelf_replace_rule_list`：列出替换规则，支持按书籍作用域、分组、启用状态过滤。
+- `bookshelf_replace_rule_draft_upsert`：创建或更新替换规则草稿；传 `book_url` 且未传 `scope` 时默认作用于书名。
+- `bookshelf_replace_rule_draft_apply`：按 `ids` 启用或禁用替换规则。
+- `bookshelf_replace_rule_rollback`：删除指定替换规则，主要用于回滚 MCP 创建的草稿。
+
+注意：角色卡和替换规则草稿接口是写操作；当前 P0 不做 token 和权限分级，外部调试时应只在受信任局域网环境开启 MCP 服务。
+
+### 设置模块工具
+
+设置模块先覆盖全局规则类配置：TXT 目录规则、全局替换净化规则、字典查询规则。列表接口统一支持 `keyword`、`enabled`、`offset`、`limit`；写接口直接落现有数据库表，不做隐藏迁移或兜底修复。
+
+#### 规则统计
+
+- `settings_rule_stats_get`：获取目录规则、净化规则、字典规则的轻量统计。回答“当前有多少目录规则/净化规则/字典规则、哪些分组规则最多”时优先使用。
+
+示例：
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":49,"method":"tools/call","params":{"name":"settings_rule_stats_get","arguments":{}}}'
+```
+
+返回字段：
+
+- `txt_toc_rules`：总数、启用/停用、默认/自定义、带替换结果的目录规则数量。
+- `replace_rules`：总数、启用/停用、正则/纯文本、有效/无效、标题/正文作用域、分组统计。
+- `dict_rules`：总数、启用/停用、带展示规则的字典规则数量。
+
+#### 目录规则
+
+- `settings_txt_toc_rule_list`：列出 TXT 本地书目录识别规则。
+- `settings_txt_toc_rule_get`：按 `id` 获取目录规则。
+- `settings_txt_toc_rule_upsert`：新增或更新目录规则，字段包含 `name`、`rule`、`replacement`、`example`、`serial_number`、`enabled`。
+- `settings_txt_toc_rule_delete`：按 `ids` 删除目录规则。
+- `settings_txt_toc_rule_set_enabled`：按 `ids` 启用或停用目录规则。
+
+示例：
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":50,"method":"tools/call","params":{"name":"settings_txt_toc_rule_list","arguments":{"limit":10}}}'
+```
+
+#### 净化规则
+
+- `settings_replace_rule_list`：列出全局替换净化规则，额外支持 `group`、`scope` 过滤。
+- `settings_replace_rule_get`：按 `id` 获取净化规则。
+- `settings_replace_rule_upsert`：新增或更新净化规则，字段包含 `name`、`group`、`pattern`、`replacement`、`scope`、`scope_title`、`scope_content`、`exclude_scope`、`enabled`、`is_regex`、`timeout_millisecond`、`order`。
+- `settings_replace_rule_delete`：按 `ids` 删除净化规则。
+- `settings_replace_rule_set_enabled`：按 `ids` 启用或停用净化规则。
+
+说明：`bookshelf_replace_rule_*` 面向书架书籍作用域和 AI 草稿回滚；`settings_replace_rule_*` 面向全局净化规则管理。
+
+#### 字典规则
+
+- `settings_dict_rule_list`：列出字典查询规则。
+- `settings_dict_rule_get`：按 `name` 获取字典规则。
+- `settings_dict_rule_upsert`：新增或更新字典规则，字段包含 `name`、`url_rule`、`show_rule`、`enabled`、`sort_number`。
+- `settings_dict_rule_delete`：按 `names` 删除字典规则。
+- `settings_dict_rule_set_enabled`：按 `names` 启用或停用字典规则。
+
+注意：设置模块写接口同样是写操作；当前 P0 不做 token 和权限分级，外部调试时应只在受信任局域网环境开启 MCP 服务。
+
+### debug_log_list
+
+分页获取 App 内存调试日志摘要。这个接口读取的是 `AppLog.logs` 当前内存窗口，不读取外部缓存目录里的日志文件。
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":60,"method":"tools/call","params":{"name":"debug_log_list","arguments":{"limit":20}}}'
+```
+
+支持参数：
+
+- `offset`：分页偏移，默认 `0`。
+- `limit`：返回条数，默认 `20`，最大 `100`。
+- `keyword`：可选，匹配 message 或异常堆栈。
+- `only_errors`：可选，只返回带 Throwable 的日志。
+
+### debug_log_get
+
+按 `debug_log_list` 返回的 `id` 获取单条调试日志详情。`id` 使用日志时间戳，内存日志窗口清空或被新日志挤出后会失效。
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":61,"method":"tools/call","params":{"name":"debug_log_get","arguments":{"id":1781840000000,"include_stack":false}}}'
+```
+
+### debug_log_clear
+
+清空当前 App 内存调试日志窗口。这个接口不会删除文件日志。
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":62,"method":"tools/call","params":{"name":"debug_log_clear","arguments":{}}}'
+```
+
 ### network_log_list
 
 分页获取运行时网络请求日志摘要。这个接口不会返回 headers/body，只返回足够定位单条请求的摘要字段，避免一次把网络日志撑爆 MCP 上下文。
@@ -467,6 +828,8 @@ curl -s http://192.0.2.10:1124/mcp \
 
 - `legado://api/mcp`
 - `legado://schema/book-source`
+- `legado://schema/bookshelf`
+- `legado://schema/settings`
 
 ### resources/read
 
@@ -484,6 +847,22 @@ curl -s http://192.0.2.10:1124/mcp \
 curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":32,"method":"resources/read","params":{"uri":"legado://schema/book-source"}}'
+```
+
+读取书架模块接口概要：
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":33,"method":"resources/read","params":{"uri":"legado://schema/bookshelf"}}'
+```
+
+读取设置模块接口概要：
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":34,"method":"resources/read","params":{"uri":"legado://schema/settings"}}'
 ```
 
 ## 批量请求

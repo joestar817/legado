@@ -185,6 +185,11 @@ object McpServer {
                 properties = emptyMap()
             ),
             tool(
+                name = "book_source_stats_get",
+                description = "Return lightweight book source counts grouped by enabled state, source type, group, and capabilities.",
+                properties = emptyMap()
+            ),
+            tool(
                 name = "book_source_get",
                 description = "Get one Legado book source by bookSourceUrl.",
                 properties = mapOf(
@@ -427,6 +432,7 @@ object McpServer {
                 normalizedData = apiSummary()
             )
             "book_source_list" -> listBookSources()
+            "book_source_stats_get" -> getBookSourceStats()
             "book_source_get" -> {
                 val url = arguments.get("url").asRequiredString("url")
                 normalizeReturnData(
@@ -630,6 +636,32 @@ object McpServer {
             upstreamEndpoint = "native://bookSourceList",
             normalizedData = sources,
             warnings = if (sources.isEmpty()) listOf("设备源列表为空") else emptyList()
+        )
+    }
+
+    private fun getBookSourceStats(): Map<String, Any?> {
+        val sources = appDb.bookSourceDao.all
+        val parts = appDb.bookSourceDao.allPart
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookSourceStats",
+            normalizedData = mapOf(
+                "total" to sources.size,
+                "enabled" to sources.count { it.enabled },
+                "disabled" to sources.count { !it.enabled },
+                "enabled_explore" to sources.count { it.enabledExplore },
+                "disabled_explore" to sources.count { !it.enabledExplore },
+                "login_required" to sources.count { !it.loginUrl.isNullOrBlank() },
+                "type_counts" to sourceTypeCounts(sources.map { it.bookSourceType }),
+                "group_counts" to sourceGroupCounts(sources.map { it.bookSourceGroup }),
+                "capability_counts" to mapOf(
+                    "search" to parts.count { it.hasSearchUrl },
+                    "explore" to parts.count { it.hasExploreUrl },
+                    "login" to parts.count { it.hasLoginUrl },
+                    "event_listener" to parts.count { it.eventListener },
+                    "enabled_text" to appDb.bookSourceDao.allTextEnabledPart.size
+                )
+            )
         )
     }
 
@@ -896,6 +928,51 @@ object McpServer {
         } else {
             this
         }
+    }
+
+    private fun sourceTypeCounts(types: List<Int>): List<Map<String, Any>> {
+        return types
+            .groupingBy { it }
+            .eachCount()
+            .toSortedMap()
+            .map { (type, count) ->
+                mapOf(
+                    "type" to type,
+                    "label" to sourceTypeLabel(type),
+                    "count" to count
+                )
+            }
+    }
+
+    private fun sourceTypeLabel(type: Int): String {
+        return when (type) {
+            0 -> "text"
+            1 -> "audio"
+            2 -> "image"
+            3 -> "file"
+            4 -> "video"
+            else -> "unknown"
+        }
+    }
+
+    private fun sourceGroupCounts(groups: List<String?>): List<Map<String, Any>> {
+        val counts = linkedMapOf<String, Int>()
+        groups.forEach { value ->
+            val names = splitGroupNames(value).ifEmpty { listOf("未分组") }
+            names.forEach { name ->
+                counts[name] = (counts[name] ?: 0) + 1
+            }
+        }
+        return counts
+            .map { (group, count) -> mapOf("group" to group, "count" to count) }
+            .sortedWith(compareByDescending<Map<String, Any>> { it["count"] as Int }.thenBy { it["group"] as String })
+    }
+
+    private fun splitGroupNames(value: String?): List<String> {
+        return value.orEmpty()
+            .split(',', '，')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
     }
 
     private fun toolResult(
