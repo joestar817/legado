@@ -90,6 +90,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun initData(intent: Intent) {
         execute {
+            inBookshelf = false
+            hasCustomBtn = false
+            bookSource = null
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             val bookUrl = intent.getStringExtra("bookUrl") ?: ""
@@ -172,6 +175,25 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         if (otherWorksBookKey != key) {
             otherWorksBookKey = key
             otherWorksData.value = OtherWorksState.Idle
+            loadCachedOtherWorks(book)
+        }
+    }
+
+    private fun loadCachedOtherWorks(book: Book) {
+        val source = bookSource ?: return
+        val author = normalizeAuthor(book.author)
+        if (author.isBlank()) return
+        execute {
+            filterOtherWorks(
+                book,
+                appDb.searchBookDao.getByOriginAuthor(source.bookSourceUrl, author)
+            )
+        }.onSuccess {
+            if (it.isNotEmpty()) {
+                otherWorksData.postValue(OtherWorksState.Success(it))
+            }
+        }.onError {
+            AppLog.put("加载作者其它作品缓存失败\n${it.localizedMessage}", it)
         }
     }
 
@@ -197,13 +219,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 }
             ).onEach {
                 it.releaseHtmlData()
-            }.filter {
-                normalizeAuthor(it.author) == author &&
-                        it.bookUrl != book.bookUrl &&
-                        !(it.name == book.name && normalizeAuthor(it.author) == author)
-            }.distinctBy {
-                it.bookUrl.ifBlank { "${it.name}-${it.author}" }
-            }
+            }.let { filterOtherWorks(book, it) }
             if (items.isNotEmpty()) {
                 appDb.searchBookDao.insert(*items.toTypedArray())
             }
@@ -226,6 +242,16 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         val bookUrl = book.bookUrl
         val key = if (author.isNotBlank()) "$name-$author" else name
         return bookshelf.contains(key) || bookshelf.contains(bookUrl)
+    }
+
+    private fun filterOtherWorks(book: Book, books: List<SearchBook>): List<SearchBook> {
+        val author = normalizeAuthor(book.author)
+        val currentName = book.name.trim()
+        return books.filter {
+            normalizeAuthor(it.author) == author && it.name.trim() != currentName
+        }.distinctBy {
+            it.bookUrl.ifBlank { "${it.name}-${it.author}-${it.origin}" }
+        }
     }
 
     private fun normalizeAuthor(author: String): String {

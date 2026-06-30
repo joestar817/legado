@@ -56,6 +56,9 @@ interface SearchBookDao {
     )
     fun getEnabledByNameAuthor(name: String, author: String): List<SearchBook>
 
+    @Query("select * from searchBooks where origin = :origin and author like '%'||:author||'%' order by time desc")
+    fun getByOriginAuthor(origin: String, author: String): List<SearchBook>
+
     @Query(
         """
         select t1.name, t1.author, t1.origin, t1.originName, t1.coverUrl, t1.bookUrl, 

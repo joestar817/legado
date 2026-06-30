@@ -5,17 +5,23 @@ import android.os.Bundle
 import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
 import io.legado.app.base.adapter.DiffRecyclerAdapter
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.ItemSearchBinding
 import io.legado.app.help.config.AppConfig
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.visible
 
 
-class SearchAdapter(context: Context, val callBack: CallBack) :
+class SearchAdapter(
+    context: Context,
+    val callBack: CallBack,
+    private val config: Config = Config()
+) :
     DiffRecyclerAdapter<SearchBook, ItemSearchBinding>(context) {
 
     override val keepScrollPosition = true
@@ -54,7 +60,7 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
         }
 
     override fun getViewBinding(parent: ViewGroup): ItemSearchBinding {
-        return ItemSearchBinding.inflate(inflater, parent, false)
+        return ItemSearchBinding.inflate(inflater, parent, false).also(::applyConfig)
     }
 
     override fun convert(
@@ -75,12 +81,16 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemSearchBinding) {
         binding.root.setOnClickListener {
-            getItem(holder.layoutPosition)?.let {
+            val position = holder.bindingAdapterPosition
+            if (position == RecyclerView.NO_POSITION) return@setOnClickListener
+            getItem(position)?.let {
                 callBack.showBookInfo(it.name, it.author, it.bookUrl)
             }
         }
         binding.root.setOnLongClickListener {
-            getItem(holder.layoutPosition)?.let {
+            val position = holder.bindingAdapterPosition
+            if (position == RecyclerView.NO_POSITION) return@setOnLongClickListener true
+            getItem(position)?.let {
                 callBack.showAllSources(it)
             }
             true
@@ -93,7 +103,10 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
             tvAuthor.text = context.getString(R.string.author_show, searchBook.author)
             tvOrigin.text = context.getString(R.string.origin_show, searchBook.originName)
             ivInBookshelf.isVisible = callBack.isInBookshelf(searchBook)
-            bvOriginCount.setBadgeCount(searchBook.origins.size)
+            bvOriginCount.isVisible = config.showOriginCount
+            if (config.showOriginCount) {
+                bvOriginCount.setBadgeCount(searchBook.origins.size)
+            }
             upLasted(binding, searchBook.latestChapterTitle)
             tvIntroduce.text = searchBook.trimIntro(context)
             llKind.textSize = 11f
@@ -109,7 +122,9 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
         binding.run {
             bundle.keySet().forEach {
                 when (it) {
-                    "origins" -> bvOriginCount.setBadgeCount(searchBook.origins.size)
+                    "origins" -> if (config.showOriginCount) {
+                        bvOriginCount.setBadgeCount(searchBook.origins.size)
+                    }
                     "origin" -> tvOrigin.text =
                         context.getString(R.string.origin_show, searchBook.originName)
                     "last" -> upLasted(binding, searchBook.latestChapterTitle)
@@ -145,6 +160,26 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
             llKind.setLabels(kinds)
         }
     }
+
+    private fun applyConfig(binding: ItemSearchBinding) {
+        config.horizontalMarginDp?.let { marginDp ->
+            val margin = marginDp.dpToPx()
+            val params = binding.root.layoutParams as? ViewGroup.MarginLayoutParams ?: return@let
+            params.marginStart = margin
+            params.marginEnd = margin
+            binding.root.layoutParams = params
+        }
+        binding.bvOriginCount.isVisible = config.showOriginCount
+        config.backgroundRes?.let {
+            binding.root.setBackgroundResource(it)
+        }
+    }
+
+    data class Config(
+        val showOriginCount: Boolean = true,
+        val horizontalMarginDp: Int? = null,
+        val backgroundRes: Int? = null
+    )
 
     interface CallBack {
 

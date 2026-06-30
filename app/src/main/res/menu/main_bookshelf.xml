@@ -84,7 +84,7 @@
 
     <item
         android:id="@+id/menu_network_log"
-        android:icon="@drawable/ic_cfg_about"
+        android:icon="@drawable/ic_network_check"
         android:title="@string/network_request_log"
         app:showAsAction="never" />
 

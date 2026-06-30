@@ -21,6 +21,12 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/menu_more"
+        android:icon="@drawable/ic_more_vert"
+        android:title="@string/more"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/menu_upload"
         android:title="@string/upload_to_remote"
         app:showAsAction="never" />
@@ -90,7 +96,7 @@
 
     <item
         android:id="@+id/menu_network_log"
-        android:icon="@drawable/ic_cfg_about"
+        android:icon="@drawable/ic_network_check"
         android:title="@string/network_request_log"
         app:showAsAction="never" />
 

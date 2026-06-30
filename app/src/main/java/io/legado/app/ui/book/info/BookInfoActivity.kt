@@ -10,12 +10,14 @@ import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.View
 import io.legado.app.ui.widget.text.ScrollTextView
 import android.view.textclassifier.TextClassifier
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.CheckBox
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -66,6 +68,7 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.lib.theme.ThemeUtils
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
@@ -92,6 +95,8 @@ import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.video.VideoPlayerActivity
+import io.legado.app.ui.widget.NgActionPopup
+import io.legado.app.ui.widget.NgActionPopupItem
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
 import io.legado.app.ui.widget.dialog.WaitDialog
@@ -206,8 +211,35 @@ class BookInfoActivity :
     private val waitDialog by lazy { WaitDialog(this) }
     private var editMenuItem: MenuItem? = null
     private var menuCustomBtn: MenuItem? = null
+    private var bookInfoMenu: Menu? = null
     private var characterPreviewJob: Job? = null
-    private val otherWorksAdapter by lazy { SearchAdapter(this, this) }
+    private val bookInfoPopupItemIds = intArrayOf(
+        R.id.menu_upload,
+        R.id.menu_refresh,
+        R.id.menu_login,
+        R.id.menu_top,
+        R.id.menu_set_source_variable,
+        R.id.menu_set_book_variable,
+        R.id.menu_copy_book_url,
+        R.id.menu_copy_toc_url,
+        R.id.menu_can_update,
+        R.id.menu_split_long_chapter,
+        R.id.menu_delete_alert,
+        R.id.menu_clear_cache,
+        R.id.menu_log,
+        R.id.menu_network_log
+    )
+    private val otherWorksAdapter by lazy {
+        SearchAdapter(
+            this,
+            this,
+            SearchAdapter.Config(
+                showOriginCount = false,
+                horizontalMarginDp = 0,
+                backgroundRes = R.drawable.ng_bg_search_result_card_compact
+            )
+        )
+    }
     private val book get() = viewModel.getBook(false)
 
     override val binding by viewBinding(ActivityBookInfoBinding::inflate)
@@ -287,16 +319,51 @@ class BookInfoActivity :
         initViewEvent()
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        binding.scrollView?.scrollTo(0, 0)
+        binding.scrollViewL?.scrollTo(0, 0)
+        binding.scrollViewR?.scrollTo(0, 0)
+        viewModel.initData(intent)
+    }
+
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.book_info, menu)
+        bookInfoMenu = menu
         editMenuItem = menu.findItem(R.id.menu_edit)
         menuCustomBtn = menu.findItem(R.id.menu_custom_btn).also {
             it.isVisible = viewModel.hasCustomBtn
         }
+        menu.findItem(R.id.menu_more)?.setActionView(createBookInfoMoreButton())
+        hideBookInfoSystemOverflowItems(menu)
         return super.onCompatCreateOptionsMenu(menu)
     }
 
+    private fun createBookInfoMoreButton(): View {
+        return ImageButton(this).apply {
+            layoutParams = LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx())
+            background = ThemeUtils.resolveDrawable(
+                this@BookInfoActivity,
+                android.R.attr.selectableItemBackgroundBorderless
+            )
+            contentDescription = getString(R.string.more)
+            setImageResource(R.drawable.ic_more_vert)
+            setColorFilter(getPrimaryTextColor(ColorUtils.isColorLight(bottomBackground)))
+            setPadding(12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx())
+            setOnClickListener {
+                showBookInfoActionMenu(this)
+            }
+        }
+    }
+
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
+        updateBookInfoMenuState(menu)
+        hideBookInfoSystemOverflowItems(menu)
+        return super.onMenuOpened(featureId, menu)
+    }
+
+    private fun updateBookInfoMenuState(menu: Menu) {
         menu.findItem(R.id.menu_can_update)?.isChecked =
             viewModel.bookData.value?.canUpdate ?: true
         menu.findItem(R.id.menu_split_long_chapter)?.isChecked =
@@ -315,11 +382,61 @@ class BookInfoActivity :
             viewModel.bookData.value?.isLocal ?: false
         menu.findItem(R.id.menu_delete_alert)?.isChecked =
             LocalConfig.bookInfoDeleteAlert
-        return super.onMenuOpened(featureId, menu)
+    }
+
+    private fun hideBookInfoSystemOverflowItems(menu: Menu) {
+        bookInfoPopupItemIds.forEach {
+            menu.findItem(it)?.isVisible = false
+        }
+    }
+
+    private fun showBookInfoActionMenu(anchor: View) {
+        val menu = bookInfoMenu ?: return
+        updateBookInfoMenuState(menu)
+        hideBookInfoSystemOverflowItems(menu)
+        NgActionPopup(this, buildBookInfoActionItems()) { action ->
+            menu.findItem(action.itemId)?.let {
+                onCompatOptionsItemSelected(it)
+            }
+        }.show(anchor)
+    }
+
+    private fun buildBookInfoActionItems(): List<NgActionPopupItem> {
+        val book = viewModel.bookData.value
+        val source = viewModel.bookSource
+        return buildList {
+            if (book?.isLocal == true) {
+                add(NgActionPopupItem(R.id.menu_upload, R.string.upload_to_remote, R.drawable.ic_outline_cloud_24))
+            }
+            add(NgActionPopupItem(R.id.menu_refresh, R.string.refresh, R.drawable.ic_refresh_black_24dp))
+            if (!source?.loginUrl.isNullOrBlank()) {
+                add(NgActionPopupItem(R.id.menu_login, R.string.login, R.drawable.ic_lock_outline))
+            }
+            add(NgActionPopupItem(R.id.menu_top, R.string.to_top, R.drawable.ic_arrow_drop_up))
+            if (source != null) {
+                add(NgActionPopupItem(R.id.menu_set_source_variable, R.string.set_source_variable, R.drawable.ic_code, dividerBefore = true))
+                add(NgActionPopupItem(R.id.menu_set_book_variable, R.string.set_book_variable, R.drawable.ic_code))
+                add(NgActionPopupItem(R.id.menu_can_update, R.string.allow_update, R.drawable.ic_update, checked = book?.canUpdate ?: true))
+            }
+            add(NgActionPopupItem(R.id.menu_copy_book_url, R.string.copy_book_url, R.drawable.ic_copy, dividerBefore = true))
+            add(NgActionPopupItem(R.id.menu_copy_toc_url, R.string.copy_toc_url, R.drawable.ic_copy))
+            if (book?.isLocalTxt == true) {
+                add(NgActionPopupItem(R.id.menu_split_long_chapter, R.string.split_long_chapter, R.drawable.ic_chapter_list, checked = book.getSplitLongChapter()))
+            }
+            add(NgActionPopupItem(R.id.menu_delete_alert, R.string.delete_alert, R.drawable.ic_outline_delete, checked = LocalConfig.bookInfoDeleteAlert, dividerBefore = true))
+            add(NgActionPopupItem(R.id.menu_clear_cache, R.string.clear_cache, R.drawable.ic_clear_all))
+            add(NgActionPopupItem(R.id.menu_log, R.string.log, R.drawable.ic_cfg_about, dividerBefore = true))
+            add(NgActionPopupItem(R.id.menu_network_log, R.string.network_request_log, R.drawable.ic_network_check))
+        }
     }
 
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.menu_more -> {
+                item.actionView?.let(::showBookInfoActionMenu)
+                return true
+            }
+
             R.id.menu_custom_btn -> {
                 viewModel.bookSource?.customButton?.let {
                     viewModel.getBook()?.let { book ->
@@ -561,8 +678,7 @@ class BookInfoActivity :
         when (state) {
             BookInfoViewModel.OtherWorksState.Idle -> {
                 rvOtherWorks.gone()
-                tvOtherWorksState.visible()
-                tvOtherWorksState.text = getString(R.string.book_other_works_idle)
+                tvOtherWorksState.gone()
                 otherWorksAdapter.setItems(emptyList())
             }
 
@@ -705,8 +821,6 @@ class BookInfoActivity :
 
     override fun showBookInfo(name: String, author: String, bookUrl: String) {
         startActivity<BookInfoActivity> {
-            putExtra("name", name)
-            putExtra("author", author)
             putExtra("bookUrl", bookUrl)
         }
     }
