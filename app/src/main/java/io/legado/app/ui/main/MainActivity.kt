@@ -266,12 +266,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     private fun startBookshelfGenericAiChat() {
-        startActivity<AiChatActivity> {
-            putStringArrayListExtra(
-                AiChatActivity.EXTRA_AVAILABLE_CONTEXTS,
-                arrayListOf(AiChatActivity.CONTEXT_BOOKSHELF)
-            )
-        }
+        startActivity<AiChatActivity>()
     }
 
     private fun refreshAiChatFab() = binding.run {

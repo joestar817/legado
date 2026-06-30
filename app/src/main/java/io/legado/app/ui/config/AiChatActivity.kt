@@ -21,6 +21,12 @@ import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -99,6 +105,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -125,6 +132,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipboardManager
@@ -148,11 +156,14 @@ import androidx.core.content.FileProvider
 import com.bumptech.glide.Glide
 import com.google.gson.JsonObject
 import io.legado.app.R
-import io.legado.app.data.appDb
-import io.legado.app.data.entities.BookGroup
 import io.legado.app.help.ai.AiChatClient
 import io.legado.app.help.ai.AiChatHistoryState
 import io.legado.app.help.ai.AiChatHistoryStore
+import io.legado.app.help.ai.AiChatInteraction
+import io.legado.app.help.ai.AiChatInteractionOption
+import io.legado.app.help.ai.AiChatInteractionParser
+import io.legado.app.help.ai.AiChatInteractionSubmit
+import io.legado.app.help.ai.AiChatInteractionType
 import io.legado.app.help.ai.AiChatMessageSnapshot
 import io.legado.app.help.ai.AiChatSessionSnapshot
 import io.legado.app.help.ai.AiChatStreamUpdate
@@ -160,12 +171,6 @@ import io.legado.app.help.ai.AiChatTurnResult
 import io.legado.app.help.ai.AiConfig
 import io.legado.app.help.ai.AiSkillRegistry
 import io.legado.app.help.ai.AiSkillScope
-import io.legado.app.help.book.isAudio
-import io.legado.app.help.book.isImage
-import io.legado.app.help.book.isLocal
-import io.legado.app.help.book.isNotShelf
-import io.legado.app.help.book.isUpError
-import io.legado.app.help.book.isVideo
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
@@ -206,7 +211,6 @@ class AiChatActivity : AppCompatActivity() {
         const val EXTRA_ENTRY = "entry"
         const val EXTRA_AVAILABLE_CONTEXTS = "available_contexts"
         const val ENTRY_BOOKSHELF = "bookshelf"
-        const val CONTEXT_BOOKSHELF = "bookshelf"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -358,6 +362,11 @@ private fun AiChatRoute(onBack: () -> Unit) {
     val internalMcpEnabled = remember(configVersion) {
         AiConfig.internalMcpEnabled
     }
+    val skillSuggestions = inputAttachments
+        .filter { it.type == AiChatInputAttachmentType.SKILL }
+        .flatMap { it.suggestions }
+        .distinct()
+    var suggestionsExpanded by remember { mutableStateOf(false) }
     val currentTitle = sessions.firstOrNull { it.id == activeSessionId }?.title
         ?: messages.deriveChatTitle()
         ?: "新聊天"
@@ -962,30 +971,6 @@ private fun AiChatRoute(onBack: () -> Unit) {
                                     onConfirm = ::confirmExportSelection
                                 )
                             }
-                            AiChatSkillSuggestionRow(
-                                visible = messages.isEmpty()
-                                        && input.isBlank()
-                                        && inputAttachments.any {
-                                    it.type == AiChatInputAttachmentType.SKILL
-                                            && it.suggestions.isNotEmpty()
-                                },
-                                suggestions = inputAttachments
-                                    .filter { it.type == AiChatInputAttachmentType.SKILL }
-                                    .flatMap { it.suggestions }
-                                    .distinct(),
-                                onSelect = { suggestion ->
-                                    sendMessage(suggestion)
-                                }
-                            )
-                            AiChatLoadedSkillBar(
-                                skills = inputAttachments.filter {
-                                    it.type == AiChatInputAttachmentType.SKILL
-                                },
-                                onRemove = { skill ->
-                                    inputAttachments.removeAll { it.id == skill.id }
-                                    persistActiveSession()
-                                }
-                            )
                             RikkaChatInput(
                                 value = input,
                                 onValueChange = { input = it },
@@ -996,7 +981,16 @@ private fun AiChatRoute(onBack: () -> Unit) {
                                 skillEnabled = inputAttachments.any {
                                     it.type == AiChatInputAttachmentType.SKILL
                                 },
+                                contextAvailable = availableContextAttachments.isNotEmpty()
+                                        || inputAttachments.any {
+                                    it.type == AiChatInputAttachmentType.CONTEXT
+                                },
+                                suggestionAvailable = skillSuggestions.isNotEmpty(),
+                                suggestionExpanded = suggestionsExpanded,
                                 attachments = inputAttachments,
+                                skills = inputAttachments.filter {
+                                    it.type == AiChatInputAttachmentType.SKILL
+                                },
                                 onSend = ::sendMessage,
                                 onStop = ::stopSending,
                                 onModelClick = {
@@ -1013,6 +1007,9 @@ private fun AiChatRoute(onBack: () -> Unit) {
                                     AiAssistantConfigUi.showInternalMcpSheet(context) {
                                         configVersion++
                                     }
+                                },
+                                onSuggestionClick = {
+                                    suggestionsExpanded = !suggestionsExpanded
                                 },
                                 onSkillClick = {
                                     showSkillAttachmentSheet = true
@@ -1032,37 +1029,58 @@ private fun AiChatRoute(onBack: () -> Unit) {
                                 },
                                 onRemoveAttachment = { attachment ->
                                     inputAttachments.removeAll { it.id == attachment.id }
+                                },
+                                onRemoveSkill = { skill ->
+                                    inputAttachments.removeAll { it.id == skill.id }
+                                    persistActiveSession()
                                 }
                             )
                         }
                     }
                 ) { padding ->
-                    RikkaChatList(
-                        padding = padding,
-                        state = listState,
-                        messages = messages,
-                        previewMode = previewMode,
-                        onRegenerate = ::regenerateMessage,
-                        onDelete = ::deleteMessage,
-                        onFork = ::forkMessage,
-                        onToggleFavorite = ::toggleFavorite,
-                        selectionMode = exportSelectionMode,
-                        selectedIds = selectedExportMessageIds.toSet(),
-                        onToggleSelection = { message ->
-                            if (message.id in selectedExportMessageIds) {
-                                selectedExportMessageIds.remove(message.id)
-                            } else {
-                                selectedExportMessageIds.add(message.id)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        RikkaChatList(
+                            padding = padding,
+                            state = listState,
+                            messages = messages,
+                            previewMode = previewMode,
+                            onRegenerate = ::regenerateMessage,
+                            onDelete = ::deleteMessage,
+                            onFork = ::forkMessage,
+                            onToggleFavorite = ::toggleFavorite,
+                            selectionMode = exportSelectionMode,
+                            selectedIds = selectedExportMessageIds.toSet(),
+                            onToggleSelection = { message ->
+                                if (message.id in selectedExportMessageIds) {
+                                    selectedExportMessageIds.remove(message.id)
+                                } else {
+                                    selectedExportMessageIds.add(message.id)
+                                }
+                            },
+                            onExport = ::startExportSelection,
+                            onInteractionSubmit = { prompt -> sendMessage(prompt) },
+                            onJumpToMessage = { index ->
+                                previewMode = false
+                                scope.launch {
+                                    listState.animateScrollToItem(index)
+                                }
                             }
-                        },
-                        onExport = ::startExportSelection,
-                        onJumpToMessage = { index ->
-                            previewMode = false
-                            scope.launch {
-                                listState.animateScrollToItem(index)
-                            }
-                        }
-                    )
+                        )
+                        FloatingSkillSuggestionPanel(
+                            suggestions = skillSuggestions,
+                            expanded = suggestionsExpanded,
+                            onSelect = { suggestion ->
+                                suggestionsExpanded = false
+                                sendMessage(suggestion)
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(
+                                    end = 16.dp,
+                                    bottom = padding.calculateBottomPadding() + 8.dp
+                                )
+                        )
+                    }
                 }
             }
         }
@@ -1606,6 +1624,7 @@ private fun RikkaChatList(
     selectedIds: Set<String>,
     onToggleSelection: (ChatUiMessage) -> Unit,
     onExport: (ChatUiMessage) -> Unit,
+    onInteractionSubmit: (String) -> Unit,
     onJumpToMessage: (Int) -> Unit
 ) {
     if (previewMode) {
@@ -1647,7 +1666,8 @@ private fun RikkaChatList(
                             onDelete = { onDelete(message) },
                             onFork = { onFork(message) },
                             onToggleFavorite = { onToggleFavorite(message) },
-                            onExport = { onExport(message) }
+                            onExport = { onExport(message) },
+                            onInteractionSubmit = onInteractionSubmit
                         )
                     }
                 }
@@ -1658,7 +1678,8 @@ private fun RikkaChatList(
                     onDelete = { onDelete(message) },
                     onFork = { onFork(message) },
                     onToggleFavorite = { onToggleFavorite(message) },
-                    onExport = { onExport(message) }
+                    onExport = { onExport(message) },
+                    onInteractionSubmit = onInteractionSubmit
                 )
             }
         }
@@ -1772,7 +1793,8 @@ private fun RikkaMessageItem(
     onDelete: () -> Unit,
     onFork: () -> Unit,
     onToggleFavorite: () -> Unit,
-    onExport: () -> Unit
+    onExport: () -> Unit,
+    onInteractionSubmit: (String) -> Unit
 ) {
     val clipboard = LocalClipboardManager.current
     val isUser = message.role == ChatRole.USER
@@ -1805,6 +1827,9 @@ private fun RikkaMessageItem(
                 onExport = onExport
             )
         } else {
+            val interactionRender = remember(message.content) {
+                AiChatInteractionParser.parse(message.content)
+            }
             AssistantMessageHeader()
             if (message.loading) {
                 ThinkingLoadingLine()
@@ -1816,7 +1841,7 @@ private fun RikkaMessageItem(
                         defaultExpanded = true
                     )
                 }
-                val streamingContent = message.content
+                val streamingContent = interactionRender.content
                     .takeUnless { it == "正在思考..." }
                     .orEmpty()
                 if (streamingContent.isNotBlank()) {
@@ -1838,13 +1863,26 @@ private fun RikkaMessageItem(
                         elapsedMs = message.elapsedMs
                     )
                 }
-                MarkdownMessageText(
-                    content = message.content,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateContentSize()
-                        .padding(top = 2.dp)
-                )
+                val displayContent = if (interactionRender.interactions.isNotEmpty()) {
+                    interactionRender.content
+                } else {
+                    interactionRender.content.ifBlank { message.content }
+                }
+                if (displayContent.isNotBlank()) {
+                    MarkdownMessageText(
+                        content = displayContent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize()
+                            .padding(top = 2.dp)
+                    )
+                }
+                interactionRender.interactions.forEach { interaction ->
+                    ChatInteractionBlock(
+                        interaction = interaction,
+                        onSubmit = onInteractionSubmit
+                    )
+                }
                 if (message.toolTrace.isNotEmpty()) {
                     ToolTraceEntry(message.toolTrace)
                 }
@@ -1879,6 +1917,312 @@ private fun RikkaMessageItem(
                     PendingMessageAction.DELETE -> onDelete()
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun ChatInteractionBlock(
+    interaction: AiChatInteraction,
+    onSubmit: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+        border = BorderStroke(
+            width = 0.8.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (interaction.title.isNotBlank()) {
+                Text(
+                    text = interaction.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            if (interaction.description.isNotBlank()) {
+                Text(
+                    text = interaction.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            when (interaction.type) {
+                AiChatInteractionType.ACTIONS -> InteractionActions(
+                    interaction = interaction,
+                    onSubmit = onSubmit
+                )
+
+                AiChatInteractionType.SINGLE_CHOICE -> InteractionSingleChoice(
+                    interaction = interaction,
+                    onSubmit = onSubmit
+                )
+
+                AiChatInteractionType.MULTI_CHOICE -> InteractionMultiChoice(
+                    interaction = interaction,
+                    onSubmit = onSubmit
+                )
+
+                AiChatInteractionType.CONFIRM -> InteractionConfirm(
+                    interaction = interaction,
+                    onSubmit = onSubmit
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InteractionActions(
+    interaction: AiChatInteraction,
+    onSubmit: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        interaction.options.chunked(3).forEach { rowOptions ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                rowOptions.forEach { option ->
+                    InteractionChip(
+                        text = option.label,
+                        primary = false,
+                        compact = true,
+                        onClick = {
+                            onSubmit(
+                                AiChatInteractionParser.buildPrompt(
+                                    interaction = interaction,
+                                    option = option,
+                                    submit = interaction.submit
+                                )
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InteractionSingleChoice(
+    interaction: AiChatInteraction,
+    onSubmit: (String) -> Unit
+) {
+    var selectedValue by remember(interaction.id) {
+        mutableStateOf(interaction.options.firstOrNull()?.value.orEmpty())
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        interaction.options.forEach { option ->
+            InteractionOptionRow(
+                option = option,
+                selected = option.value == selectedValue,
+                multiple = false,
+                onClick = { selectedValue = option.value }
+            )
+        }
+        val selected = interaction.options.firstOrNull { it.value == selectedValue }
+        InteractionSubmitRow(
+            enabled = selected != null,
+            label = interaction.submit?.label ?: "确认",
+            onSubmit = {
+                selected?.let { option ->
+                    onSubmit(
+                        AiChatInteractionParser.buildPrompt(
+                            interaction = interaction,
+                            option = option,
+                            submit = interaction.submit
+                        )
+                    )
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun InteractionMultiChoice(
+    interaction: AiChatInteraction,
+    onSubmit: (String) -> Unit
+) {
+    var selectedValues by remember(interaction.id) { mutableStateOf(emptySet<String>()) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        interaction.options.forEach { option ->
+            InteractionOptionRow(
+                option = option,
+                selected = option.value in selectedValues,
+                multiple = true,
+                onClick = {
+                    selectedValues = if (option.value in selectedValues) {
+                        selectedValues - option.value
+                    } else {
+                        selectedValues + option.value
+                    }
+                }
+            )
+        }
+        val selected = interaction.options.filter { it.value in selectedValues }
+        InteractionSubmitRow(
+            enabled = selected.isNotEmpty(),
+            label = interaction.submit?.label ?: "确认",
+            onSubmit = {
+                onSubmit(
+                    AiChatInteractionParser.buildPrompt(
+                        interaction = interaction,
+                        options = selected,
+                        submit = interaction.submit
+                    )
+                )
+            }
+        )
+    }
+}
+
+@Composable
+private fun InteractionConfirm(
+    interaction: AiChatInteraction,
+    onSubmit: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End
+    ) {
+        interaction.cancel?.let { cancel ->
+            InteractionChip(
+                text = cancel.label.ifBlank { "取消" },
+                primary = false,
+                modifier = Modifier.padding(end = 8.dp),
+                onClick = {
+                    onSubmit(
+                        AiChatInteractionParser.buildPrompt(
+                            interaction = interaction,
+                            submit = cancel
+                        )
+                    )
+                }
+            )
+        }
+        InteractionChip(
+            text = interaction.submit?.label ?: "确认",
+            primary = true,
+            onClick = {
+                onSubmit(
+                    AiChatInteractionParser.buildPrompt(
+                        interaction = interaction,
+                        submit = interaction.submit ?: AiChatInteractionSubmit("确认", "确认")
+                    )
+                )
+            }
+        )
+    }
+}
+
+@Composable
+private fun InteractionOptionRow(
+    option: AiChatInteractionOption,
+    selected: Boolean,
+    multiple: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (multiple) {
+            Checkbox(checked = selected, onCheckedChange = { onClick() })
+        } else {
+            RadioButton(selected = selected, onClick = onClick)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = option.label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (option.description.isNotBlank()) {
+                Text(
+                    text = option.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InteractionSubmitRow(
+    enabled: Boolean,
+    label: String,
+    onSubmit: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End
+    ) {
+        InteractionChip(
+            text = label,
+            primary = true,
+            enabled = enabled,
+            onClick = onSubmit
+        )
+    }
+}
+
+@Composable
+private fun InteractionChip(
+    text: String,
+    primary: Boolean,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    compact: Boolean = false,
+    onClick: () -> Unit
+) {
+    val contentColor = if (primary) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val containerColor = if (primary) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+    }
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = containerColor.copy(alpha = if (enabled) containerColor.alpha else 0.35f),
+        border = BorderStroke(0.8.dp, contentColor.copy(alpha = 0.16f))
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(
+                horizontal = if (compact) 10.dp else 12.dp,
+                vertical = if (compact) 6.dp else 7.dp
+            ),
+            color = contentColor.copy(alpha = if (enabled) 1f else 0.45f),
+            style = if (compact) {
+                MaterialTheme.typography.bodyMedium
+            } else {
+                MaterialTheme.typography.labelLarge
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -2790,16 +3134,22 @@ private fun RikkaChatInput(
     reasoningEnabled: Boolean,
     mcpEnabled: Boolean,
     skillEnabled: Boolean,
+    contextAvailable: Boolean,
+    suggestionAvailable: Boolean,
+    suggestionExpanded: Boolean,
     attachments: List<AiChatInputAttachment>,
+    skills: List<AiChatInputAttachment>,
     onSend: () -> Unit,
     onStop: () -> Unit,
     onModelClick: () -> Unit,
     onReasoningClick: () -> Unit,
     onMcpClick: () -> Unit,
+    onSuggestionClick: () -> Unit,
     onSkillClick: () -> Unit,
     onContextClick: () -> Unit,
     onContextPreview: (AiChatInputAttachment) -> Unit,
-    onRemoveAttachment: (AiChatInputAttachment) -> Unit
+    onRemoveAttachment: (AiChatInputAttachment) -> Unit,
+    onRemoveSkill: (AiChatInputAttachment) -> Unit
 ) {
     Surface(color = Color.Transparent) {
         Column(
@@ -2815,6 +3165,10 @@ private fun RikkaChatInput(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
             ) {
                 Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    CompactSkillStatusRow(
+                        skills = skills,
+                        onRemove = onRemoveSkill
+                    )
                     val contextAttachments = attachments.filter {
                         it.type == AiChatInputAttachmentType.CONTEXT
                     }
@@ -2866,13 +3220,22 @@ private fun RikkaChatInput(
                                 onClick = onSkillClick
                             )
                         }
-                        InputDrawableIcon(
-                            iconRes = R.drawable.ic_ai_context_menu,
-                            active = attachments.any {
-                                it.type == AiChatInputAttachmentType.CONTEXT
-                            },
-                            onClick = onContextClick
-                        )
+                        if (contextAvailable) {
+                            InputDrawableIcon(
+                                iconRes = R.drawable.ic_ai_context_menu,
+                                active = attachments.any {
+                                    it.type == AiChatInputAttachmentType.CONTEXT
+                                },
+                                onClick = onContextClick
+                            )
+                        }
+                        if (suggestionAvailable) {
+                            InputDrawableIcon(
+                                iconRes = R.drawable.ic_ai_chat_suggestion,
+                                active = suggestionExpanded,
+                                onClick = onSuggestionClick
+                            )
+                        }
                         Surface(
                             onClick = {
                                 if (sending) onStop() else onSend()
@@ -2909,19 +3272,17 @@ private fun RikkaChatInput(
 }
 
 @Composable
-private fun AiChatLoadedSkillBar(
+private fun CompactSkillStatusRow(
     skills: List<AiChatInputAttachment>,
     onRemove: (AiChatInputAttachment) -> Unit
 ) {
     AnimatedVisibility(visible = skills.isNotEmpty()) {
-        Surface(color = Color.Transparent) {
+        Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.88f))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .height(30.dp)
+                    .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -2929,11 +3290,11 @@ private fun AiChatLoadedSkillBar(
                     imageVector = Icons.Rounded.Psychology,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
                 Text(
-                    text = "当前skill：${skills.joinToString("、") { it.title }}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Skill：${skills.joinToString("、") { it.title }}",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -2943,7 +3304,7 @@ private fun AiChatLoadedSkillBar(
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .size(26.dp)
+                            .size(24.dp)
                             .clickable { onRemove(skill) },
                         contentAlignment = Alignment.Center
                     ) {
@@ -2951,11 +3312,15 @@ private fun AiChatLoadedSkillBar(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                     }
                 }
             }
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            )
         }
     }
 }
@@ -3241,31 +3606,52 @@ private fun AiChatAttachmentSheetSection(
 }
 
 @Composable
-private fun AiChatSkillSuggestionRow(
-    visible: Boolean,
+private fun FloatingSkillSuggestionPanel(
     suggestions: List<String>,
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
     onSelect: (String) -> Unit
 ) {
-    AnimatedVisibility(visible = visible) {
-        Row(
+    AnimatedVisibility(
+        visible = expanded && suggestions.isNotEmpty(),
+        modifier = modifier,
+        enter = fadeIn(animationSpec = tween(140)) +
+                scaleIn(
+                    animationSpec = tween(180),
+                    transformOrigin = TransformOrigin(1f, 1f),
+                    initialScale = 0.92f
+                ) +
+                expandVertically(expandFrom = Alignment.Bottom),
+        exit = fadeOut(animationSpec = tween(120)) +
+                scaleOut(
+                    animationSpec = tween(140),
+                    transformOrigin = TransformOrigin(1f, 1f),
+                    targetScale = 0.92f
+                ) +
+                shrinkVertically(shrinkTowards = Alignment.Bottom)
+    ) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 4.dp)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .widthIn(max = 280.dp)
+                .heightIn(max = 190.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalAlignment = Alignment.End
         ) {
             suggestions.forEach { suggestion ->
                 Surface(
                     onClick = { onSelect(suggestion) },
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    shape = RoundedCornerShape(7.dp),
+                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.92f),
+                    shadowElevation = 2.dp
                 ) {
                     Text(
                         text = suggestion,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -3601,7 +3987,6 @@ private fun rebuildUploadMessages(
 private fun buildEntryInputAttachments(entrySource: String?): List<AiChatInputAttachment> {
     return when (entrySource) {
         AiChatActivity.ENTRY_BOOKSHELF -> buildList {
-            add(buildBookshelfContextInputAttachment())
             AiSkillRegistry.get(AiSkillRegistry.SKILL_BOOKSHELF_MANAGEMENT)
                 ?.let(::toSkillInputAttachment)
                 ?.let(::add)
@@ -3611,100 +3996,9 @@ private fun buildEntryInputAttachments(entrySource: String?): List<AiChatInputAt
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 private fun buildContextInputAttachments(contextSources: List<String>): List<AiChatInputAttachment> {
-    return contextSources.distinct().mapNotNull { source ->
-        when (source) {
-            AiChatActivity.CONTEXT_BOOKSHELF -> buildBookshelfContextInputAttachment()
-            else -> null
-        }
-    }
-}
-
-private fun buildBookshelfContextInputAttachment(): AiChatInputAttachment {
-    return AiChatInputAttachment(
-        id = "context.bookshelf.current",
-        type = AiChatInputAttachmentType.CONTEXT,
-        title = "当前书架",
-        subtitle = "书架摘要，一次性附加",
-        prompt = buildBookshelfContextSummary()
-    )
-}
-
-private fun buildBookshelfContextSummary(): String {
-    val allBooks = appDb.bookDao.all
-    val shelfBooks = allBooks.filterNot { it.isNotShelf }
-    val groups = appDb.bookGroupDao.all
-    val customGroups = groups.filter { it.groupId > 0L }
-    val customGroupMask = customGroups.fold(0L) { acc, group -> acc or group.groupId }
-    val ungroupedCount = shelfBooks.count { book ->
-        customGroupMask == 0L || (book.group and customGroupMask) == 0L
-    }
-    val generatedAt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-    return buildString {
-        appendLine("# 当前书架摘要")
-        appendLine()
-        appendLine("- 生成时间：$generatedAt")
-        appendLine("- 图书总数：${allBooks.size}")
-        appendLine("- 正式书架图书：${shelfBooks.size}")
-        appendLine("- 临时/未加入书架图书：${allBooks.size - shelfBooks.size}")
-        appendLine("- 分组数量：${groups.size}（自定义 ${customGroups.size}）")
-        appendLine("- 未加入自定义分组：$ungroupedCount")
-        appendLine()
-        appendLine("## 类型分布")
-        appendLine()
-        appendLine("| 类型 | 数量 |")
-        appendLine("| --- | ---: |")
-        appendLine("| 文本/网络 | ${shelfBooks.count { !it.isLocal && !it.isAudio && !it.isVideo && !it.isImage }} |")
-        appendLine("| 本地 | ${shelfBooks.count { it.isLocal }} |")
-        appendLine("| 音频 | ${shelfBooks.count { it.isAudio }} |")
-        appendLine("| 视频 | ${shelfBooks.count { it.isVideo }} |")
-        appendLine("| 图片 | ${shelfBooks.count { it.isImage }} |")
-        appendLine("| 更新异常 | ${shelfBooks.count { it.isUpError }} |")
-        appendLine()
-        appendLine("## 自定义分组概况")
-        appendLine()
-        if (customGroups.isEmpty()) {
-            appendLine("- 暂无自定义分组")
-        } else {
-            appendLine("| 分组 | 图书数 |")
-            appendLine("| --- | ---: |")
-            customGroups.sortedWith(compareBy<BookGroup> { it.order }.thenBy { it.groupName })
-                .take(20)
-                .forEach { group ->
-                    val count = shelfBooks.count { (it.group and group.groupId) > 0L }
-                    appendLine("| ${group.groupName.escapeMarkdownCell()} | $count |")
-                }
-            if (customGroups.size > 20) {
-                appendLine()
-                appendLine("- 还有 ${customGroups.size - 20} 个自定义分组未列出")
-            }
-        }
-        appendTopCounts("作者分布 Top 8", shelfBooks.map { it.author.ifBlank { "未知作者" } })
-        appendTopCounts("来源分布 Top 8", shelfBooks.map { it.originName.ifBlank { it.origin.ifBlank { "未知来源" } } })
-    }
-}
-
-private fun StringBuilder.appendTopCounts(title: String, values: List<String>) {
-    val counts = values.groupingBy { it }.eachCount()
-        .toList()
-        .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
-        .take(8)
-    appendLine()
-    appendLine("## $title")
-    appendLine()
-    if (counts.isEmpty()) {
-        appendLine("- 暂无数据")
-        return
-    }
-    appendLine("| 名称 | 数量 |")
-    appendLine("| --- | ---: |")
-    counts.forEach { (name, count) ->
-        appendLine("| ${name.escapeMarkdownCell()} | $count |")
-    }
-}
-
-private fun String.escapeMarkdownCell(): String {
-    return replace("|", "\\|").replace("\n", " ")
+    return emptyList()
 }
 
 private fun buildAgentSkillInputAttachments(): List<AiChatInputAttachment> {
