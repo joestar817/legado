@@ -20,8 +20,10 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.os.bundleOf
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import io.legado.app.R
@@ -37,6 +39,7 @@ import io.legado.app.data.entities.BookCharacter
 import io.legado.app.data.entities.BookCharacterProfile
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.ActivityBookInfoBinding
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
@@ -67,6 +70,7 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
+import io.legado.app.model.SourceCallBack
 import io.legado.app.model.remote.RemoteBookWebDav
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.about.NetworkLogDialog
@@ -81,7 +85,7 @@ import io.legado.app.ui.book.manga.ReadMangaActivity
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
 import io.legado.app.ui.book.search.SearchActivity
-import io.legado.app.model.SourceCallBack
+import io.legado.app.ui.book.search.SearchAdapter
 import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
@@ -105,6 +109,7 @@ import io.legado.app.utils.observeEvent
 import io.legado.app.utils.openFileUri
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.sendToClip
+import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.setHtml
 import io.legado.app.utils.setMarkdown
 import io.legado.app.utils.showDialogFragment
@@ -128,7 +133,8 @@ class BookInfoActivity :
     GroupSelectDialog.CallBack,
     ChangeBookSourceDialog.CallBack,
     ChangeCoverDialog.CallBack,
-    VariableDialog.Callback {
+    VariableDialog.Callback,
+    SearchAdapter.CallBack {
 
     private val tocActivityResult = registerForActivityResult(TocActivityResult()) {
         it?.let {
@@ -201,6 +207,7 @@ class BookInfoActivity :
     private var editMenuItem: MenuItem? = null
     private var menuCustomBtn: MenuItem? = null
     private var characterPreviewJob: Job? = null
+    private val otherWorksAdapter by lazy { SearchAdapter(this, this) }
     private val book get() = viewModel.getBook(false)
 
     override val binding by viewBinding(ActivityBookInfoBinding::inflate)
@@ -264,8 +271,17 @@ class BookInfoActivity :
             if (isPortrait) accentColor else getPrimaryTextColor(ColorUtils.isColorLight(bottomBackground))
         )
         binding.tvToc.text = getString(R.string.toc_s, getString(R.string.loading))
+        initOtherWorksView()
         viewModel.bookData.observe(this) { showBook(it) }
         viewModel.chapterListData.observe(this) { upLoading(false, it) }
+        viewModel.otherWorksData.observe(this) { showOtherWorks(it) }
+        viewModel.bookshelfChanged.observe(this) {
+            otherWorksAdapter.notifyItemRangeChanged(
+                0,
+                otherWorksAdapter.itemCount,
+                bundleOf("isInBookshelf" to null)
+            )
+        }
         viewModel.waitDialogData.observe(this) { upWaitDialogStatus(it) }
         viewModel.initData(intent)
         initViewEvent()
@@ -521,6 +537,61 @@ class BookInfoActivity :
         upKinds(book)
         upGroup(book.group)
         observeCharacterPreview(book)
+        viewModel.prepareOtherWorks(book)
+        if (book.isLocal || book.getRealAuthor().isBlank()) {
+            llOtherWorks.gone()
+        } else {
+            llOtherWorks.visible()
+        }
+    }
+
+    private fun initOtherWorksView() = binding.run {
+        rvOtherWorks.layoutManager = LinearLayoutManager(this@BookInfoActivity)
+        rvOtherWorks.adapter = otherWorksAdapter
+        rvOtherWorks.itemAnimator = null
+        rvOtherWorks.isNestedScrollingEnabled = false
+        rvOtherWorks.setEdgeEffectColor(accentColor)
+        ivOtherWorksRefresh.setOnClickListener {
+            viewModel.searchOtherWorks()
+        }
+    }
+
+    private fun showOtherWorks(state: BookInfoViewModel.OtherWorksState) = binding.run {
+        ivOtherWorksRefresh.isEnabled = state !is BookInfoViewModel.OtherWorksState.Loading
+        when (state) {
+            BookInfoViewModel.OtherWorksState.Idle -> {
+                rvOtherWorks.gone()
+                tvOtherWorksState.visible()
+                tvOtherWorksState.text = getString(R.string.book_other_works_idle)
+                otherWorksAdapter.setItems(emptyList())
+            }
+
+            BookInfoViewModel.OtherWorksState.Loading -> {
+                rvOtherWorks.gone()
+                tvOtherWorksState.visible()
+                tvOtherWorksState.text = getString(R.string.book_other_works_loading)
+            }
+
+            BookInfoViewModel.OtherWorksState.Empty -> {
+                rvOtherWorks.gone()
+                tvOtherWorksState.visible()
+                tvOtherWorksState.text = getString(R.string.book_other_works_empty)
+                otherWorksAdapter.setItems(emptyList())
+            }
+
+            is BookInfoViewModel.OtherWorksState.Success -> {
+                tvOtherWorksState.gone()
+                rvOtherWorks.visible()
+                otherWorksAdapter.setItems(state.books)
+            }
+
+            is BookInfoViewModel.OtherWorksState.Error -> {
+                rvOtherWorks.gone()
+                tvOtherWorksState.visible()
+                tvOtherWorksState.text =
+                    getString(R.string.book_other_works_error, state.message)
+            }
+        }
     }
 
     private fun observeCharacterPreview(book: Book) {
@@ -626,6 +697,22 @@ class BookInfoActivity :
                 })
             })
         }
+    }
+
+    override fun isInBookshelf(book: SearchBook): Boolean {
+        return viewModel.isInBookShelf(book)
+    }
+
+    override fun showBookInfo(name: String, author: String, bookUrl: String) {
+        startActivity<BookInfoActivity> {
+            putExtra("name", name)
+            putExtra("author", author)
+            putExtra("bookUrl", bookUrl)
+        }
+    }
+
+    override fun showAllSources(book: SearchBook) {
+        SearchActivity.start(this, book.name)
     }
 
     private fun BookCharacter.avatarBackground(): Int {

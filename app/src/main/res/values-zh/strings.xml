@@ -48,6 +48,11 @@
     <string name="book_characters">角色</string>
     <string name="character_count_format">%1$d个</string>
     <string name="book_character_empty">还没有角色卡，点击右上角 + 添加。</string>
+    <string name="book_other_works">其它作品</string>
+    <string name="book_other_works_idle">点击右侧刷新，查找该作者的其它作品。</string>
+    <string name="book_other_works_loading">正在加载其它作品...</string>
+    <string name="book_other_works_empty">没有找到其它作品。</string>
+    <string name="book_other_works_error">搜索失败：%1$s</string>
     <string name="add_character">添加角色</string>
     <string name="edit_character">编辑角色</string>
     <string name="character_name">角色名称</string>

@@ -49,6 +49,11 @@
     <string name="book_characters">Characters</string>
     <string name="character_count_format">%1$d characters</string>
     <string name="book_character_empty">No characters yet. Tap + to add one.</string>
+    <string name="book_other_works">Other works</string>
+    <string name="book_other_works_idle">Tap refresh to search this author\'s other books.</string>
+    <string name="book_other_works_loading">Loading other works...</string>
+    <string name="book_other_works_empty">No other works found.</string>
+    <string name="book_other_works_error">Search failed: %1$s</string>
     <string name="add_character">Add character</string>
     <string name="edit_character">Edit character</string>
     <string name="character_name">Name</string>
