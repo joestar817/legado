@@ -14,6 +14,7 @@ import androidx.fragment.app.Fragment
 import io.legado.app.R
 import io.legado.app.constant.Theme
 import io.legado.app.lib.theme.transparentNavBar
+import io.legado.app.ui.widget.NgMenuPopup
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.applyTint
 
@@ -61,6 +62,12 @@ abstract class BaseFragment(@LayoutRes layoutID: Int) : Fragment(layoutID) {
                 applyTint(
                     requireContext(),
                     if (requireContext().transparentNavBar) Theme.Light else Theme.Auto
+                )
+                NgMenuPopup.bindToolbarMenu(
+                    context = requireContext(),
+                    toolbar = it,
+                    menu = this,
+                    onItemClick = { menuItem -> onCompatOptionsItemSelected(menuItem) }
                 )
             }
 

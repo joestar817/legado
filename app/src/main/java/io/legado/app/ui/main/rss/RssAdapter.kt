@@ -3,7 +3,6 @@ package io.legado.app.ui.main.rss
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.PopupMenu
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import com.bumptech.glide.request.RequestOptions
@@ -14,6 +13,8 @@ import io.legado.app.data.entities.RssSource
 import io.legado.app.databinding.ItemRssBinding
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.glide.OkHttpModelLoader
+import io.legado.app.ui.widget.NgActionPopup
+import io.legado.app.ui.widget.NgActionPopupItem
 import splitties.views.onLongClick
 
 class RssAdapter(
@@ -62,10 +63,7 @@ class RssAdapter(
     }
 
     private fun showMenu(view: View, rssSource: RssSource) {
-        val popupMenu = PopupMenu(context, view)
-        popupMenu.inflate(R.menu.rss_main_item)
-        popupMenu.menu.findItem(R.id.menu_login).isVisible = !rssSource.loginUrl.isNullOrBlank()
-        popupMenu.setOnMenuItemClickListener {
+        NgActionPopup(context, buildRssMenuItems(rssSource)) {
             when (it.itemId) {
                 R.id.menu_edit -> callBack.edit(rssSource)
                 R.id.menu_top -> callBack.toTop(rssSource)
@@ -73,9 +71,19 @@ class RssAdapter(
                 R.id.menu_del -> callBack.del(rssSource)
                 R.id.menu_disable -> callBack.disable(rssSource)
             }
-            true
+        }.show(view)
+    }
+
+    private fun buildRssMenuItems(rssSource: RssSource): List<NgActionPopupItem> {
+        return buildList {
+            add(NgActionPopupItem(R.id.menu_edit, R.string.edit, R.drawable.ic_edit))
+            add(NgActionPopupItem(R.id.menu_top, R.string.to_top, R.drawable.ic_arrow_drop_up))
+            if (!rssSource.loginUrl.isNullOrBlank()) {
+                add(NgActionPopupItem(R.id.menu_login, R.string.login, R.drawable.ic_lock_outline))
+            }
+            add(NgActionPopupItem(R.id.menu_disable, R.string.disable_source, R.drawable.ic_baseline_close, dividerBefore = true))
+            add(NgActionPopupItem(R.id.menu_del, R.string.delete, R.drawable.ic_outline_delete))
         }
-        popupMenu.show()
     }
 
     interface CallBack {

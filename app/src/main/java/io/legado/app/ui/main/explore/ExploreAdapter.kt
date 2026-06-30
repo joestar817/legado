@@ -12,7 +12,6 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.LinearLayout
-import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatSpinner
@@ -40,6 +39,8 @@ import io.legado.app.help.source.exploreKinds
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.login.SourceLoginJsExtensions
+import io.legado.app.ui.widget.NgActionPopup
+import io.legado.app.ui.widget.NgActionPopupItem
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.ui.widget.text.AccentTextView
 import io.legado.app.utils.InfoMap
@@ -639,10 +640,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
 
     private fun showMenu(binding: ItemFindBookBinding, position: Int): Boolean {
         val source = getItem(position) ?: return true
-        val popupMenu = PopupMenu(context, binding.llTitle)
-        popupMenu.inflate(R.menu.explore_item)
-        popupMenu.menu.findItem(R.id.menu_login).isVisible = source.hasLoginUrl
-        popupMenu.setOnMenuItemClickListener {
+        NgActionPopup(context, buildExploreMenuItems(source)) {
             when (it.itemId) {
                 R.id.menu_edit -> callBack.editSource(source.bookSourceUrl)
                 R.id.menu_top -> callBack.toTop(source)
@@ -656,10 +654,21 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
 
                 R.id.menu_del -> callBack.deleteSource(source)
             }
-            true
-        }
-        popupMenu.show()
+        }.show(binding.llTitle)
         return true
+    }
+
+    private fun buildExploreMenuItems(source: BookSourcePart): List<NgActionPopupItem> {
+        return buildList {
+            add(NgActionPopupItem(R.id.menu_edit, R.string.edit, R.drawable.ic_edit))
+            add(NgActionPopupItem(R.id.menu_top, R.string.to_top, R.drawable.ic_arrow_drop_up))
+            if (source.hasLoginUrl) {
+                add(NgActionPopupItem(R.id.menu_login, R.string.login, R.drawable.ic_lock_outline))
+            }
+            add(NgActionPopupItem(R.id.menu_search, R.string.search, R.drawable.ic_search, dividerBefore = true))
+            add(NgActionPopupItem(R.id.menu_refresh, R.string.refresh, R.drawable.ic_refresh_black_24dp))
+            add(NgActionPopupItem(R.id.menu_del, R.string.delete, R.drawable.ic_outline_delete, dividerBefore = true))
+        }
     }
 
     interface CallBack {

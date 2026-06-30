@@ -25,6 +25,7 @@ import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.transparentNavBar
+import io.legado.app.ui.widget.NgMenuPopup
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyBackgroundTint
@@ -49,6 +50,8 @@ abstract class BaseActivity<VB : ViewBinding>(
 ) : AppCompatActivity() {
 
     protected abstract val binding: VB
+
+    protected open val bindNgToolbarMenu: Boolean = true
 
     val isInMultiWindow: Boolean
         @SuppressLint("ObsoleteSdkInt")
@@ -115,6 +118,15 @@ abstract class BaseActivity<VB : ViewBinding>(
     final override fun onCreateOptionsMenu(menu: Menu): Boolean {
         val bool = onCompatCreateOptionsMenu(menu)
         menu.applyTint(this, if (transparentNavBar) Theme.Light else toolBarTheme)
+        if (bindNgToolbarMenu) {
+            NgMenuPopup.bindToolbarMenu(
+                context = this,
+                toolbar = findViewById<TitleBar>(R.id.title_bar)?.toolbar,
+                menu = menu,
+                prepareMenu = { onPrepareOptionsMenu(menu) },
+                onItemClick = { onCompatOptionsItemSelected(it) }
+            )
+        }
         return bool
     }
 

@@ -244,6 +244,7 @@ class BookInfoActivity :
 
     override val binding by viewBinding(ActivityBookInfoBinding::inflate)
     override val viewModel by viewModels<BookInfoViewModel>()
+    override val bindNgToolbarMenu: Boolean = false
     private var initIntroView = false
     private val introTextView by lazy {
         initIntroView = true

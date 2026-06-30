@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.PopupMenu
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
@@ -15,6 +14,8 @@ import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.ItemChangeSourceBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.ui.widget.NgActionPopup
+import io.legado.app.ui.widget.NgActionPopupItem
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
@@ -188,9 +189,7 @@ class ChangeBookSourceAdapter(
 
     private fun showMenu(view: View, searchBook: SearchBook?) {
         searchBook ?: return
-        val popupMenu = PopupMenu(context, view)
-        popupMenu.inflate(R.menu.change_source_item)
-        popupMenu.setOnMenuItemClickListener {
+        NgActionPopup(context, buildChangeSourceMenuItems()) {
             when (it.itemId) {
                 R.id.menu_top_source -> {
                     callBack.topSource(searchBook)
@@ -217,9 +216,17 @@ class ChangeBookSourceAdapter(
                     }
                 }
             }
-            true
-        }
-        popupMenu.show()
+        }.show(view)
+    }
+
+    private fun buildChangeSourceMenuItems(): List<NgActionPopupItem> {
+        return listOf(
+            NgActionPopupItem(R.id.menu_top_source, R.string.to_top, R.drawable.ic_arrow_drop_up),
+            NgActionPopupItem(R.id.menu_bottom_source, R.string.to_bottom, R.drawable.ic_arrow_down),
+            NgActionPopupItem(R.id.menu_edit_source, R.string.edit_source, R.drawable.ic_edit),
+            NgActionPopupItem(R.id.menu_disable_source, R.string.disable_source, R.drawable.ic_baseline_close, dividerBefore = true),
+            NgActionPopupItem(R.id.menu_delete_source, R.string.delete_source, R.drawable.ic_outline_delete)
+        )
     }
 
     interface CallBack {

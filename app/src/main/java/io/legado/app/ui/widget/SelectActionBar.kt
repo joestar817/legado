@@ -6,10 +6,12 @@ import android.graphics.PorterDuff
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.Menu
+import android.view.MenuItem
 import android.widget.FrameLayout
 import androidx.annotation.MenuRes
 import androidx.annotation.StringRes
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.view.get
 import io.legado.app.R
 import io.legado.app.databinding.ViewSelectActionBarBinding
 import io.legado.app.lib.theme.TintHelper
@@ -36,6 +38,7 @@ class SelectActionBar @JvmOverloads constructor(
 
     private var callBack: CallBack? = null
     private var selMenu: PopupMenu? = null
+    private var menuItemClickListener: PopupMenu.OnMenuItemClickListener? = null
     private val binding = ViewSelectActionBarBinding
         .inflate(LayoutInflater.from(context), this, true)
 
@@ -56,7 +59,7 @@ class SelectActionBar @JvmOverloads constructor(
             }
             binding.btnRevertSelection.setOnClickListener { callBack?.revertSelection() }
             binding.btnSelectActionMain.setOnClickListener { callBack?.onClickSelectBarMainAction() }
-            binding.ivMenuMore.setOnClickListener { selMenu?.show() }
+            binding.ivMenuMore.setOnClickListener { showSelectionMenu() }
             applyNavigationBarPadding()
         }
     }
@@ -83,7 +86,63 @@ class SelectActionBar @JvmOverloads constructor(
     }
 
     fun setOnMenuItemClickListener(listener: PopupMenu.OnMenuItemClickListener) {
-        selMenu?.setOnMenuItemClickListener(listener)
+        menuItemClickListener = listener
+    }
+
+    private fun showSelectionMenu() {
+        val menu = selMenu?.menu ?: return
+        val items = buildPopupItems(menu)
+        if (items.isEmpty()) return
+        NgActionPopup(context, items, widthDp = 180) { item ->
+            (item.payload as? MenuItem)?.let { menuItem ->
+                menuItemClickListener?.onMenuItemClick(menuItem)
+            }
+        }.show(binding.ivMenuMore)
+    }
+
+    private fun buildPopupItems(menu: Menu): List<NgActionPopupItem> {
+        val items = arrayListOf<NgActionPopupItem>()
+        for (index in 0 until menu.size()) {
+            val menuItem = menu[index]
+            if (!menuItem.isVisible) continue
+            items.add(
+                NgActionPopupItem(
+                    itemId = menuItem.itemId,
+                    title = menuItem.title,
+                    iconRes = selectActionIcon(menuItem.itemId),
+                    checked = menuItem.isChecked,
+                    payload = menuItem
+                )
+            )
+        }
+        return items
+    }
+
+    private fun selectActionIcon(itemId: Int): Int {
+        return when (itemId) {
+            R.id.menu_enable_selection,
+            R.id.menu_enable_explore,
+            R.id.menu_update_enable -> R.drawable.ic_check
+            R.id.menu_disable_selection,
+            R.id.menu_disable_explore,
+            R.id.menu_update_disable -> R.drawable.ic_baseline_close
+            R.id.menu_add_group,
+            R.id.menu_add_to_group -> R.drawable.ic_add
+            R.id.menu_remove_group,
+            R.id.menu_remove_to_group,
+            R.id.menu_del_selection -> R.drawable.ic_outline_delete
+            R.id.menu_clear_group,
+            R.id.menu_clear_cache -> R.drawable.ic_clear_all
+            R.id.menu_auto_group,
+            R.id.menu_check_selected_interval -> R.drawable.ic_refresh_black_24dp
+            R.id.menu_top_sel -> R.drawable.ic_arrow_drop_up
+            R.id.menu_bottom_sel -> R.drawable.ic_arrow_down
+            R.id.menu_export_selection -> R.drawable.ic_export
+            R.id.menu_share_source -> R.drawable.ic_share
+            R.id.menu_check_source -> R.drawable.ic_check_source
+            R.id.menu_change_source -> R.drawable.ic_swap_horiz
+            else -> 0
+        }
     }
 
     fun upCountView(selectCount: Int, allCount: Int) = binding.run {

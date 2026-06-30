@@ -9,25 +9,19 @@ import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.PorterDuff
 import android.graphics.PixelFormat
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.provider.Settings
-import android.text.TextUtils
 import android.util.AttributeSet
-import android.util.TypedValue
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
 import android.view.animation.Animation
 import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.SeekBar
-import android.widget.TextView
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import io.legado.app.R
@@ -51,6 +45,8 @@ import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.ReadBook
 import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.browser.WebViewActivity
+import io.legado.app.ui.widget.NgActionPopup
+import io.legado.app.ui.widget.NgActionPopupItem
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.ConstraintModify
@@ -127,17 +123,6 @@ class ReadMenu @JvmOverloads constructor(
             PreferKey.showBrightnessView,
             true
         )
-    private val sourceActionPopup by lazy {
-        SourceActionPopup(context) {
-            when (it) {
-                R.id.menu_login -> callBack.showLogin()
-                R.id.menu_chapter_pay -> callBack.payAction()
-                R.id.menu_edit_source -> callBack.openSourceEditActivity()
-                R.id.menu_disable_source -> callBack.disableSource()
-            }
-        }
-    }
-
     private fun createFloatingButtonBackgroundList(): ColorStateList {
         val defaultColor = if (useGradientThemeMenu) {
             ThemeConfig.getReadingNgImageSurfaceColor()
@@ -581,7 +566,7 @@ class ReadMenu @JvmOverloads constructor(
             val showChapterPay = showLogin
                     && ReadBook.curTextChapter?.isVip == true
                     && ReadBook.curTextChapter?.isPay != true
-            sourceActionPopup.show(binding.tvSourceAction, showLogin, showChapterPay)
+            showSourceActionPopup(showLogin, showChapterPay)
         }
         //亮度跟随
         ivBrightnessAuto.setOnClickListener {
@@ -797,67 +782,31 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
-    private class SourceActionPopup(
-        context: Context,
-        private val onItemClick: (Int) -> Unit
-    ) : PopupWindow(160.dpToPx(), ViewGroup.LayoutParams.WRAP_CONTENT) {
-
-        private val menuLogin = createMenuItem(context, R.string.login, R.id.menu_login)
-        private val menuChapterPay = createMenuItem(
-            context,
-            R.string.chapter_pay,
-            R.id.menu_chapter_pay
-        )
-
-        init {
-            contentView = LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(0, 4.dpToPx(), 0, 4.dpToPx())
-                setBackgroundResource(R.drawable.bg_popup_menu)
-                addView(menuLogin)
-                addView(menuChapterPay)
-                addView(createMenuItem(context, R.string.edit_book_source, R.id.menu_edit_source))
-                addView(createMenuItem(context, R.string.disable_book_source, R.id.menu_disable_source))
+    private fun showSourceActionPopup(showLogin: Boolean, showChapterPay: Boolean) {
+        val items = buildList {
+            if (showLogin) {
+                add(NgActionPopupItem(R.id.menu_login, R.string.login, R.drawable.ic_lock_outline))
             }
-            isTouchable = true
-            isOutsideTouchable = true
-            isFocusable = true
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            elevation = 4.dpToPx().toFloat()
-        }
-
-        fun show(anchor: View, showLogin: Boolean, showChapterPay: Boolean) {
-            menuLogin.isVisible = showLogin
-            menuChapterPay.isVisible = showChapterPay
-            if (isShowing) {
-                dismiss()
+            if (showChapterPay) {
+                add(NgActionPopupItem(R.id.menu_chapter_pay, R.string.chapter_pay, R.drawable.ic_check))
             }
-            showAsDropDown(anchor, anchor.width - width, 0)
-        }
-
-        private fun createMenuItem(context: Context, titleRes: Int, itemId: Int): TextView {
-            val outValue = TypedValue()
-            context.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
-            return TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    44.dpToPx()
+            add(NgActionPopupItem(R.id.menu_edit_source, R.string.edit_book_source, R.drawable.ic_edit))
+            add(
+                NgActionPopupItem(
+                    R.id.menu_disable_source,
+                    R.string.disable_book_source,
+                    R.drawable.ic_baseline_close
                 )
-                ellipsize = TextUtils.TruncateAt.END
-                gravity = Gravity.CENTER_VERTICAL
-                maxLines = 1
-                setBackgroundResource(outValue.resourceId)
-                setPadding(16.dpToPx(), 0, 12.dpToPx(), 0)
-                setText(titleRes)
-                setTextColor(context.primaryTextColor)
-                textSize = 16f
-                setOnClickListener {
-                    dismiss()
-                    onItemClick(itemId)
-                }
-            }
+            )
         }
-
+        NgActionPopup(context, items, widthDp = 176) {
+            when (it.itemId) {
+                R.id.menu_login -> callBack.showLogin()
+                R.id.menu_chapter_pay -> callBack.payAction()
+                R.id.menu_edit_source -> callBack.openSourceEditActivity()
+                R.id.menu_disable_source -> callBack.disableSource()
+            }
+        }.show(binding.tvSourceAction)
     }
 
     interface CallBack {

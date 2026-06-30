@@ -5,7 +5,6 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.widget.PopupMenu
 import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
@@ -16,6 +15,8 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.databinding.ItemReplaceRuleBinding
 import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.ui.widget.NgActionPopup
+import io.legado.app.ui.widget.NgActionPopupItem
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.utils.ColorUtils
 
@@ -220,11 +221,7 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
 
     private fun showRuleMenu(view: View, position: Int) {
         val item = (getItem(position) as? ReplaceRuleListItem.Rule)?.rule ?: return
-        val popupMenu = PopupMenu(context, view)
-        popupMenu.inflate(R.menu.replace_rule_item)
-        popupMenu.menu.findItem(R.id.menu_enable)?.isVisible = !item.isEnabled
-        popupMenu.menu.findItem(R.id.menu_disable)?.isVisible = item.isEnabled
-        popupMenu.setOnMenuItemClickListener { menuItem ->
+        NgActionPopup(context, buildRuleMenuItems(item.isEnabled)) { menuItem ->
             when (menuItem.itemId) {
                 R.id.menu_enable -> callBack.update(item.copy(isEnabled = true))
                 R.id.menu_disable -> callBack.update(item.copy(isEnabled = false))
@@ -236,31 +233,44 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
                     selected.remove(item)
                 }
             }
-            true
-        }
-        popupMenu.show()
+        }.show(view)
     }
 
     private fun showSectionMenu(view: View, item: ReplaceRuleListItem.Section) {
-        val popupMenu = PopupMenu(context, view)
-        val hasDisabled = item.rules.any { !it.isEnabled }
-        val hasEnabled = item.rules.any { it.isEnabled }
-        if (hasDisabled) {
-            popupMenu.menu.add(0, R.id.menu_enable, 0, R.string.enable)
-        }
-        if (hasEnabled) {
-            popupMenu.menu.add(0, R.id.menu_disable, 1, R.string.replace_rule_disable)
-        }
-        popupMenu.menu.add(0, R.id.menu_del, 2, R.string.delete)
-        popupMenu.setOnMenuItemClickListener { menuItem ->
+        NgActionPopup(context, buildSectionMenuItems(item.rules.any { !it.isEnabled }, item.rules.any { it.isEnabled })) { menuItem ->
             when (menuItem.itemId) {
                 R.id.menu_enable -> callBack.updateSectionEnabled(item.title, item.rules, true)
                 R.id.menu_disable -> callBack.updateSectionEnabled(item.title, item.rules, false)
                 R.id.menu_del -> callBack.deleteSection(item.title, item.rules)
             }
-            true
+        }.show(view)
+    }
+
+    private fun buildRuleMenuItems(enabled: Boolean): List<NgActionPopupItem> {
+        return buildList {
+            if (!enabled) {
+                add(NgActionPopupItem(R.id.menu_enable, R.string.enable, R.drawable.ic_check))
+            }
+            if (enabled) {
+                add(NgActionPopupItem(R.id.menu_disable, R.string.replace_rule_disable, R.drawable.ic_baseline_close))
+            }
+            add(NgActionPopupItem(R.id.menu_edit, R.string.edit, R.drawable.ic_edit))
+            add(NgActionPopupItem(R.id.menu_top, R.string.to_top, R.drawable.ic_arrow_drop_up))
+            add(NgActionPopupItem(R.id.menu_bottom, R.string.to_bottom, R.drawable.ic_arrow_down))
+            add(NgActionPopupItem(R.id.menu_del, R.string.delete, R.drawable.ic_outline_delete, dividerBefore = true))
         }
-        popupMenu.show()
+    }
+
+    private fun buildSectionMenuItems(hasDisabled: Boolean, hasEnabled: Boolean): List<NgActionPopupItem> {
+        return buildList {
+            if (hasDisabled) {
+                add(NgActionPopupItem(R.id.menu_enable, R.string.enable, R.drawable.ic_check))
+            }
+            if (hasEnabled) {
+                add(NgActionPopupItem(R.id.menu_disable, R.string.replace_rule_disable, R.drawable.ic_baseline_close))
+            }
+            add(NgActionPopupItem(R.id.menu_del, R.string.delete, R.drawable.ic_outline_delete, dividerBefore = isNotEmpty()))
+        }
     }
 
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {

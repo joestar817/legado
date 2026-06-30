@@ -13,9 +13,9 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.widget.ActionMenuView
-import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.core.os.bundleOf
+import androidx.core.view.get
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -46,6 +46,8 @@ import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.about.NetworkLogDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.source.manage.BookSourceActivity
+import io.legado.app.ui.widget.NgActionPopup
+import io.legado.app.ui.widget.NgActionPopupItem
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyNavigationBarMargin
 import io.legado.app.utils.applyNavigationBarPadding
@@ -80,6 +82,7 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
 
     override val binding by viewBinding(ActivityBookSearchBinding::inflate)
     override val viewModel by viewModels<SearchViewModel>()
+    override val bindNgToolbarMenu: Boolean = false
 
     private val adapter by lazy { SearchAdapter(this, this) }
     private val bookAdapter by lazy {
@@ -291,16 +294,57 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
     }
 
     private fun showSearchMenu() {
-        PopupMenu(this, searchMoreButton).apply {
-            menuInflater.inflate(R.menu.book_search, menu)
-            menu.findItem(R.id.menu_precision_search)?.isChecked =
-                getPrefBoolean(PreferKey.precisionSearch)
-            prepareSearchMenu(menu)
-            setOnMenuItemClickListener {
+        val menu = menu ?: return
+        menu.findItem(R.id.menu_precision_search)?.isChecked =
+            getPrefBoolean(PreferKey.precisionSearch)
+        prepareSearchMenu(menu)
+        val items = buildSearchPopupItems(menu)
+        if (items.isEmpty()) return
+        NgActionPopup(this, items, widthDp = 180) { item ->
+            (item.payload as? MenuItem)?.let {
                 onCompatOptionsItemSelected(it)
-                true
             }
-            show()
+        }.show(searchMoreButton)
+    }
+
+    private fun buildSearchPopupItems(menu: Menu): List<NgActionPopupItem> {
+        val items = arrayListOf<NgActionPopupItem>()
+        var hasDynamicDivider = false
+        for (index in 0 until menu.size()) {
+            val menuItem = menu[index]
+            if (!menuItem.isVisible) continue
+            val isDynamicScope = menuItem.groupId == R.id.menu_group_1 ||
+                menuItem.groupId == R.id.menu_group_2
+            items.add(
+                NgActionPopupItem(
+                    itemId = menuItem.itemId,
+                    title = menuItem.title,
+                    iconRes = searchMenuIcon(menuItem),
+                    checked = menuItem.isChecked,
+                    dividerBefore = isDynamicScope && !hasDynamicDivider && items.isNotEmpty(),
+                    payload = menuItem
+                )
+            )
+            if (isDynamicScope) {
+                hasDynamicDivider = true
+            }
+        }
+        return items
+    }
+
+    private fun searchMenuIcon(menuItem: MenuItem): Int {
+        return when (menuItem.itemId) {
+            R.id.menu_precision_search -> R.drawable.ic_check
+            R.id.menu_source_manage -> R.drawable.ic_cfg_source
+            R.id.menu_search_scope -> R.drawable.ic_groups
+            R.id.menu_log -> R.drawable.ic_cfg_about
+            R.id.menu_network_log -> R.drawable.ic_network_check
+            R.id.menu_1 -> R.drawable.ic_check_source
+            else -> if (menuItem.groupId == R.id.menu_group_1 || menuItem.groupId == R.id.menu_group_2) {
+                R.drawable.ic_groups
+            } else {
+                0
+            }
         }
     }
 

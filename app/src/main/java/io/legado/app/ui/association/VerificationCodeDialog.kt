@@ -1,22 +1,12 @@
 package io.legado.app.ui.association
 
 import android.annotation.SuppressLint
-import android.content.Context
-import android.graphics.Color
 import android.graphics.Bitmap
-import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
-import android.text.TextUtils
-import android.util.TypedValue
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MenuItem
 import android.view.View
-import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
-import android.widget.LinearLayout
-import android.widget.PopupWindow
-import android.widget.TextView
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.viewModels
 import com.bumptech.glide.load.DataSource
@@ -32,8 +22,9 @@ import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.help.source.SourceVerificationHelp
 import io.legado.app.lib.dialogs.alert
-import io.legado.app.lib.theme.accentColor
 import io.legado.app.model.ImageProvider
+import io.legado.app.ui.widget.NgActionPopup
+import io.legado.app.ui.widget.NgActionPopupItem
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.ui.widget.dialog.applyNgDialogWindow
 import io.legado.app.utils.applyTint
@@ -76,7 +67,6 @@ class VerificationCodeDialog() : BaseDialogFragment(R.layout.dialog_verification
 
     private var sourceOrigin: String? = null
     private var imageUrl: String? = null
-    private var sourceActionPopup: SourceActionPopup? = null
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?): Unit = binding.run {
         initMenu()
@@ -189,12 +179,24 @@ class VerificationCodeDialog() : BaseDialogFragment(R.layout.dialog_verification
     }
 
     private fun showSourceActionPopup() {
-        val popup = sourceActionPopup ?: SourceActionPopup(requireContext()) { itemId ->
-            onSourceActionClick(itemId)
-        }.also {
-            sourceActionPopup = it
-        }
-        popup.show(binding.toolBar)
+        NgActionPopup(
+            requireContext(),
+            listOf(
+                NgActionPopupItem(
+                    R.id.menu_disable_source,
+                    R.string.disable_source,
+                    R.drawable.ic_baseline_close
+                ),
+                NgActionPopupItem(
+                    R.id.menu_delete_source,
+                    R.string.delete_source,
+                    R.drawable.ic_outline_delete
+                )
+            ),
+            widthDp = 156
+        ) { item ->
+            onSourceActionClick(item.itemId)
+        }.show(binding.toolBar)
     }
 
     private fun onSourceActionClick(itemId: Int) {
@@ -230,62 +232,9 @@ class VerificationCodeDialog() : BaseDialogFragment(R.layout.dialog_verification
     }
 
     override fun onDestroy() {
-        sourceActionPopup?.dismiss()
         SourceVerificationHelp.checkResult(sourceOrigin!!)
         super.onDestroy()
         activity?.finish()
-    }
-
-    private class SourceActionPopup(
-        context: Context,
-        private val onItemClick: (Int) -> Unit
-    ) : PopupWindow(128.dpToPx(), ViewGroup.LayoutParams.WRAP_CONTENT) {
-
-        init {
-            contentView = LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(0, 4.dpToPx(), 0, 4.dpToPx())
-                setBackgroundResource(R.drawable.bg_popup_menu)
-                addView(createMenuItem(context, R.string.disable_source, R.id.menu_disable_source))
-                addView(createMenuItem(context, R.string.delete_source, R.id.menu_delete_source))
-            }
-            isTouchable = true
-            isOutsideTouchable = true
-            isFocusable = true
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            elevation = 4.dpToPx().toFloat()
-        }
-
-        fun show(anchor: View) {
-            if (isShowing) {
-                dismiss()
-            }
-            showAsDropDown(anchor, anchor.width - width - 8.dpToPx(), 0)
-        }
-
-        private fun createMenuItem(context: Context, titleRes: Int, itemId: Int): TextView {
-            val outValue = TypedValue()
-            context.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
-            return TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    44.dpToPx()
-                )
-                ellipsize = TextUtils.TruncateAt.END
-                gravity = Gravity.CENTER_VERTICAL
-                maxLines = 1
-                setBackgroundResource(outValue.resourceId)
-                setPadding(16.dpToPx(), 0, 12.dpToPx(), 0)
-                setText(titleRes)
-                setTextColor(context.accentColor)
-                textSize = 16f
-                setOnClickListener {
-                    dismiss()
-                    onItemClick(itemId)
-                }
-            }
-        }
-
     }
 
 }

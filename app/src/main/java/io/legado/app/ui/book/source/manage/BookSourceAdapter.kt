@@ -5,7 +5,6 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.core.os.bundleOf
 import androidx.core.view.doOnLayout
@@ -21,6 +20,8 @@ import io.legado.app.databinding.ItemBookSourceBinding
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.model.Debug
 import io.legado.app.ui.login.SourceLoginActivity
+import io.legado.app.ui.widget.NgActionPopup
+import io.legado.app.ui.widget.NgActionPopupItem
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.buildMainHandler
@@ -232,27 +233,8 @@ class BookSourceAdapter(
 
     private fun showMenu(view: View, position: Int) {
         val source = (getItem(position) as? BookSourceListItem.Source)?.source ?: return
-        val popupMenu = PopupMenu(context, view)
-        popupMenu.inflate(R.menu.book_source_item)
-        popupMenu.menu.findItem(R.id.menu_enable).isVisible = !source.enabled
-        popupMenu.menu.findItem(R.id.menu_disable).isVisible = source.enabled
-        popupMenu.menu.findItem(R.id.menu_top).isVisible = callBack.sort == BookSourceSort.Default
-        popupMenu.menu.findItem(R.id.menu_bottom).isVisible =
-            callBack.sort == BookSourceSort.Default
-        val qyMenu = popupMenu.menu.findItem(R.id.menu_enable_explore)
-        if (!source.hasExploreUrl) {
-            qyMenu.isVisible = false
-        } else {
-            if (source.enabledExplore) {
-                qyMenu.setTitle(R.string.disable_explore)
-            } else {
-                qyMenu.setTitle(R.string.enable_explore)
-            }
-        }
-        val loginMenu = popupMenu.menu.findItem(R.id.menu_login)
-        loginMenu.isVisible = source.hasLoginUrl
-        popupMenu.setOnMenuItemClickListener { menuItem ->
-            when (menuItem.itemId) {
+        NgActionPopup(context, buildSourceMenuItems(source)) { item ->
+            when (item.itemId) {
                 R.id.menu_enable -> callBack.enable(true, source)
                 R.id.menu_disable -> callBack.enable(false, source)
                 R.id.menu_edit -> callBack.edit(source)
@@ -274,31 +256,60 @@ class BookSourceAdapter(
                     callBack.enableExplore(!source.enabledExplore, source)
                 }
             }
-            true
-        }
-        popupMenu.show()
+        }.show(view)
     }
 
     private fun showSectionMenu(view: View, item: BookSourceListItem.Section) {
-        val popupMenu = PopupMenu(context, view)
-        val hasDisabled = item.sources.any { !it.enabled }
-        val hasEnabled = item.sources.any { it.enabled }
-        if (hasDisabled) {
-            popupMenu.menu.add(0, R.id.menu_enable, 0, R.string.enable)
-        }
-        if (hasEnabled) {
-            popupMenu.menu.add(0, R.id.menu_disable, 1, R.string.replace_rule_disable)
-        }
-        popupMenu.menu.add(0, R.id.menu_del, 2, R.string.delete)
-        popupMenu.setOnMenuItemClickListener { menuItem ->
+        NgActionPopup(context, buildSectionMenuItems(item.sources.any { !it.enabled }, item.sources.any { it.enabled })) { menuItem ->
             when (menuItem.itemId) {
                 R.id.menu_enable -> callBack.updateSectionEnabled(item.title, item.sources, true)
                 R.id.menu_disable -> callBack.updateSectionEnabled(item.title, item.sources, false)
                 R.id.menu_del -> callBack.deleteSection(item.title, item.sources)
             }
-            true
+        }.show(view)
+    }
+
+    private fun buildSourceMenuItems(source: BookSourcePart): List<NgActionPopupItem> {
+        return buildList {
+            if (!source.enabled) {
+                add(NgActionPopupItem(R.id.menu_enable, R.string.enable, R.drawable.ic_check))
+            }
+            if (source.enabled) {
+                add(NgActionPopupItem(R.id.menu_disable, R.string.replace_rule_disable, R.drawable.ic_baseline_close))
+            }
+            add(NgActionPopupItem(R.id.menu_edit, R.string.edit, R.drawable.ic_edit))
+            if (callBack.sort == BookSourceSort.Default) {
+                add(NgActionPopupItem(R.id.menu_top, R.string.to_top, R.drawable.ic_arrow_drop_up))
+                add(NgActionPopupItem(R.id.menu_bottom, R.string.to_bottom, R.drawable.ic_arrow_down))
+            }
+            if (source.hasLoginUrl) {
+                add(NgActionPopupItem(R.id.menu_login, R.string.login, R.drawable.ic_lock_outline, dividerBefore = true))
+            }
+            add(NgActionPopupItem(R.id.menu_search, R.string.search, R.drawable.ic_search, dividerBefore = !source.hasLoginUrl))
+            add(NgActionPopupItem(R.id.menu_debug_source, R.string.debug, R.drawable.ic_code))
+            if (source.hasExploreUrl) {
+                add(
+                    NgActionPopupItem(
+                        R.id.menu_enable_explore,
+                        if (source.enabledExplore) R.string.disable_explore else R.string.enable_explore,
+                        R.drawable.ic_bottom_explore
+                    )
+                )
+            }
+            add(NgActionPopupItem(R.id.menu_del, R.string.delete, R.drawable.ic_outline_delete, dividerBefore = true))
         }
-        popupMenu.show()
+    }
+
+    private fun buildSectionMenuItems(hasDisabled: Boolean, hasEnabled: Boolean): List<NgActionPopupItem> {
+        return buildList {
+            if (hasDisabled) {
+                add(NgActionPopupItem(R.id.menu_enable, R.string.enable, R.drawable.ic_check))
+            }
+            if (hasEnabled) {
+                add(NgActionPopupItem(R.id.menu_disable, R.string.replace_rule_disable, R.drawable.ic_baseline_close))
+            }
+            add(NgActionPopupItem(R.id.menu_del, R.string.delete, R.drawable.ic_outline_delete, dividerBefore = isNotEmpty()))
+        }
     }
 
     private fun upSourceTags(binding: ItemBookSourceBinding, source: BookSourcePart) = binding.run {

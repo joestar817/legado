@@ -1,9 +1,11 @@
 package io.legado.app.ui.widget
 
 import android.content.Context
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
+import android.text.TextPaint
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -19,10 +21,13 @@ import io.legado.app.utils.getCompatColor
 
 data class NgActionPopupItem(
     val itemId: Int,
-    val titleRes: Int,
-    val iconRes: Int,
+    val titleRes: Int = 0,
+    val iconRes: Int = 0,
     val checked: Boolean = false,
-    val dividerBefore: Boolean = false
+    val dividerBefore: Boolean = false,
+    val title: CharSequence? = null,
+    val iconDrawable: Drawable? = null,
+    val payload: Any? = null
 )
 
 class NgActionPopup(
@@ -30,7 +35,10 @@ class NgActionPopup(
     items: List<NgActionPopupItem>,
     private val widthDp: Int = 152,
     onItemClick: (NgActionPopupItem) -> Unit
-) : PopupWindow(widthDp.dpToPx(), ViewGroup.LayoutParams.WRAP_CONTENT) {
+) : PopupWindow(
+    resolveWidth(context, items, widthDp),
+    ViewGroup.LayoutParams.WRAP_CONTENT
+) {
 
     init {
         val panel = LinearLayout(context).apply {
@@ -60,13 +68,28 @@ class NgActionPopup(
     fun show(anchor: View) {
         val margin = 8.dpToPx()
         val location = IntArray(2)
+        val rootLocation = IntArray(2)
         anchor.getLocationOnScreen(location)
+        anchor.rootView.getLocationOnScreen(rootLocation)
         val rootWidth = anchor.rootView.width
+        val rootTop = rootLocation[1]
+        val rootBottom = rootTop + anchor.rootView.height
         val maxX = (rootWidth - width - margin).coerceAtLeast(margin)
-        val anchorRight = location[0] + anchor.width
-        val right = if (anchorRight > width) anchorRight else rootWidth - margin
-        val x = (right - width - margin).coerceIn(margin, maxX)
-        val y = location[1] + anchor.height + margin
+        val x = (location[0] + anchor.width - width).coerceIn(margin, maxX)
+        contentView.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        val popupHeight = contentView.measuredHeight
+        val belowY = location[1] + anchor.height + margin
+        val aboveY = location[1] - popupHeight - margin
+        val y = if (belowY + popupHeight > rootBottom - margin && aboveY >= rootTop + margin) {
+            aboveY
+        } else {
+            belowY
+                .coerceAtMost(rootBottom - popupHeight - margin)
+                .coerceAtLeast(rootTop + margin)
+        }
         showAtLocation(anchor.rootView, Gravity.NO_GRAVITY, x, y)
     }
 
@@ -85,13 +108,17 @@ class NgActionPopup(
             isFocusable = true
             setOnClickListener { onClick() }
             addView(ImageView(context).apply {
-                setImageDrawable(ContextCompat.getDrawable(context, item.iconRes))
+                val drawable = item.iconDrawable ?: item.iconRes
+                    .takeIf { it != 0 }
+                    ?.let { ContextCompat.getDrawable(context, it) }
+                setImageDrawable(drawable?.mutate())
                 setColorFilter(color)
+                alpha = if (drawable == null) 0f else 1f
             }, LinearLayout.LayoutParams(20.dpToPx(), 20.dpToPx()).apply {
                 marginEnd = 10.dpToPx()
             })
             addView(TextView(context).apply {
-                text = context.getString(item.titleRes)
+                text = item.title ?: context.getString(item.titleRes)
                 setTextColor(color)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                 includeFontPadding = false
@@ -121,6 +148,38 @@ class NgActionPopup(
                 topMargin = 3.dpToPx()
                 bottomMargin = 3.dpToPx()
             }
+        }
+    }
+
+    companion object {
+        private fun resolveWidth(
+            context: Context,
+            items: List<NgActionPopupItem>,
+            widthDp: Int
+        ): Int {
+            if (widthDp > 0) return widthDp.dpToPx()
+            val textPaint = TextPaint().apply {
+                textSize = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_SP,
+                    16f,
+                    context.resources.displayMetrics
+                )
+            }
+            val textWidth = items.maxOfOrNull { item ->
+                textPaint.measureText(
+                    item.title?.toString()
+                        ?: item.titleRes.takeIf { it != 0 }?.let { context.getString(it) }
+                        ?: ""
+                )
+            }?.toInt() ?: 0
+            val hasChecked = items.any { it.checked }
+            val chromeWidth = 12.dpToPx() + 20.dpToPx() + 10.dpToPx() + 12.dpToPx() +
+                if (hasChecked) 30.dpToPx() else 0
+            val minWidth = 152.dpToPx()
+            val maxWidth = (context.resources.displayMetrics.widthPixels - 16.dpToPx())
+                .coerceAtMost(280.dpToPx())
+                .coerceAtLeast(minWidth)
+            return (textWidth + chromeWidth + 4.dpToPx()).coerceIn(minWidth, maxWidth)
         }
     }
 }

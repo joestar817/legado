@@ -11,7 +11,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -57,7 +56,6 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
     SearchView.OnQueryTextListener {
 
     companion object {
-        private const val SORT_MENU_GROUP_ID = 20260617
         private const val SORT_MENU_ID_OFFSET = 1000
         private const val GRADIENT_GROUP_SELECTED_COLOR = 0xDE000000.toInt()
         private const val GRADIENT_GROUP_UNSELECTED_COLOR = 0x8A000000.toInt()
@@ -213,24 +211,22 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
     }
 
     private fun showSortMenu(anchor: View) {
-        PopupMenu(requireContext(), anchor).apply {
-            sortValues.forEachIndexed { index, sort ->
-                menu.add(
-                    SORT_MENU_GROUP_ID,
-                    SORT_MENU_ID_OFFSET + sort,
-                    index,
-                    getString(sortLabelRes(sort))
+        val currentSort = currentBookSort()
+        NgActionPopup(
+            requireContext(),
+            sortValues.map { sort ->
+                NgActionPopupItem(
+                    itemId = SORT_MENU_ID_OFFSET + sort,
+                    title = getString(sortLabelRes(sort)),
+                    iconRes = R.drawable.ic_sort,
+                    checked = sort == currentSort,
+                    payload = sort
                 )
-            }
-            menu.setGroupCheckable(SORT_MENU_GROUP_ID, true, true)
-            menu.findItem(SORT_MENU_ID_OFFSET + currentBookSort())?.isChecked = true
-            setOnMenuItemClickListener { item ->
-                val sort = item.itemId - SORT_MENU_ID_OFFSET
-                updateBookSort(sort)
-                true
-            }
-            show()
-        }
+            },
+            widthDp = 164
+        ) { item ->
+            (item.payload as? Int)?.let(::updateBookSort)
+        }.show(anchor)
     }
 
     private fun updateBookSort(sort: Int) {
