@@ -38,6 +38,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -1955,26 +1956,39 @@ private fun ChatInteractionBlock(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            when (interaction.type) {
-                AiChatInteractionType.ACTIONS -> InteractionActions(
-                    interaction = interaction,
-                    onSubmit = onSubmit
-                )
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val minContentWidth = maxWidth
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                ) {
+                    when (interaction.type) {
+                        AiChatInteractionType.ACTIONS -> InteractionActions(
+                            interaction = interaction,
+                            minWidth = minContentWidth,
+                            onSubmit = onSubmit
+                        )
 
-                AiChatInteractionType.SINGLE_CHOICE -> InteractionSingleChoice(
-                    interaction = interaction,
-                    onSubmit = onSubmit
-                )
+                        AiChatInteractionType.SINGLE_CHOICE -> InteractionSingleChoice(
+                            interaction = interaction,
+                            minWidth = minContentWidth,
+                            onSubmit = onSubmit
+                        )
 
-                AiChatInteractionType.MULTI_CHOICE -> InteractionMultiChoice(
-                    interaction = interaction,
-                    onSubmit = onSubmit
-                )
+                        AiChatInteractionType.MULTI_CHOICE -> InteractionMultiChoice(
+                            interaction = interaction,
+                            minWidth = minContentWidth,
+                            onSubmit = onSubmit
+                        )
 
-                AiChatInteractionType.CONFIRM -> InteractionConfirm(
-                    interaction = interaction,
-                    onSubmit = onSubmit
-                )
+                        AiChatInteractionType.CONFIRM -> InteractionConfirm(
+                            interaction = interaction,
+                            minWidth = minContentWidth,
+                            onSubmit = onSubmit
+                        )
+                    }
+                }
             }
         }
     }
@@ -1983,9 +1997,13 @@ private fun ChatInteractionBlock(
 @Composable
 private fun InteractionActions(
     interaction: AiChatInteraction,
+    minWidth: Dp,
     onSubmit: (String) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier = Modifier.widthIn(min = minWidth),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         interaction.options.chunked(3).forEach { rowOptions ->
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1996,6 +2014,7 @@ private fun InteractionActions(
                         text = option.label,
                         primary = false,
                         compact = true,
+                        modifier = Modifier.widthIn(max = 148.dp),
                         onClick = {
                             onSubmit(
                                 AiChatInteractionParser.buildPrompt(
@@ -2015,15 +2034,20 @@ private fun InteractionActions(
 @Composable
 private fun InteractionSingleChoice(
     interaction: AiChatInteraction,
+    minWidth: Dp,
     onSubmit: (String) -> Unit
 ) {
     var selectedValue by remember(interaction.id) {
         mutableStateOf(interaction.options.firstOrNull()?.value.orEmpty())
     }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        modifier = Modifier.widthIn(min = minWidth),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
         interaction.options.forEach { option ->
             InteractionOptionRow(
                 option = option,
+                minWidth = minWidth,
                 selected = option.value == selectedValue,
                 multiple = false,
                 onClick = { selectedValue = option.value }
@@ -2033,6 +2057,7 @@ private fun InteractionSingleChoice(
         InteractionSubmitRow(
             enabled = selected != null,
             label = interaction.submit?.label ?: "确认",
+            minWidth = minWidth,
             onSubmit = {
                 selected?.let { option ->
                     onSubmit(
@@ -2051,13 +2076,18 @@ private fun InteractionSingleChoice(
 @Composable
 private fun InteractionMultiChoice(
     interaction: AiChatInteraction,
+    minWidth: Dp,
     onSubmit: (String) -> Unit
 ) {
     var selectedValues by remember(interaction.id) { mutableStateOf(emptySet<String>()) }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        modifier = Modifier.widthIn(min = minWidth),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
         interaction.options.forEach { option ->
             InteractionOptionRow(
                 option = option,
+                minWidth = minWidth,
                 selected = option.value in selectedValues,
                 multiple = true,
                 onClick = {
@@ -2073,6 +2103,7 @@ private fun InteractionMultiChoice(
         InteractionSubmitRow(
             enabled = selected.isNotEmpty(),
             label = interaction.submit?.label ?: "确认",
+            minWidth = minWidth,
             onSubmit = {
                 onSubmit(
                     AiChatInteractionParser.buildPrompt(
@@ -2089,10 +2120,11 @@ private fun InteractionMultiChoice(
 @Composable
 private fun InteractionConfirm(
     interaction: AiChatInteraction,
+    minWidth: Dp,
     onSubmit: (String) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.widthIn(min = minWidth),
         horizontalArrangement = Arrangement.End
     ) {
         interaction.cancel?.let { cancel ->
@@ -2128,13 +2160,14 @@ private fun InteractionConfirm(
 @Composable
 private fun InteractionOptionRow(
     option: AiChatInteractionOption,
+    minWidth: Dp,
     selected: Boolean,
     multiple: Boolean,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .widthIn(min = minWidth)
             .clip(RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 6.dp),
@@ -2146,7 +2179,7 @@ private fun InteractionOptionRow(
         } else {
             RadioButton(selected = selected, onClick = onClick)
         }
-        Column(modifier = Modifier.weight(1f)) {
+        Column {
             Text(
                 text = option.label,
                 style = MaterialTheme.typography.bodyMedium,
@@ -2167,10 +2200,11 @@ private fun InteractionOptionRow(
 private fun InteractionSubmitRow(
     enabled: Boolean,
     label: String,
+    minWidth: Dp,
     onSubmit: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.widthIn(min = minWidth),
         horizontalArrangement = Arrangement.End
     ) {
         InteractionChip(
