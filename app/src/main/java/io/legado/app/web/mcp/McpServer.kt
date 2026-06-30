@@ -209,6 +209,32 @@ object McpServer {
                 required = listOf("source")
             ),
             tool(
+                name = "book_source_delete",
+                description = "Delete Legado book sources by bookSourceUrl.",
+                properties = mapOf(
+                    "urls" to mapOf(
+                        "type" to "array",
+                        "description" to "BookSource.bookSourceUrl list"
+                    )
+                ),
+                required = listOf("urls")
+            ),
+            tool(
+                name = "book_source_set_enabled",
+                description = "Enable or disable Legado book sources by bookSourceUrl.",
+                properties = mapOf(
+                    "urls" to mapOf(
+                        "type" to "array",
+                        "description" to "BookSource.bookSourceUrl list"
+                    ),
+                    "enabled" to mapOf(
+                        "type" to "boolean",
+                        "default" to true
+                    )
+                ),
+                required = listOf("urls")
+            ),
+            tool(
                 name = "book_source_debug",
                 description = "Debug a Legado book source and return collected debug logs.",
                 properties = mapOf(
@@ -447,6 +473,8 @@ object McpServer {
                     BookSourceController.saveSource(GSON.toJson(source))
                 )
             }
+            "book_source_delete" -> deleteBookSources(arguments)
+            "book_source_set_enabled" -> setBookSourcesEnabled(arguments)
             "book_source_debug" -> runBookSourceDebug(arguments)
             "book_search" -> runBookSearch(arguments)
             "bookshelf_search" -> runBookSearch(arguments)
@@ -470,6 +498,53 @@ object McpServer {
             ),
             "structuredContent" to result,
             "isError" to (result["ok"] != true)
+        )
+    }
+
+    private fun deleteBookSources(arguments: JsonObject): Map<String, Any?> {
+        val urls = arguments.get("urls").asStringList()
+        val sources = urls.mapNotNull { appDb.bookSourceDao.getBookSource(it) }
+        sources.forEach { appDb.bookSourceDao.delete(it) }
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookSourceDelete",
+            normalizedData = mapOf(
+                "requested" to urls.size,
+                "deleted_count" to sources.size,
+                "deleted" to sources.map {
+                    mapOf(
+                        "url" to it.bookSourceUrl,
+                        "name" to it.bookSourceName,
+                        "group" to it.bookSourceGroup
+                    )
+                }
+            ),
+            warnings = if (sources.size == urls.size) emptyList() else listOf("部分书源 url 未找到")
+        )
+    }
+
+    private fun setBookSourcesEnabled(arguments: JsonObject): Map<String, Any?> {
+        val urls = arguments.get("urls").asStringList()
+        val enabled = arguments.get("enabled").asBooleanOrNull() ?: true
+        val sources = urls.mapNotNull { appDb.bookSourceDao.getBookSource(it) }
+        sources.forEach { appDb.bookSourceDao.enable(it.bookSourceUrl, enabled) }
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookSourceSetEnabled",
+            normalizedData = mapOf(
+                "requested" to urls.size,
+                "enabled" to enabled,
+                "updated_count" to sources.size,
+                "updated" to sources.map {
+                    mapOf(
+                        "url" to it.bookSourceUrl,
+                        "name" to it.bookSourceName,
+                        "old_enabled" to it.enabled,
+                        "enabled" to enabled
+                    )
+                }
+            ),
+            warnings = if (sources.size == urls.size) emptyList() else listOf("部分书源 url 未找到")
         )
     }
 
@@ -1080,5 +1155,19 @@ object McpServer {
     private fun JsonElement?.asRequiredString(name: String): String {
         return asStringOrNull()?.takeIf { it.isNotBlank() }
             ?: throw IllegalArgumentException("$name is required")
+    }
+
+    private fun JsonElement?.asStringList(): List<String> {
+        val element = this ?: throw IllegalArgumentException("urls is required")
+        return when {
+            element.isJsonArray -> element.asJsonArray.mapNotNull { it.asStringOrNull()?.trim() }
+                .filter { it.isNotEmpty() }
+            element.isJsonPrimitive -> element.asString.split(',', '，')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            else -> emptyList()
+        }.also {
+            if (it.isEmpty()) throw IllegalArgumentException("urls is required")
+        }
     }
 }

@@ -29,12 +29,20 @@ MCP 现在有两条通道：
 | 书源 | `book_source_stats_get` | tool | 获取书源数量、分组、类型和能力统计。 |
 | 书源 | `book_source_get` | tool | 按 `bookSourceUrl` 获取完整书源规则。 |
 | 书源 | `book_source_save` | tool | 新增或覆盖保存书源规则；写接口，测试脚本默认跳过。 |
+| 书源 | `book_source_delete` | tool | 按 `bookSourceUrl` 删除书源；写接口，测试脚本默认跳过。 |
+| 书源 | `book_source_set_enabled` | tool | 按 `bookSourceUrl` 启用或停用书源；写接口。 |
 | 书源 | `book_source_debug` | tool | 运行书源搜索调试并返回调试日志。 |
 | 书源 | `book_search` | tool | 跨书源搜索书籍。 |
 | 书架 | `bookshelf_group_list` | tool | 列出书架分组。 |
+| 书架 | `bookshelf_group_get` | tool | 按 ID 或名称获取单个书架分组。 |
+| 书架 | `bookshelf_group_upsert` | tool | 新建或更新自定义书架分组；写接口。 |
+| 书架 | `bookshelf_group_delete` | tool | 删除自定义书架分组；默认只删除空分组。 |
 | 书架 | `bookshelf_stats_get` | tool | 获取书架图书数量、类型和分组统计。 |
 | 书架 | `bookshelf_book_list` | tool | 分页列出书架书籍，可按分组过滤。 |
 | 书架 | `bookshelf_book_get` | tool | 按 `book_url` 获取书籍详情。 |
+| 书架 | `bookshelf_book_upsert` | tool | 新增或覆盖书架图书；写接口。 |
+| 书架 | `bookshelf_book_delete` | tool | 按 `book_url` 删除书架图书；写接口。 |
+| 书架 | `bookshelf_book_group_update` | tool | 批量添加、移除或替换图书自定义分组归属；写接口。 |
 | 书架 | `bookshelf_current_book_get` | tool | 获取当前阅读书籍。 |
 | 书架 | `bookshelf_chapter_list` | tool | 获取书籍目录列表。 |
 | 书架 | `bookshelf_chapter_content_get` | tool | 读取本地或已缓存章节正文，不主动联网抓取。 |
@@ -54,10 +62,17 @@ MCP 现在有两条通道：
 | 书架/角色卡 | `bookshelf_character_profile_get` | tool | 获取当前书籍角色资料集信息。 |
 | 书架/角色卡 | `bookshelf_character_list` | tool | 列出当前书籍角色。 |
 | 书架/角色卡 | `bookshelf_character_get` | tool | 按角色 ID 获取角色详情。 |
+| 书架/角色卡 | `bookshelf_character_upsert` | tool | 新增或更新角色卡；写接口。 |
+| 书架/角色卡 | `bookshelf_character_delete` | tool | 按角色 ID 删除角色卡；写接口。 |
+| 书架/角色卡 | `bookshelf_character_set_enabled` | tool | 按角色 ID 启用或停用角色卡；写接口。 |
 | 书架/角色卡 | `bookshelf_character_draft_upsert` | tool | 新增或更新角色草稿；写接口。 |
 | 书架/角色卡 | `bookshelf_character_draft_apply` | tool | 应用角色草稿。 |
 | 书架/角色卡 | `bookshelf_character_draft_rollback` | tool | 回滚角色草稿，供外部验证后清理。 |
 | 书架/替换规则 | `bookshelf_replace_rule_list` | tool | 列出当前书籍相关替换规则。 |
+| 书架/替换规则 | `bookshelf_replace_rule_get` | tool | 按 ID 获取替换规则详情。 |
+| 书架/替换规则 | `bookshelf_replace_rule_upsert` | tool | 新增或更新替换规则；写接口。 |
+| 书架/替换规则 | `bookshelf_replace_rule_delete` | tool | 按 ID 删除替换规则；写接口。 |
+| 书架/替换规则 | `bookshelf_replace_rule_set_enabled` | tool | 按 ID 启用或停用替换规则；写接口。 |
 | 书架/替换规则 | `bookshelf_replace_rule_draft_upsert` | tool | 新增或更新替换规则草稿；写接口。 |
 | 书架/替换规则 | `bookshelf_replace_rule_draft_apply` | tool | 应用替换规则草稿。 |
 | 书架/替换规则 | `bookshelf_replace_rule_rollback` | tool | 回滚替换规则草稿，供外部验证后清理。 |
@@ -152,7 +167,8 @@ python scripts\test_mcp_api.py --endpoint http://192.0.2.10:1124/mcp
 - `book_source_get`
 - `book_search`
 - `book_source_debug`
-- 书架只读工具：`bookshelf_group_list`、`bookshelf_stats_get`、`bookshelf_book_list`、`bookshelf_book_get`、`bookshelf_current_book_get`、`bookshelf_chapter_list`、`bookshelf_chapter_content_get`、`bookshelf_text_window_get`、`bookshelf_cache_status_get`、`bookshelf_bookmark_list/get`、`bookshelf_read_record_list/get`、`bookshelf_book_sources_get`、`bookshelf_change_source_preview`、`bookshelf_character_profile_get`、`bookshelf_character_list`、`bookshelf_replace_rule_list`
+- 默认只跑安全读取工具：`bookshelf_group_list/get`、`bookshelf_stats_get`、`bookshelf_book_list/get`、`bookshelf_current_book_get`、`bookshelf_chapter_list`、`bookshelf_chapter_content_get`、`bookshelf_text_window_get`、`bookshelf_cache_status_get`、`bookshelf_bookmark_list/get`、`bookshelf_read_record_list/get`、`bookshelf_book_sources_get`、`bookshelf_change_source_preview`、`bookshelf_character_profile_get/list/get`、`bookshelf_replace_rule_list/get`
+- 书源、书架、角色卡、替换规则和设置规则的写入/删除/启用停用接口会检查工具是否存在；实际写入用例只在传入 `--write` 时执行。
 - 设置只读工具：`settings_rule_stats_get`、`settings_txt_toc_rule_list/get`、`settings_replace_rule_list/get`、`settings_dict_rule_list/get`
 - 调试日志只读工具：`debug_log_list/get`
 - 未知 method 错误返回
@@ -259,12 +275,20 @@ curl -s http://192.0.2.10:1124/mcp \
 - `book_source_stats_get`
 - `book_source_get`
 - `book_source_save`
+- `book_source_delete`
+- `book_source_set_enabled`
 - `book_source_debug`
 - `book_search`
 - `bookshelf_group_list`
+- `bookshelf_group_get`
+- `bookshelf_group_upsert`
+- `bookshelf_group_delete`
 - `bookshelf_stats_get`
 - `bookshelf_book_list`
 - `bookshelf_book_get`
+- `bookshelf_book_upsert`
+- `bookshelf_book_delete`
+- `bookshelf_book_group_update`
 - `bookshelf_current_book_get`
 - `bookshelf_chapter_list`
 - `bookshelf_chapter_content_get`
@@ -284,10 +308,17 @@ curl -s http://192.0.2.10:1124/mcp \
 - `bookshelf_character_profile_get`
 - `bookshelf_character_list`
 - `bookshelf_character_get`
+- `bookshelf_character_upsert`
+- `bookshelf_character_delete`
+- `bookshelf_character_set_enabled`
 - `bookshelf_character_draft_upsert`
 - `bookshelf_character_draft_apply`
 - `bookshelf_character_draft_rollback`
 - `bookshelf_replace_rule_list`
+- `bookshelf_replace_rule_get`
+- `bookshelf_replace_rule_upsert`
+- `bookshelf_replace_rule_delete`
+- `bookshelf_replace_rule_set_enabled`
 - `bookshelf_replace_rule_draft_upsert`
 - `bookshelf_replace_rule_draft_apply`
 - `bookshelf_replace_rule_rollback`
@@ -527,14 +558,20 @@ curl -s http://192.0.2.10:1124/mcp \
 
 ### 书架模块工具
 
-书架模块按子模块拆成：书籍/分组、目录/正文/缓存、书签、阅读记录、搜索/换源预览、角色卡、替换规则。所有正文类接口只读取本地书籍或已缓存正文，不会通过 MCP 主动联网抓取章节。
+书架模块按子模块拆成：书籍/分组、目录/正文/缓存、书签、阅读记录、搜索/换源预览、角色卡、替换规则。所有正文类接口只读取本地书籍或已缓存正文，不会通过 MCP 主动联网抓取章节。写接口应在 AI 回复中先说明影响范围并等待用户确认。
 
 #### 书籍/分组
 
 - `bookshelf_group_list`：列出书架分组和每个分组当前书籍数。
+- `bookshelf_group_get`：按 `group_id` 或 `group_name` 获取单个分组。
+- `bookshelf_group_upsert`：新建或更新自定义分组；内置分组不能通过 MCP 修改。
+- `bookshelf_group_delete`：按 `group_ids` 或 `group_names` 删除自定义分组；默认 `only_empty=true`，只删除空分组；传 `only_empty=false` 会先移除图书的该分组归属再删除分组。
 - `bookshelf_stats_get`：获取书架图书总数、类型数量、未入书架数量和分组统计；回答“书架上有多少本书、多少个分组”时优先使用。
 - `bookshelf_book_list`：分页列出书架书籍，支持 `group_id`、`keyword`、`offset`、`limit`、`include_not_shelf`。
 - `bookshelf_book_get`：按 `book_url`，或 `name` + `author` 获取单本书详情。
+- `bookshelf_book_upsert`：按完整 `Book` JSON 新增或覆盖书籍。
+- `bookshelf_book_delete`：按 `book_urls` 删除书籍。
+- `bookshelf_book_group_update`：批量添加、移除或替换图书自定义分组归属；`mode` 支持 `add/remove/replace`，可用 `group_ids` 或 `group_names` 指定目标分组。
 - `bookshelf_current_book_get`：获取当前阅读书籍；没有活动阅读状态时返回最近阅读文本书。
 
 示例：
@@ -605,6 +642,9 @@ curl -s http://192.0.2.10:1124/mcp \
 - `bookshelf_character_profile_get`：获取角色档案；传 `create=true` 且提供书籍身份时可创建档案。
 - `bookshelf_character_list`：列出一本书的角色卡。
 - `bookshelf_character_get`：按角色 `id` 获取单张角色卡。
+- `bookshelf_character_upsert`：创建或更新角色卡。
+- `bookshelf_character_delete`：按 `ids` 删除角色卡。
+- `bookshelf_character_set_enabled`：按 `ids` 启用或禁用角色卡。
 - `bookshelf_character_draft_upsert`：创建或更新 AI/导入来源的角色草稿。
 - `bookshelf_character_draft_apply`：按 `ids` 启用或禁用已存在的角色草稿。
 - `bookshelf_character_draft_rollback`：删除指定角色草稿，主要用于回滚 MCP 创建的临时草稿。
@@ -612,11 +652,15 @@ curl -s http://192.0.2.10:1124/mcp \
 #### 替换规则
 
 - `bookshelf_replace_rule_list`：列出替换规则，支持按书籍作用域、分组、启用状态过滤。
+- `bookshelf_replace_rule_get`：按 `id` 获取替换规则。
+- `bookshelf_replace_rule_upsert`：创建或更新替换规则；传 `book_url` 且未传 `scope` 时默认作用于书名。
+- `bookshelf_replace_rule_delete`：按 `ids` 删除替换规则。
+- `bookshelf_replace_rule_set_enabled`：按 `ids` 启用或禁用替换规则。
 - `bookshelf_replace_rule_draft_upsert`：创建或更新替换规则草稿；传 `book_url` 且未传 `scope` 时默认作用于书名。
 - `bookshelf_replace_rule_draft_apply`：按 `ids` 启用或禁用替换规则。
 - `bookshelf_replace_rule_rollback`：删除指定替换规则，主要用于回滚 MCP 创建的草稿。
 
-注意：角色卡和替换规则草稿接口是写操作；当前 P0 不做 token 和权限分级，外部调试时应只在受信任局域网环境开启 MCP 服务。
+注意：角色卡和替换规则的标准 CRUD 与草稿接口都是写操作；当前 P0 不做 token 和权限分级，外部调试时应只在受信任局域网环境开启 MCP 服务。
 
 ### 设置模块工具
 

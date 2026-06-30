@@ -47,6 +47,31 @@ object BookshelfMcpTools {
                 properties = emptyMap()
             ),
             tool(
+                name = "bookshelf_group_get",
+                description = "Get one bookshelf group by group_id or group_name.",
+                properties = mapOf(
+                    "group_id" to numberSchema("Optional BookGroup.groupId"),
+                    "group_name" to stringSchema("Optional BookGroup.groupName")
+                )
+            ),
+            tool(
+                name = "bookshelf_group_upsert",
+                description = "Create or update one custom bookshelf group. Built-in groups cannot be changed through MCP.",
+                properties = mapOf(
+                    "group" to mapOf("type" to "object", "description" to "BookGroup fields")
+                ),
+                required = listOf("group")
+            ),
+            tool(
+                name = "bookshelf_group_delete",
+                description = "Delete custom bookshelf groups by id or name. Default only deletes empty groups.",
+                properties = mapOf(
+                    "group_ids" to arraySchema("BookGroup.groupId list"),
+                    "group_names" to arraySchema("BookGroup.groupName list"),
+                    "only_empty" to booleanSchema("Default true. When false, remove group bits from books before deleting.")
+                )
+            ),
+            tool(
                 name = "bookshelf_stats_get",
                 description = "Return lightweight bookshelf book counts and group counts without listing books.",
                 properties = mapOf(
@@ -72,6 +97,36 @@ object BookshelfMcpTools {
                     "name" to stringSchema("Book.name"),
                     "author" to stringSchema("Book.author")
                 )
+            ),
+            tool(
+                name = "bookshelf_book_upsert",
+                description = "Create or replace one bookshelf book from a complete Book JSON object.",
+                properties = mapOf(
+                    "book" to mapOf("type" to "object", "description" to "Complete Book fields")
+                ),
+                required = listOf("book")
+            ),
+            tool(
+                name = "bookshelf_book_delete",
+                description = "Delete bookshelf books by book_url.",
+                properties = mapOf("book_urls" to arraySchema("Book.bookUrl list")),
+                required = listOf("book_urls")
+            ),
+            tool(
+                name = "bookshelf_book_group_update",
+                description = "Batch add, remove, or replace custom bookshelf group membership for books.",
+                properties = mapOf(
+                    "book_urls" to arraySchema("Book.bookUrl list"),
+                    "group_ids" to arraySchema("BookGroup.groupId list"),
+                    "group_names" to arraySchema("BookGroup.groupName list"),
+                    "mode" to mapOf(
+                        "type" to "string",
+                        "enum" to listOf("add", "remove", "replace"),
+                        "default" to "add"
+                    ),
+                    "create_missing_groups" to booleanSchema("Default true when group_names are supplied")
+                ),
+                required = listOf("book_urls")
             ),
             tool(
                 name = "bookshelf_current_book_get",
@@ -245,6 +300,33 @@ object BookshelfMcpTools {
                 required = listOf("id")
             ),
             tool(
+                name = "bookshelf_character_upsert",
+                description = "Create or update one character card for a book/work.",
+                properties = mapOf(
+                    "book_url" to stringSchema("Book.bookUrl"),
+                    "name" to stringSchema("Book.name"),
+                    "author" to stringSchema("Book.author"),
+                    "work_key" to stringSchema("BookCharacterProfile.workKey"),
+                    "character" to mapOf("type" to "object")
+                ),
+                required = listOf("character")
+            ),
+            tool(
+                name = "bookshelf_character_delete",
+                description = "Delete character cards by id.",
+                properties = mapOf("ids" to arraySchema("BookCharacter.id list")),
+                required = listOf("ids")
+            ),
+            tool(
+                name = "bookshelf_character_set_enabled",
+                description = "Enable or disable character cards by id.",
+                properties = mapOf(
+                    "ids" to arraySchema("BookCharacter.id list"),
+                    "enabled" to booleanSchema("Default true")
+                ),
+                required = listOf("ids")
+            ),
+            tool(
                 name = "bookshelf_character_draft_upsert",
                 description = "Create or update an AI/imported character draft for one book/work.",
                 properties = mapOf(
@@ -282,6 +364,36 @@ object BookshelfMcpTools {
                     "offset" to numberSchema("Default 0"),
                     "limit" to numberSchema("Default 50, max 200")
                 )
+            ),
+            tool(
+                name = "bookshelf_replace_rule_get",
+                description = "Get one replacement rule by id.",
+                properties = mapOf("id" to numberSchema("ReplaceRule.id")),
+                required = listOf("id")
+            ),
+            tool(
+                name = "bookshelf_replace_rule_upsert",
+                description = "Create or update replacement rules, optionally scoped to one book.",
+                properties = mapOf(
+                    "book_url" to stringSchema("Optional Book.bookUrl"),
+                    "rule" to mapOf("type" to "object"),
+                    "rules" to arraySchema("ReplaceRule objects")
+                )
+            ),
+            tool(
+                name = "bookshelf_replace_rule_delete",
+                description = "Delete replacement rules by id.",
+                properties = mapOf("ids" to arraySchema("ReplaceRule.id list")),
+                required = listOf("ids")
+            ),
+            tool(
+                name = "bookshelf_replace_rule_set_enabled",
+                description = "Enable or disable replacement rules by id.",
+                properties = mapOf(
+                    "ids" to arraySchema("ReplaceRule.id list"),
+                    "enabled" to booleanSchema("Default true")
+                ),
+                required = listOf("ids")
             ),
             tool(
                 name = "bookshelf_replace_rule_draft_upsert",
@@ -348,9 +460,15 @@ object BookshelfMcpTools {
     fun call(name: String, arguments: JsonObject): Map<String, Any?>? {
         return when (name) {
             "bookshelf_group_list" -> listGroups()
+            "bookshelf_group_get" -> getGroup(arguments)
+            "bookshelf_group_upsert" -> upsertGroup(arguments)
+            "bookshelf_group_delete" -> deleteGroups(arguments)
             "bookshelf_stats_get" -> getStats(arguments)
             "bookshelf_book_list" -> listBooks(arguments)
             "bookshelf_book_get" -> getBook(arguments)
+            "bookshelf_book_upsert" -> upsertBook(arguments)
+            "bookshelf_book_delete" -> deleteBooks(arguments)
+            "bookshelf_book_group_update" -> updateBookGroups(arguments)
             "bookshelf_current_book_get" -> getCurrentBook()
             "bookshelf_chapter_list" -> listChapters(arguments)
             "bookshelf_chapter_content_get" -> getChapterContent(arguments)
@@ -369,10 +487,17 @@ object BookshelfMcpTools {
             "bookshelf_character_profile_get" -> getCharacterProfile(arguments)
             "bookshelf_character_list" -> listCharacters(arguments)
             "bookshelf_character_get" -> getCharacter(arguments)
+            "bookshelf_character_upsert" -> upsertCharacter(arguments)
+            "bookshelf_character_delete" -> deleteCharacters(arguments)
+            "bookshelf_character_set_enabled" -> setCharactersEnabled(arguments)
             "bookshelf_character_draft_upsert" -> upsertCharacterDraft(arguments)
             "bookshelf_character_draft_apply" -> applyCharacterDraft(arguments)
             "bookshelf_character_draft_rollback" -> rollbackCharacterDraft(arguments)
             "bookshelf_replace_rule_list" -> listReplaceRules(arguments)
+            "bookshelf_replace_rule_get" -> getReplaceRule(arguments)
+            "bookshelf_replace_rule_upsert" -> upsertReplaceRule(arguments)
+            "bookshelf_replace_rule_delete" -> deleteReplaceRules(arguments)
+            "bookshelf_replace_rule_set_enabled" -> setReplaceRulesEnabled(arguments)
             "bookshelf_replace_rule_draft_upsert" -> upsertReplaceRuleDraft(arguments)
             "bookshelf_replace_rule_draft_apply" -> applyReplaceRuleDraft(arguments)
             "bookshelf_replace_rule_rollback" -> rollbackReplaceRuleDraft(arguments)
@@ -390,6 +515,99 @@ object BookshelfMcpTools {
             normalizedData = mapOf(
                 "groups" to groups,
                 "total" to groups.size
+            )
+        )
+    }
+
+    private fun getGroup(arguments: JsonObject): Map<String, Any?> {
+        val group = arguments.get("group_id").asLongOrNull()?.let { appDb.bookGroupDao.getByID(it) }
+            ?: arguments.get("group_name").asStringOrNull()?.takeIf { it.isNotBlank() }
+                ?.let { appDb.bookGroupDao.getByName(it) }
+            ?: return notFound("native://bookshelf/group", "未找到分组，请检查 group_id 或 group_name")
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookshelf/group",
+            normalizedData = group.toMcpMap(bookCount = booksForGroup(group.groupId, includeNotShelf = false).size)
+        )
+    }
+
+    private fun upsertGroup(arguments: JsonObject): Map<String, Any?> {
+        val input = arguments.get("group")?.takeIf { it.isJsonObject }?.asJsonObject
+            ?: throw IllegalArgumentException("group is required")
+        val requestedId = input.get("group_id").asLongOrNull()
+            ?: input.get("groupId").asLongOrNull()
+        if (requestedId != null && requestedId < 0L) {
+            throw IllegalArgumentException("built-in groups cannot be changed through MCP")
+        }
+        val groupName = input.get("group_name").asStringOrNull()
+            ?: input.get("groupName").asStringOrNull()
+        val existing = requestedId?.takeIf { it > 0L }?.let { appDb.bookGroupDao.getByID(it) }
+            ?: groupName?.takeIf { it.isNotBlank() }?.let { appDb.bookGroupDao.getByName(it) }
+        if (existing?.groupId != null && existing.groupId < 0L) {
+            throw IllegalArgumentException("built-in groups cannot be changed through MCP")
+        }
+        if (existing == null && !appDb.bookGroupDao.canAddGroup) {
+            throw IllegalStateException("book group limit reached")
+        }
+        val group = (existing ?: BookGroup(groupId = requestedId?.takeIf { it > 0L } ?: appDb.bookGroupDao.getUnusedId())).apply {
+            this.groupName = groupName?.takeIf { it.isNotBlank() } ?: this.groupName
+            if (this.groupName.isBlank()) throw IllegalArgumentException("group.group_name is required")
+            cover = input.get("cover").asStringOrNull() ?: cover
+            order = input.get("order").asIntOrNull() ?: order.takeIf { existing != null } ?: (appDb.bookGroupDao.maxOrder + 1)
+            enableRefresh = input.get("enable_refresh").asBooleanOrNull()
+                ?: input.get("enableRefresh").asBooleanOrNull()
+                        ?: enableRefresh
+            show = input.get("show").asBooleanOrNull() ?: show
+            bookSort = input.get("book_sort").asIntOrNull()
+                ?: input.get("bookSort").asIntOrNull()
+                        ?: bookSort
+            onlyUpdateRead = input.get("only_update_read").asBooleanOrNull()
+                ?: input.get("onlyUpdateRead").asBooleanOrNull()
+                        ?: onlyUpdateRead
+        }
+        appDb.bookGroupDao.insert(group)
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookshelf/groupUpsert",
+            normalizedData = mapOf(
+                "group" to group.toMcpMap(bookCount = booksForGroup(group.groupId, includeNotShelf = false).size),
+                "created" to (existing == null)
+            )
+        )
+    }
+
+    private fun deleteGroups(arguments: JsonObject): Map<String, Any?> {
+        val ids = arguments.get("group_ids").asLongListOrEmpty()
+        val names = arguments.get("group_names").asStringListOrNull().orEmpty()
+        if (ids.isEmpty() && names.isEmpty()) {
+            throw IllegalArgumentException("group_ids or group_names is required")
+        }
+        val onlyEmpty = arguments.get("only_empty").asBooleanOrNull() ?: true
+        val groups = (ids.mapNotNull { appDb.bookGroupDao.getByID(it) } +
+                names.mapNotNull { appDb.bookGroupDao.getByName(it) })
+            .distinctBy { it.groupId }
+        val deleted = mutableListOf<BookGroup>()
+        val skipped = mutableListOf<Map<String, Any?>>()
+        groups.forEach { group ->
+            val count = booksForGroup(group.groupId, includeNotShelf = true).size
+            when {
+                group.groupId < 0L -> skipped.add(mapOf("group_id" to group.groupId, "reason" to "built_in_group"))
+                onlyEmpty && count > 0 -> skipped.add(mapOf("group_id" to group.groupId, "reason" to "not_empty", "book_count" to count))
+                else -> {
+                    appDb.bookDao.removeGroup(group.groupId)
+                    appDb.bookGroupDao.delete(group)
+                    deleted.add(group)
+                }
+            }
+        }
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookshelf/groupDelete",
+            normalizedData = mapOf(
+                "requested" to (ids.size + names.size),
+                "deleted_count" to deleted.size,
+                "deleted" to deleted.map { it.toMcpMap(bookCount = 0) },
+                "skipped" to skipped
             )
         )
     }
@@ -454,6 +672,106 @@ object BookshelfMcpTools {
             ok = true,
             upstreamEndpoint = "native://bookshelf/book",
             normalizedData = book.toMcpDetail()
+        )
+    }
+
+    private fun upsertBook(arguments: JsonObject): Map<String, Any?> {
+        val input = arguments.get("book")?.takeIf { it.isJsonObject }
+            ?: throw IllegalArgumentException("book is required")
+        val book = runCatching { GSON.fromJson(input, Book::class.java) }.getOrNull()
+            ?: throw IllegalArgumentException("book cannot be parsed")
+        if (book.bookUrl.isBlank()) throw IllegalArgumentException("book.book_url/bookUrl is required")
+        if (book.name.isBlank()) throw IllegalArgumentException("book.name is required")
+        if (book.author.isBlank()) throw IllegalArgumentException("book.author is required")
+        val existing = appDb.bookDao.getBook(book.bookUrl)
+        appDb.bookDao.insert(book)
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookshelf/bookUpsert",
+            normalizedData = mapOf(
+                "book" to appDb.bookDao.getBook(book.bookUrl)?.toMcpDetail(),
+                "created" to (existing == null)
+            )
+        )
+    }
+
+    private fun deleteBooks(arguments: JsonObject): Map<String, Any?> {
+        val urls = arguments.get("book_urls").asStringListOrNull().orEmpty()
+        if (urls.isEmpty()) throw IllegalArgumentException("book_urls is required")
+        val books = urls.mapNotNull { appDb.bookDao.getBook(it) }
+        if (books.isNotEmpty()) {
+            appDb.bookDao.delete(*books.toTypedArray())
+        }
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookshelf/bookDelete",
+            normalizedData = mapOf(
+                "requested" to urls.size,
+                "deleted_count" to books.size,
+                "deleted" to books.map { it.toMcpSummary() }
+            ),
+            warnings = if (books.size == urls.size) emptyList() else listOf("部分 book_url 未找到")
+        )
+    }
+
+    private fun updateBookGroups(arguments: JsonObject): Map<String, Any?> {
+        val urls = arguments.get("book_urls").asStringListOrNull().orEmpty()
+        if (urls.isEmpty()) throw IllegalArgumentException("book_urls is required")
+        val mode = arguments.get("mode").asStringOrNull()?.trim()?.lowercase()
+            ?.takeIf { it in setOf("add", "remove", "replace") }
+            ?: "add"
+        val createMissingGroups = arguments.get("create_missing_groups").asBooleanOrNull() ?: true
+        val groupIds = linkedSetOf<Long>()
+        arguments.get("group_ids").asLongListOrEmpty()
+            .filter { it > 0L }
+            .forEach { groupIds.add(it) }
+        arguments.get("group_names").asStringListOrNull().orEmpty().forEach { name ->
+            val existing = appDb.bookGroupDao.getByName(name)
+            val group = existing ?: if (createMissingGroups) {
+                val created = BookGroup(
+                    groupId = appDb.bookGroupDao.getUnusedId(),
+                    groupName = name,
+                    order = appDb.bookGroupDao.maxOrder + 1
+                )
+                appDb.bookGroupDao.insert(created)
+                created
+            } else {
+                null
+            }
+            group?.takeIf { it.groupId > 0L }?.let { groupIds.add(it.groupId) }
+        }
+        if (mode != "replace" && groupIds.isEmpty()) {
+            throw IllegalArgumentException("group_ids or group_names is required")
+        }
+        val mask = groupIds.fold(0L) { acc, id -> acc or id }
+        val books = urls.mapNotNull { appDb.bookDao.getBook(it) }
+        val updated = books.map { book ->
+            val oldGroup = book.group
+            book.group = when (mode) {
+                "remove" -> book.group and mask.inv()
+                "replace" -> mask
+                else -> book.group or mask
+            }
+            appDb.bookDao.update(book)
+            mapOf(
+                "book_url" to book.bookUrl,
+                "name" to book.name,
+                "old_group" to oldGroup,
+                "new_group" to book.group,
+                "group_names" to appDb.bookGroupDao.getGroupNames(book.group)
+            )
+        }
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookshelf/bookGroupUpdate",
+            normalizedData = mapOf(
+                "mode" to mode,
+                "group_ids" to groupIds.toList(),
+                "requested_books" to urls.size,
+                "updated_count" to updated.size,
+                "updated" to updated
+            ),
+            warnings = if (books.size == urls.size) emptyList() else listOf("部分 book_url 未找到")
         )
     }
 
@@ -937,6 +1255,10 @@ object BookshelfMcpTools {
         )
     }
 
+    private fun upsertCharacter(arguments: JsonObject): Map<String, Any?> {
+        return withEndpoint(upsertCharacterDraft(arguments), "native://bookshelf/characterUpsert")
+    }
+
     private fun upsertCharacterDraft(arguments: JsonObject): Map<String, Any?> {
         val characterJson = arguments.get("character")?.takeIf { it.isJsonObject }?.asJsonObject
             ?: throw IllegalArgumentException("character is required")
@@ -1015,6 +1337,10 @@ object BookshelfMcpTools {
         )
     }
 
+    private fun setCharactersEnabled(arguments: JsonObject): Map<String, Any?> {
+        return withEndpoint(applyCharacterDraft(arguments), "native://bookshelf/characterSetEnabled")
+    }
+
     private fun applyCharacterDraft(arguments: JsonObject): Map<String, Any?> {
         val ids = arguments.get("ids").asLongList()
         val enabled = arguments.get("enabled").asBooleanOrNull() ?: true
@@ -1036,6 +1362,10 @@ object BookshelfMcpTools {
             ),
             warnings = if (changed.size == ids.size) emptyList() else listOf("部分角色卡 id 未找到")
         )
+    }
+
+    private fun deleteCharacters(arguments: JsonObject): Map<String, Any?> {
+        return withEndpoint(rollbackCharacterDraft(arguments), "native://bookshelf/characterDelete")
     }
 
     private fun rollbackCharacterDraft(arguments: JsonObject): Map<String, Any?> {
@@ -1088,7 +1418,27 @@ object BookshelfMcpTools {
         )
     }
 
+    private fun getReplaceRule(arguments: JsonObject): Map<String, Any?> {
+        val id = arguments.get("id").asLongOrNull()
+            ?: throw IllegalArgumentException("id is required")
+        val rule = appDb.replaceRuleDao.findById(id)
+            ?: return notFound("native://bookshelf/replaceRule", "未找到替换规则: $id")
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookshelf/replaceRule",
+            normalizedData = rule.toMcpMap()
+        )
+    }
+
+    private fun upsertReplaceRule(arguments: JsonObject): Map<String, Any?> {
+        return upsertReplaceRules(arguments, draft = false)
+    }
+
     private fun upsertReplaceRuleDraft(arguments: JsonObject): Map<String, Any?> {
+        return upsertReplaceRules(arguments, draft = true)
+    }
+
+    private fun upsertReplaceRules(arguments: JsonObject, draft: Boolean): Map<String, Any?> {
         val book = arguments.get("book_url").asStringOrNull()?.let { appDb.bookDao.getBook(it) }
         val ruleJsons = buildList {
             arguments.get("rule")?.takeIf { it.isJsonObject }?.asJsonObject?.let { add(it) }
@@ -1108,7 +1458,7 @@ object BookshelfMcpTools {
                 name = json.get("name").asStringOrNull() ?: name
                 pattern = json.get("pattern").asStringOrNull() ?: pattern
                 replacement = json.get("replacement").asStringOrNull() ?: replacement
-                group = json.get("group").asStringOrNull() ?: group ?: DRAFT_REPLACE_RULE_GROUP
+                group = json.get("group").asStringOrNull() ?: group ?: DRAFT_REPLACE_RULE_GROUP.takeIf { draft }
                 scope = json.get("scope").asStringOrNull() ?: scope ?: book?.name
                 scopeTitle = json.get("scope_title").asBooleanOrNull()
                     ?: json.get("scopeTitle").asBooleanOrNull()
@@ -1149,7 +1499,11 @@ object BookshelfMcpTools {
         }
         return toolResult(
             ok = validRules.isNotEmpty(),
-            upstreamEndpoint = "native://bookshelf/replaceRuleDraftUpsert",
+            upstreamEndpoint = if (draft) {
+                "native://bookshelf/replaceRuleDraftUpsert"
+            } else {
+                "native://bookshelf/replaceRuleUpsert"
+            },
             normalizedData = mapOf(
                 "ids" to insertedIds,
                 "rules" to insertedIds.mapNotNull { appDb.replaceRuleDao.findById(it) }.map { it.toMcpMap() },
@@ -1157,6 +1511,10 @@ object BookshelfMcpTools {
             ),
             warnings = warnings
         )
+    }
+
+    private fun setReplaceRulesEnabled(arguments: JsonObject): Map<String, Any?> {
+        return withEndpoint(applyReplaceRuleDraft(arguments), "native://bookshelf/replaceRuleSetEnabled")
     }
 
     private fun applyReplaceRuleDraft(arguments: JsonObject): Map<String, Any?> {
@@ -1177,6 +1535,10 @@ object BookshelfMcpTools {
             ),
             warnings = if (rules.size == ids.size) emptyList() else listOf("部分替换规则 id 未找到")
         )
+    }
+
+    private fun deleteReplaceRules(arguments: JsonObject): Map<String, Any?> {
+        return withEndpoint(rollbackReplaceRuleDraft(arguments), "native://bookshelf/replaceRuleDelete")
     }
 
     private fun rollbackReplaceRuleDraft(arguments: JsonObject): Map<String, Any?> {
@@ -1532,6 +1894,12 @@ object BookshelfMcpTools {
         )
     }
 
+    private fun withEndpoint(result: Map<String, Any?>, upstreamEndpoint: String): Map<String, Any?> {
+        return result.toMutableMap().apply {
+            put("upstream_endpoint", upstreamEndpoint)
+        }
+    }
+
     private fun tool(
         name: String,
         description: String,
@@ -1607,6 +1975,15 @@ object BookshelfMcpTools {
             else -> emptyList()
         }.also {
             if (it.isEmpty()) throw IllegalArgumentException("ids is required")
+        }
+    }
+
+    private fun JsonElement?.asLongListOrEmpty(): List<Long> {
+        val element = this ?: return emptyList()
+        return when {
+            element.isJsonArray -> element.asJsonArray.mapNotNull { it.asLongOrNull() }
+            element.isJsonPrimitive -> listOfNotNull(element.asLongOrNull())
+            else -> emptyList()
         }
     }
 }
