@@ -46,11 +46,18 @@ object AiChatInteractionParser {
     )
 
     fun parse(content: String): AiChatInteractionRender {
-        val interactions = blockRegex.findAll(content)
+        val completedInteractions = blockRegex.findAll(content)
             .mapNotNull { match -> parseInteraction(match.groupValues[1]) }
             .toList()
-        val visibleContent = blockRegex.replace(content, "")
-            .replace(partialBlockRegex, "")
+        val contentWithoutCompletedBlocks = blockRegex.replace(content, "")
+        val partialInteraction = partialBlockRegex.find(contentWithoutCompletedBlocks)
+            ?.let { match -> parsePartialInteraction(match.value) }
+        val interactions = completedInteractions + listOfNotNull(partialInteraction)
+        val visibleContent = if (partialInteraction != null) {
+            partialBlockRegex.replace(contentWithoutCompletedBlocks, "")
+        } else {
+            contentWithoutCompletedBlocks
+        }
             .trim()
         return AiChatInteractionRender(
             content = visibleContent,
@@ -117,6 +124,12 @@ object AiChatInteractionParser {
             submit = root.objectOrNull("submit")?.toSubmit(defaultLabel = "确认"),
             cancel = root.objectOrNull("cancel")?.toSubmit(defaultLabel = "取消")
         )
+    }
+
+    private fun parsePartialInteraction(text: String): AiChatInteraction? {
+        val body = text.substringAfter('\n', missingDelimiterValue = "").trim()
+        if (body.isBlank()) return null
+        return parseInteraction(body)
     }
 
     private fun JsonObject.toSubmit(defaultLabel: String): AiChatInteractionSubmit {

@@ -64,7 +64,7 @@ object AiAssistantConfigUi {
     fun selectedModelIconRes(): Int {
         return selectedModel()?.let { selected ->
             selected.model.iconRes(selected.provider.iconRes())
-        } ?: R.drawable.ic_ai_provider
+        } ?: R.drawable.ic_cfg_web
     }
 
     fun selectedReasoningEnabled(): Boolean {

@@ -21,6 +21,7 @@ object DatabaseMigrations {
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
             migration_89_90, migration_90_91, migration_91_92, migration_92_93, migration_93_94,
+            migration_94_95,
         )
     }
 
@@ -448,6 +449,36 @@ object DatabaseMigrations {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `aiChatConversations` ADD COLUMN `loadedSkillIds` TEXT NOT NULL DEFAULT '[]'")
             db.execSQL("ALTER TABLE `aiSkills` ADD COLUMN `userModified` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    private val migration_94_95 = object : Migration(94, 95) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `agentMemories` (
+                    `id` TEXT NOT NULL,
+                    `scopeType` TEXT NOT NULL DEFAULT '',
+                    `scopeKey` TEXT NOT NULL DEFAULT '',
+                    `subject` TEXT NOT NULL DEFAULT '',
+                    `domain` TEXT NOT NULL DEFAULT '',
+                    `memoryType` TEXT NOT NULL DEFAULT 'checkpoint',
+                    `title` TEXT NOT NULL DEFAULT '',
+                    `content` TEXT NOT NULL DEFAULT '',
+                    `dataJson` TEXT NOT NULL DEFAULT '{}',
+                    `tags` TEXT NOT NULL DEFAULT '',
+                    `confidence` REAL NOT NULL DEFAULT 1,
+                    `source` TEXT NOT NULL DEFAULT 'ai',
+                    `status` TEXT NOT NULL DEFAULT 'active',
+                    `createdAt` INTEGER NOT NULL DEFAULT 0,
+                    `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_agentMemories_scopeType_scopeKey` ON `agentMemories` (`scopeType`, `scopeKey`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_agentMemories_domain_memoryType_status` ON `agentMemories` (`domain`, `memoryType`, `status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_agentMemories_updatedAt` ON `agentMemories` (`updatedAt`)")
         }
     }
 

@@ -35,6 +35,28 @@ object AiConfig {
             appCtx.putPrefBoolean(PreferKey.aiInternalMcp, value)
         }
 
+    var operationPermissionMode: AiOperationPermissionMode
+        get() {
+            val stored = appCtx.getPrefString(PreferKey.aiOperationPermissionMode)
+            if (!stored.isNullOrBlank()) {
+                return AiOperationPermissionMode.from(stored)
+            }
+            return if (appCtx.getPrefBoolean(PreferKey.aiSafetyGate, true)) {
+                AiOperationPermissionMode.CONFIRM_WRITE
+            } else {
+                AiOperationPermissionMode.TRUSTED
+            }
+        }
+        set(value) {
+            appCtx.putPrefString(PreferKey.aiOperationPermissionMode, value.prefValue)
+        }
+
+    var memoryEnabled: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.aiMemory, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.aiMemory, value)
+        }
+
     var chatFabEnabled: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.aiChatFab, false)
         set(value) {
@@ -345,6 +367,22 @@ enum class AiReasoningLevel(
     companion object {
         fun from(value: String?): AiReasoningLevel {
             return entries.firstOrNull { it.prefValue == value } ?: OFF
+        }
+    }
+}
+
+enum class AiOperationPermissionMode(
+    val prefValue: String
+) {
+    CONFIRM_WRITE("confirm_write"),
+    TRUSTED("trusted");
+
+    val requiresWriteConfirmation: Boolean
+        get() = this == CONFIRM_WRITE
+
+    companion object {
+        fun from(value: String?): AiOperationPermissionMode {
+            return entries.firstOrNull { it.prefValue == value } ?: CONFIRM_WRITE
         }
     }
 }

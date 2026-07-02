@@ -1,5 +1,6 @@
 package io.legado.app.ui.config
 
+import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -14,6 +15,9 @@ import android.text.method.LinkMovementMethod
 import android.util.TypedValue
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.DrawableRes
 import androidx.activity.compose.BackHandler
@@ -153,6 +157,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.bumptech.glide.Glide
 import com.google.gson.JsonObject
@@ -170,6 +175,7 @@ import io.legado.app.help.ai.AiChatSessionSnapshot
 import io.legado.app.help.ai.AiChatStreamUpdate
 import io.legado.app.help.ai.AiChatTurnResult
 import io.legado.app.help.ai.AiConfig
+import io.legado.app.help.ai.AiPendingToolCall
 import io.legado.app.help.ai.AiSkillRegistry
 import io.legado.app.help.ai.AiSkillScope
 import io.legado.app.help.config.ThemeConfig
@@ -178,8 +184,11 @@ import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.ui.widget.compose.NgFunctionMenu
 import io.legado.app.ui.widget.compose.NgFunctionMenuAction
+import io.legado.app.ui.widget.dialog.applyNgWindow
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.utils.ColorUtils
+import io.legado.app.utils.GSON
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.openUrl
 import io.noties.markwon.Markwon
 import io.noties.markwon.ext.tables.TablePlugin
@@ -190,7 +199,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import java.io.File
@@ -211,6 +222,9 @@ class AiChatActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_ENTRY = "entry"
         const val EXTRA_AVAILABLE_CONTEXTS = "available_contexts"
+        const val EXTRA_LOADED_SKILL_IDS = "loaded_skill_ids"
+        const val EXTRA_CONTEXT_ATTACHMENTS = "context_attachments"
+        const val EXTRA_EXPAND_SUGGESTIONS = "expand_suggestions"
         const val ENTRY_BOOKSHELF = "bookshelf"
     }
 
@@ -312,8 +326,30 @@ private fun AiChatRoute(onBack: () -> Unit) {
     val entrySource = remember {
         (context as? AiChatActivity)?.intent?.getStringExtra(AiChatActivity.EXTRA_ENTRY)
     }
-    val entryAttachments = remember(entrySource) {
-        buildEntryInputAttachments(entrySource)
+    val preloadSkillIds = remember {
+        (context as? AiChatActivity)
+            ?.intent
+            ?.getStringArrayListExtra(AiChatActivity.EXTRA_LOADED_SKILL_IDS)
+            .orEmpty()
+    }
+    val preloadContextAttachments = remember {
+        buildIntentContextInputAttachments(
+            (context as? AiChatActivity)
+                ?.intent
+                ?.getStringArrayListExtra(AiChatActivity.EXTRA_CONTEXT_ATTACHMENTS)
+                .orEmpty()
+        )
+    }
+    val expandSuggestionsOnEntry = remember {
+        (context as? AiChatActivity)
+            ?.intent
+            ?.getBooleanExtra(AiChatActivity.EXTRA_EXPAND_SUGGESTIONS, false) == true
+    }
+    val entryAttachments = remember(entrySource, preloadSkillIds, preloadContextAttachments) {
+        (buildEntryInputAttachments(entrySource) +
+            buildSkillInputAttachments(preloadSkillIds) +
+            preloadContextAttachments)
+            .distinctBy { it.id }
     }
     val availableContextAttachments = remember(entrySource) {
         val contextSources = (context as? AiChatActivity)
@@ -327,7 +363,11 @@ private fun AiChatRoute(onBack: () -> Unit) {
             addAll(entryAttachments)
         }
     }
-    val uploadMessages = remember { mutableStateListOf<JsonObject>() }
+    val uploadMessages = remember {
+        mutableStateListOf<JsonObject>().apply {
+            add(chatClient.newSystemMessage())
+        }
+    }
     val messages = remember { mutableStateListOf<ChatUiMessage>() }
     val sessions = remember { mutableStateListOf<AiChatSessionSnapshot>() }
     val listState = rememberLazyListState()
@@ -367,7 +407,7 @@ private fun AiChatRoute(onBack: () -> Unit) {
         .filter { it.type == AiChatInputAttachmentType.SKILL }
         .flatMap { it.suggestions }
         .distinct()
-    var suggestionsExpanded by remember { mutableStateOf(false) }
+    var suggestionsExpanded by remember { mutableStateOf(expandSuggestionsOnEntry) }
     val currentTitle = sessions.firstOrNull { it.id == activeSessionId }?.title
         ?: messages.deriveChatTitle()
         ?: "新聊天"
@@ -385,6 +425,9 @@ private fun AiChatRoute(onBack: () -> Unit) {
         }
         sessions.clear()
         sessions += history.sessions
+        if (sending || messages.isNotEmpty()) {
+            return@LaunchedEffect
+        }
         val activeSession = history.activeSessionId
             ?.let { activeId -> history.sessions.firstOrNull { it.id == activeId } }
             ?: history.sessions.firstOrNull()
@@ -399,8 +442,6 @@ private fun AiChatRoute(onBack: () -> Unit) {
             messages.replaceWith(activeSession.messages.map { it.toUiMessage() })
             uploadMessages.replaceUploadMessages(activeSession, chatClient)
             inputAttachments.replaceWith(buildSkillInputAttachments(activeSession.loadedSkillIds))
-        } else if (uploadMessages.isEmpty()) {
-            uploadMessages += chatClient.newSystemMessage()
         }
     }
     LaunchedEffect(messages.size) {
@@ -527,6 +568,115 @@ private fun AiChatRoute(onBack: () -> Unit) {
         saveHistory(session.id)
     }
 
+    suspend fun confirmToolCalls(toolCalls: List<AiPendingToolCall>): Boolean {
+        if (toolCalls.isEmpty()) return true
+        return withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine { continuation ->
+                val activity = context as? AiChatActivity
+                if (activity == null || activity.isFinishing) {
+                    continuation.resume(false)
+                    return@suspendCancellableCoroutine
+                }
+                val summaries = toolCalls.map { it.toWriteOperationSummary() }
+                var resumed = false
+                fun resumeOnce(value: Boolean) {
+                    if (resumed) return
+                    resumed = true
+                    continuation.resume(value)
+                }
+                val dialog = Dialog(activity)
+                val root = LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    background = ContextCompat.getDrawable(activity, R.drawable.ng_bg_dialog)
+                    clipToOutline = true
+                }
+                root.addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(24.dpToPx(), 24.dpToPx(), 24.dpToPx(), 10.dpToPx())
+                    addView(TextView(activity).apply {
+                        text = "确认写操作"
+                        setTextColor(ContextCompat.getColor(activity, R.color.ng_on_surface))
+                        textSize = 24f
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    })
+                })
+                val scrollView = ScrollView(activity).apply {
+                    isFillViewport = false
+                    addView(LinearLayout(activity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        addView(TextView(activity).apply {
+                            text = "AI 请求执行以下写操作，确认后会写入或修改本地数据。"
+                            setTextColor(ContextCompat.getColor(activity, R.color.ng_on_surface_variant))
+                            textSize = 15f
+                            setLineSpacing(2f, 1.05f)
+                        })
+                        summaries.forEachIndexed { index, summary ->
+                            addView(createWriteOperationSummaryView(activity, index + 1, summary))
+                        }
+                    })
+                }
+                root.addView(scrollView, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    0
+                ).apply {
+                    weight = 1f
+                    leftMargin = 24.dpToPx()
+                    rightMargin = 24.dpToPx()
+                    bottomMargin = 10.dpToPx()
+                })
+                root.addView(LinearLayout(activity).apply {
+                    gravity = android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.END
+                    setPadding(24.dpToPx(), 10.dpToPx(), 24.dpToPx(), 20.dpToPx())
+                    background = ContextCompat.getDrawable(activity, R.drawable.ng_bg_dialog_action_bar)
+                    addView(TextView(activity).apply {
+                        text = "取消"
+                        gravity = android.view.Gravity.CENTER
+                        setTextColor(ContextCompat.getColor(activity, R.color.ng_primary))
+                        textSize = 14f
+                        includeFontPadding = false
+                        background = ContextCompat.getDrawable(activity, R.drawable.ng_bg_button_secondary)
+                        setOnClickListener {
+                            dialog.dismiss()
+                            resumeOnce(false)
+                        }
+                    }, LinearLayout.LayoutParams(
+                        76.dpToPx(),
+                        36.dpToPx()
+                    ).apply {
+                        rightMargin = 8.dpToPx()
+                    })
+                    addView(TextView(activity).apply {
+                        text = "执行"
+                        gravity = android.view.Gravity.CENTER
+                        setTextColor(ContextCompat.getColor(activity, R.color.ng_on_primary))
+                        textSize = 14f
+                        includeFontPadding = false
+                        background = ContextCompat.getDrawable(activity, R.drawable.ng_bg_button_primary)
+                        setOnClickListener {
+                            dialog.dismiss()
+                            resumeOnce(true)
+                        }
+                    }, LinearLayout.LayoutParams(
+                        76.dpToPx(),
+                        36.dpToPx()
+                    ))
+                }, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ))
+                dialog.setContentView(root)
+                dialog.setOnCancelListener {
+                        resumeOnce(false)
+                }
+                continuation.invokeOnCancellation {
+                    dialog.dismiss()
+                }
+                dialog.show()
+                dialog.applyNgWindow(height = (activity.resources.displayMetrics.heightPixels * 0.62f).toInt())
+            }
+        }
+    }
+
     fun sendCurrentMessages() {
         sending = true
         val loadingId = UUID.randomUUID().toString()
@@ -544,19 +694,28 @@ private fun AiChatRoute(onBack: () -> Unit) {
             elapsedMs = 0L,
             loading = true
         )
+        scope.launch {
+            listState.scrollToItem(messages.lastIndex)
+        }
         sendingJob?.cancel()
         sendingJob = scope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    chatClient.send(uploadMessages) { update: AiChatStreamUpdate ->
-                        scope.launch {
-                            if (activeLoadingMessageId == loadingId) {
-                                activeStreamContentTarget = update.content
-                                activeStreamReasoningTarget = update.reasoning.orEmpty()
-                                activeStreamToolTraceTarget = update.toolTrace
+                    chatClient.send(
+                        messages = uploadMessages,
+                        onStreamUpdate = { update: AiChatStreamUpdate ->
+                            scope.launch {
+                                if (activeLoadingMessageId == loadingId) {
+                                    activeStreamContentTarget = update.content
+                                    activeStreamReasoningTarget = update.reasoning.orEmpty()
+                                    activeStreamToolTraceTarget = update.toolTrace
+                                }
                             }
+                        },
+                        onToolConfirmationRequired = { pendingCalls ->
+                            confirmToolCalls(pendingCalls)
                         }
-                    }
+                    )
                 }
             }
             val elapsedMs = System.currentTimeMillis() - startedAt
@@ -601,6 +760,9 @@ private fun AiChatRoute(onBack: () -> Unit) {
         input = ""
         val userMessage = ChatUiMessage(role = ChatRole.USER, content = content)
         messages += userMessage
+        scope.launch {
+            listState.scrollToItem(messages.lastIndex)
+        }
         uploadMessages += chatClient.newUserMessage(
             buildUserUploadContent(content, inputAttachments)
         )
@@ -1828,9 +1990,6 @@ private fun RikkaMessageItem(
                 onExport = onExport
             )
         } else {
-            val interactionRender = remember(message.content) {
-                AiChatInteractionParser.parse(message.content)
-            }
             AssistantMessageHeader()
             if (message.loading) {
                 ThinkingLoadingLine()
@@ -1842,7 +2001,7 @@ private fun RikkaMessageItem(
                         defaultExpanded = true
                     )
                 }
-                val streamingContent = interactionRender.content
+                val streamingContent = message.content
                     .takeUnless { it == "正在思考..." }
                     .orEmpty()
                 if (streamingContent.isNotBlank()) {
@@ -1858,6 +2017,9 @@ private fun RikkaMessageItem(
                     ToolTraceEntry(message.toolTrace)
                 }
             } else {
+                val interactionRender = remember(message.content) {
+                    AiChatInteractionParser.parse(message.content)
+                }
                 if (!message.reasoning.isNullOrBlank()) {
                     ReasoningEntry(
                         reasoning = message.reasoning,
@@ -4044,6 +4206,27 @@ private fun buildSkillInputAttachments(skillIds: List<String>): List<AiChatInput
         AiSkillRegistry.get(skillId)
             ?.takeIf { it.scope == AiSkillScope.AGENT }
             ?.let(::toSkillInputAttachment)
+    }
+}
+
+private fun buildIntentContextInputAttachments(rawAttachments: List<String>): List<AiChatInputAttachment> {
+    return rawAttachments.mapNotNull { raw ->
+        runCatching {
+            val json = GSON.fromJson(raw, JsonObject::class.java)
+            val id = json.get("id")?.asString?.trim().orEmpty()
+            val title = json.get("title")?.asString?.trim().orEmpty()
+            val prompt = json.get("prompt")?.asString?.trim().orEmpty()
+            if (id.isBlank() || title.isBlank() || prompt.isBlank()) {
+                return@runCatching null
+            }
+            AiChatInputAttachment(
+                id = "context.$id",
+                type = AiChatInputAttachmentType.CONTEXT,
+                title = title,
+                subtitle = json.get("subtitle")?.asString?.trim().orEmpty(),
+                prompt = prompt
+            )
+        }.getOrNull()
     }
 }
 

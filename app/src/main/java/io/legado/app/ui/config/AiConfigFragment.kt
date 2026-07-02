@@ -1,6 +1,7 @@
 package io.legado.app.ui.config
 
 import android.annotation.SuppressLint
+import android.app.Dialog
 import android.net.Uri
 import android.graphics.Color
 import android.content.res.ColorStateList
@@ -17,6 +18,7 @@ import android.text.method.LinkMovementMethod
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -24,6 +26,7 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.RadioButton
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
@@ -53,6 +56,7 @@ import io.legado.app.help.ai.AiModel
 import io.legado.app.help.ai.AiModelAbility
 import io.legado.app.help.ai.AiModelModality
 import io.legado.app.help.ai.AiModelType
+import io.legado.app.help.ai.AiOperationPermissionMode
 import io.legado.app.help.ai.AiPromptStore
 import io.legado.app.help.ai.AiProviderSetting
 import io.legado.app.help.ai.AiProviderStore
@@ -68,6 +72,7 @@ import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.databinding.ItemAiPromptBinding
 import io.legado.app.ui.widget.TitleBar
+import io.legado.app.ui.widget.dialog.applyNgWindow
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.utils.applyTint
@@ -167,7 +172,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             showProviderList()
         }
         binding.layoutModelEntry.setOnClickListener {
-            showModelSettings()
+            showAssistantModelSettings()
         }
         binding.layoutPromptEntry.setOnClickListener {
             showPromptList()
@@ -188,9 +193,26 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             if (!ignoreMainFormChanges) {
                 AiConfig.internalMcpEnabled = isChecked
                 refreshMain()
+                refreshModelSettings()
+            }
+        }
+        binding.layoutAiOperationPermission.setOnClickListener {
+            showOperationPermissionDialog()
+        }
+        binding.layoutAiMemory.setOnClickListener {
+            binding.switchAiMemory.isChecked = !binding.switchAiMemory.isChecked
+        }
+        binding.switchAiMemory.setOnCheckedChangeListener { _, isChecked ->
+            if (!ignoreMainFormChanges) {
+                AiConfig.memoryEnabled = isChecked
+                refreshMain()
+                refreshModelSettings()
             }
         }
         binding.layoutPurifyEntry.setOnClickListener {
+            showPurifyModelSettings()
+        }
+        binding.layoutPurifySettingsEntry.setOnClickListener {
             showPurifySettings()
         }
     }
@@ -620,9 +642,9 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             Page.PROVIDERS -> showMain()
             Page.PROMPTS -> showMain()
             Page.MODEL_SETTINGS -> showMain()
-            Page.PURIFY_MODEL_SETTINGS -> showModelSettings()
-            Page.ASSISTANT_MODEL_SETTINGS -> showModelSettings()
-            Page.PURIFY_SETTINGS -> showMain()
+            Page.PURIFY_MODEL_SETTINGS -> showMain()
+            Page.ASSISTANT_MODEL_SETTINGS -> showMain()
+            Page.PURIFY_SETTINGS -> showPurifyModelSettings()
             Page.MAIN -> Unit
         }
     }
@@ -860,6 +882,129 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             .create()
     }
 
+    private fun createNgChoiceDialogRoot(
+        title: String,
+        description: String?
+    ): LinearLayout {
+        return LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ContextCompat.getDrawable(requireContext(), R.drawable.ng_bg_dialog)
+            clipToOutline = true
+            addView(LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(24.dpToPx(), 24.dpToPx(), 24.dpToPx(), 10.dpToPx())
+                addView(TextView(requireContext()).apply {
+                    text = title
+                    setTextColor(ContextCompat.getColor(requireContext(), R.color.ng_on_surface))
+                    typeface = Typeface.DEFAULT_BOLD
+                    textSize = 24f
+                })
+                if (!description.isNullOrBlank()) {
+                    addView(TextView(requireContext()).apply {
+                        text = description
+                        setTextColor(ContextCompat.getColor(requireContext(), R.color.ng_on_surface_variant))
+                        textSize = 14f
+                        setPadding(0, 8.dpToPx(), 0, 0)
+                    })
+                }
+            })
+            addView(LinearLayout(requireContext()).apply {
+                tag = "body"
+                orientation = LinearLayout.VERTICAL
+                setPadding(20.dpToPx(), 0, 24.dpToPx(), 22.dpToPx())
+            }, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+        }
+    }
+
+    private fun selectableItemBackground(): android.graphics.drawable.Drawable? {
+        val value = TypedValue()
+        requireContext().theme.resolveAttribute(android.R.attr.selectableItemBackground, value, true)
+        return ContextCompat.getDrawable(requireContext(), value.resourceId)
+    }
+
+    private fun showOperationPermissionDialog() {
+        val modes = AiOperationPermissionMode.entries.toTypedArray()
+        val dialog = Dialog(requireContext())
+        val root = createNgChoiceDialogRoot(
+            title = getString(R.string.ai_operation_permission),
+            description = null
+        )
+        val body = root.findViewWithTag<LinearLayout>("body")
+        modes.forEach { mode ->
+            body.addView(createOperationPermissionRow(mode, dialog))
+        }
+        dialog.setContentView(root)
+        dialog.show()
+        dialog.applyNgWindow()
+    }
+
+    private fun createOperationPermissionRow(
+        mode: AiOperationPermissionMode,
+        dialog: Dialog
+    ): View {
+        val selected = AiConfig.operationPermissionMode == mode
+        return LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = selectableItemBackground()
+            isClickable = true
+            isFocusable = true
+            setPadding(0, 8.dpToPx(), 0, 8.dpToPx())
+            setOnClickListener {
+                AiConfig.operationPermissionMode = mode
+                dialog.dismiss()
+                refreshMain()
+                refreshModelSettings()
+            }
+            addView(RadioButton(requireContext()).apply {
+                isChecked = selected
+                buttonTintList = ColorStateList.valueOf(accentColor)
+                isClickable = false
+            }, LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx()))
+            addView(LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(requireContext()).apply {
+                    text = operationPermissionModeTitle(mode)
+                    setTextColor(ContextCompat.getColor(requireContext(), R.color.ng_on_surface))
+                    textSize = 17f
+                })
+                addView(TextView(requireContext()).apply {
+                    text = operationPermissionModeSummary(mode)
+                    setTextColor(ContextCompat.getColor(requireContext(), R.color.ng_on_surface_variant))
+                    textSize = 13f
+                    setPadding(0, 4.dpToPx(), 0, 0)
+                })
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                weight = 1f
+            })
+        }
+    }
+
+    private fun operationPermissionModeTitle(mode: AiOperationPermissionMode): String {
+        return getString(
+            when (mode) {
+                AiOperationPermissionMode.CONFIRM_WRITE ->
+                    R.string.ai_operation_permission_mode_confirm_write
+                AiOperationPermissionMode.TRUSTED ->
+                    R.string.ai_operation_permission_mode_trusted
+            }
+        )
+    }
+
+    private fun operationPermissionModeSummary(mode: AiOperationPermissionMode): String {
+        return getString(
+            when (mode) {
+                AiOperationPermissionMode.CONFIRM_WRITE ->
+                    R.string.ai_operation_permission_summary_confirm_write
+                AiOperationPermissionMode.TRUSTED ->
+                    R.string.ai_operation_permission_summary_trusted
+            }
+        )
+    }
+
     private fun refreshMain() {
         val providers = AiProviderStore.providers()
         val color = accentColor
@@ -869,12 +1014,12 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         binding.imageModelEntryIcon.imageTintList = entryIconTint
         binding.imagePromptEntryIcon.imageTintList = entryIconTint
         binding.imageChatFabIcon.imageTintList = entryIconTint
-        binding.imageInternalMcpIcon.imageTintList = entryIconTint
         binding.imagePurifyEntryIcon.imageTintList = entryIconTint
         ignoreMainFormChanges = true
         try {
             binding.switchChatFab.isChecked = AiConfig.chatFabEnabled
             binding.switchInternalMcp.isChecked = AiConfig.internalMcpEnabled
+            binding.switchAiMemory.isChecked = AiConfig.memoryEnabled
         } finally {
             ignoreMainFormChanges = false
         }
@@ -883,9 +1028,9 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             providers.size.toString()
         )
         binding.textModelEntrySummary.text = getString(
-            R.string.ai_model_settings_summary,
+            R.string.ai_model_function_summary,
             assistantModelSummaryText(),
-            purifyModelSummaryText()
+            assistantReasoningSummaryText()
         )
         binding.textPromptEntrySummary.text = getString(
             R.string.ai_prompt_menu_summary,
@@ -905,15 +1050,19 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                 R.string.ai_internal_mcp_summary_off
             }
         )
+        binding.textAiOperationPermissionSummary.text =
+            operationPermissionModeSummary(AiConfig.operationPermissionMode)
+        binding.textAiMemorySummary.text = getString(
+            if (AiConfig.memoryEnabled) {
+                R.string.ai_memory_summary_on
+            } else {
+                R.string.ai_memory_summary_off
+            }
+        )
         binding.textPurifyEntrySummary.text = getString(
-            R.string.ai_purify_settings_summary,
-            getString(if (AiConfig.purifyAutoApply) R.string.enabled else R.string.disabled),
-            getString(if (AiConfig.purifyChapterAutoApply) R.string.enabled else R.string.disabled),
-            AiConfig.purifyParagraphLimit.toString(),
-            AiConfig.purifyChapterSegmentLimit.toString(),
-            AiConfig.purifyChapterSampleLimit.toString(),
-            AiConfig.purifyChapterConcurrencyLimit.toString(),
-            AiConfig.purifyChapterRetryCount.toString()
+            R.string.ai_model_function_summary,
+            purifyModelSummaryText(),
+            purifyReasoningSummaryText()
         )
     }
 
@@ -1839,8 +1988,19 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         binding.imageAssistantModelSettingsIcon.imageTintList = entryIconTint
         binding.imagePurifyModelIcon.imageTintList = entryIconTint
         binding.imagePurifyReasoningIcon.imageTintList = entryIconTint
+        binding.imagePurifySettingsEntryIcon.imageTintList = entryIconTint
         binding.imageAssistantModelIcon.imageTintList = entryIconTint
         binding.imageAssistantReasoningIcon.imageTintList = entryIconTint
+        binding.imageInternalMcpIcon.imageTintList = entryIconTint
+        binding.imageAiMemoryIcon.imageTintList = entryIconTint
+        binding.imageAiOperationPermissionIcon.imageTintList = entryIconTint
+        ignoreMainFormChanges = true
+        try {
+            binding.switchInternalMcp.isChecked = AiConfig.internalMcpEnabled
+            binding.switchAiMemory.isChecked = AiConfig.memoryEnabled
+        } finally {
+            ignoreMainFormChanges = false
+        }
         binding.textPurifyModelSettingsSummary.text = getString(
             R.string.ai_model_function_summary,
             purifyModelSummaryText(),
@@ -1853,8 +2013,34 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         )
         binding.textPurifyModelSummary.text = purifyModelSummaryText()
         binding.textPurifyReasoningSummary.text = purifyReasoningSummaryText()
+        binding.textPurifySettingsEntrySummary.text = getString(
+            R.string.ai_purify_settings_summary,
+            getString(if (AiConfig.purifyAutoApply) R.string.enabled else R.string.disabled),
+            getString(if (AiConfig.purifyChapterAutoApply) R.string.enabled else R.string.disabled),
+            AiConfig.purifyParagraphLimit.toString(),
+            AiConfig.purifyChapterSegmentLimit.toString(),
+            AiConfig.purifyChapterSampleLimit.toString(),
+            AiConfig.purifyChapterConcurrencyLimit.toString(),
+            AiConfig.purifyChapterRetryCount.toString()
+        )
         binding.textAssistantModelSummary.text = assistantModelSummaryText()
         binding.textAssistantReasoningSummary.text = assistantReasoningSummaryText()
+        binding.textInternalMcpSummary.text = getString(
+            if (AiConfig.internalMcpEnabled) {
+                R.string.ai_internal_mcp_summary_on
+            } else {
+                R.string.ai_internal_mcp_summary_off
+            }
+        )
+        binding.textAiMemorySummary.text = getString(
+            if (AiConfig.memoryEnabled) {
+                R.string.ai_memory_summary_on
+            } else {
+                R.string.ai_memory_summary_off
+            }
+        )
+        binding.textAiOperationPermissionSummary.text =
+            operationPermissionModeSummary(AiConfig.operationPermissionMode)
         val reasoningEnabled = selectedPurifyModel()?.model?.supportsReasoning() == true
         binding.layoutPurifyReasoningEntry.alpha = if (reasoningEnabled) 1f else 0.55f
         val assistantReasoningEnabled = selectedAssistantModel()?.model?.supportsReasoning() == true
@@ -2151,6 +2337,55 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             ).show()
             return
         }
+        showReasoningLevelDialog(
+            title = getString(R.string.ai_purify_reasoning_title),
+            description = getString(R.string.ai_purify_reasoning_desc),
+            currentLevel = AiConfig.purifyReasoningLevel,
+            iconTintWhenOff = true
+        ) { level ->
+            AiConfig.purifyReasoningLevel = level
+            refreshModelSettings()
+            refreshMain()
+        }
+    }
+
+    private fun showAssistantReasoningDialog() {
+        val selected = selectedAssistantModel()
+        if (selected == null) {
+            Toast.makeText(
+                requireContext(),
+                R.string.ai_assistant_reasoning_select_model_first,
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        if (!selected.model.supportsReasoning()) {
+            Toast.makeText(
+                requireContext(),
+                R.string.ai_assistant_reasoning_unsupported,
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        showReasoningLevelDialog(
+            title = getString(R.string.ai_assistant_reasoning_title),
+            description = getString(R.string.ai_assistant_reasoning_desc),
+            currentLevel = AiConfig.assistantReasoningLevel,
+            iconTintWhenOff = false
+        ) { level ->
+            AiConfig.assistantReasoningLevel = level
+            refreshModelSettings()
+            refreshMain()
+        }
+    }
+
+    private fun showReasoningLevelDialog(
+        title: String,
+        description: String,
+        currentLevel: AiReasoningLevel,
+        iconTintWhenOff: Boolean,
+        onLevelChanged: (AiReasoningLevel) -> Unit
+    ) {
         val levels = AiReasoningLevel.entries.toList()
         val root = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
@@ -2162,29 +2397,34 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             }
         }
         root.addView(TextView(requireContext()).apply {
-            text = getString(R.string.ai_purify_reasoning_title)
+            text = title
             setTextColor(ContextCompat.getColor(requireContext(), R.color.ng_on_surface))
             typeface = Typeface.DEFAULT_BOLD
             textSize = 20f
             gravity = Gravity.CENTER
         })
         root.addView(TextView(requireContext()).apply {
-            text = getString(R.string.ai_purify_reasoning_desc)
+            text = description
             setTextColor(ContextCompat.getColor(requireContext(), R.color.ng_on_surface_variant))
             textSize = 14f
             gravity = Gravity.CENTER
             setPadding(0, 8.dpToPx(), 0, 22.dpToPx())
         })
         val currentLabel = TextView(requireContext()).apply {
-            text = AiConfig.purifyReasoningLevel.displayName()
+            text = currentLevel.displayName()
             setTextColor(ContextCompat.getColor(requireContext(), R.color.ng_on_surface))
             textSize = 18f
             gravity = Gravity.CENTER
         }
-        root.addView(ImageView(requireContext()).apply {
+        val currentIcon = ImageView(requireContext()).apply {
             setImageResource(R.drawable.ic_ai_capability_reasoning)
-            imageTintList = ColorStateList.valueOf(accentColor)
-        }, LinearLayout.LayoutParams(42.dpToPx(), 42.dpToPx()))
+            imageTintList = if (iconTintWhenOff || currentLevel != AiReasoningLevel.OFF) {
+                ColorStateList.valueOf(accentColor)
+            } else {
+                null
+            }
+        }
+        root.addView(currentIcon, LinearLayout.LayoutParams(42.dpToPx(), 42.dpToPx()))
         root.addView(currentLabel, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
@@ -2194,14 +2434,17 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         })
         val stepBar = ReasoningStepBar(requireContext()).apply {
             stepCount = levels.size
-            selectedIndex = levels.indexOf(AiConfig.purifyReasoningLevel).coerceAtLeast(0)
+            selectedIndex = levels.indexOf(currentLevel).coerceAtLeast(0)
             stepColor = accentColor
             onSelectedIndexChanged = { index ->
                 val level = levels.getOrNull(index) ?: AiReasoningLevel.AUTO
-                AiConfig.purifyReasoningLevel = level
+                onLevelChanged(level)
                 currentLabel.text = level.displayName()
-                refreshModelSettings()
-                refreshMain()
+                currentIcon.imageTintList = if (iconTintWhenOff || level != AiReasoningLevel.OFF) {
+                    ColorStateList.valueOf(accentColor)
+                } else {
+                    null
+                }
             }
         }
         root.addReasoningStepBar(stepBar)
@@ -2234,13 +2477,6 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             )
         }
         dialog.show()
-    }
-
-    private fun showAssistantReasoningDialog() {
-        AiAssistantConfigUi.showReasoningSheet(requireContext()) {
-            refreshModelSettings()
-            refreshMain()
-        }
     }
 
     private fun AiProviderSetting.purifyEligibleModels(): List<AiModel> {
@@ -2539,7 +2775,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                     || model.safeOwnedBy().contains(modelSearchQuery, ignoreCase = true)
             }
             .sortSelectedModelsFirst(selectedIds)
-        modelAdapter.providerIconRes = provider?.iconRes() ?: R.drawable.ic_ai_provider
+        modelAdapter.providerIconRes = provider?.iconRes() ?: R.drawable.ic_cfg_web
         modelAdapter.availableModelIds = selectedIds
         modelAdapter.setItems(models)
         updateModelSelectionAction(provider, models)
@@ -2951,7 +3187,7 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         RecyclerAdapter<AiModel, ItemAiModelBinding>(requireContext()) {
 
         var availableModelIds: Set<String> = emptySet()
-        var providerIconRes: Int = R.drawable.ic_ai_provider
+        var providerIconRes: Int = R.drawable.ic_cfg_web
         var onToggleModel: ((AiModel, Boolean) -> Unit)? = null
 
         override fun getViewBinding(parent: ViewGroup): ItemAiModelBinding {

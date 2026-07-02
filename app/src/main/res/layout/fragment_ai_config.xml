@@ -31,7 +31,7 @@
                     style="@style/Ng.SettingsIconImage"
                     android:layout_gravity="center_vertical"
                     android:contentDescription="@string/ai_provider_menu"
-                    android:src="@drawable/ic_ai_provider" />
+                    android:src="@drawable/ic_cfg_web" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -46,47 +46,6 @@
 
                     <TextView
                         android:id="@+id/text_provider_entry_summary"
-                        style="@style/Ng.SettingsSummary"
-                        android:layout_marginTop="4dp"
-                        android:maxLines="1" />
-
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="›"
-                    android:textColor="@color/ng_settings_arrow"
-                    android:textSize="30sp" />
-
-            </LinearLayout>
-
-            <View style="@style/Ng.SettingsItemGap" />
-
-            <LinearLayout
-                android:id="@+id/layout_model_entry"
-                style="@style/Ng.SettingsItem">
-
-                <ImageView
-                    android:id="@+id/image_model_entry_icon"
-                    style="@style/Ng.SettingsIconImage"
-                    android:layout_gravity="center_vertical"
-                    android:contentDescription="@string/ai_model_settings"
-                    android:src="@drawable/ic_ai_tab_models" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="14dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        style="@style/Ng.SettingsTitle"
-                        android:text="@string/ai_model_settings" />
-
-                    <TextView
-                        android:id="@+id/text_model_entry_summary"
                         style="@style/Ng.SettingsSummary"
                         android:layout_marginTop="4dp"
                         android:maxLines="1" />
@@ -188,48 +147,6 @@
             <View style="@style/Ng.SettingsItemGap" />
 
             <LinearLayout
-                android:id="@+id/layout_internal_mcp"
-                style="@style/Ng.SettingsItem"
-                android:clickable="false"
-                android:focusable="false"
-                android:foreground="@null">
-
-                <ImageView
-                    android:id="@+id/image_internal_mcp_icon"
-                    style="@style/Ng.SettingsIconImage"
-                    android:layout_gravity="center_vertical"
-                    android:contentDescription="@string/ai_internal_mcp"
-                    android:src="@drawable/ic_ai_capability_tool" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="14dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        style="@style/Ng.SettingsTitle"
-                        android:text="@string/ai_internal_mcp" />
-
-                    <TextView
-                        android:id="@+id/text_internal_mcp_summary"
-                        style="@style/Ng.SettingsSummary"
-                        android:layout_marginTop="4dp"
-                        android:maxLines="2" />
-
-                </LinearLayout>
-
-                <io.legado.app.lib.theme.view.ThemeSwitch
-                    android:id="@+id/switch_internal_mcp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-
-            </LinearLayout>
-
-            <View style="@style/Ng.SettingsItemGap" />
-
-            <LinearLayout
                 android:id="@+id/layout_purify_entry"
                 style="@style/Ng.SettingsItem">
 
@@ -237,7 +154,7 @@
                     android:id="@+id/image_purify_entry_icon"
                     style="@style/Ng.SettingsIconImage"
                     android:layout_gravity="center_vertical"
-                    android:contentDescription="@string/ai_purify_settings"
+                    android:contentDescription="@string/ai_purify"
                     android:src="@drawable/ic_ai_purify" />
 
                 <LinearLayout
@@ -249,10 +166,51 @@
 
                     <TextView
                         style="@style/Ng.SettingsTitle"
-                        android:text="@string/ai_purify_settings" />
+                        android:text="@string/ai_purify" />
 
                     <TextView
                         android:id="@+id/text_purify_entry_summary"
+                        style="@style/Ng.SettingsSummary"
+                        android:layout_marginTop="4dp"
+                        android:maxLines="1" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="@color/ng_settings_arrow"
+                    android:textSize="30sp" />
+
+            </LinearLayout>
+
+            <View style="@style/Ng.SettingsItemGap" />
+
+            <LinearLayout
+                android:id="@+id/layout_model_entry"
+                style="@style/Ng.SettingsItem">
+
+                <ImageView
+                    android:id="@+id/image_model_entry_icon"
+                    style="@style/Ng.SettingsIconImage"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="@string/ai_assistant"
+                    android:src="@drawable/ic_ai" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/Ng.SettingsTitle"
+                        android:text="@string/ai_assistant" />
+
+                    <TextView
+                        android:id="@+id/text_model_entry_summary"
                         style="@style/Ng.SettingsSummary"
                         android:layout_marginTop="4dp"
                         android:maxLines="1" />
@@ -492,6 +450,47 @@
 
                 </LinearLayout>
 
+                <View style="@style/Ng.SettingsItemGap" />
+
+                <LinearLayout
+                    android:id="@+id/layout_purify_settings_entry"
+                    style="@style/Ng.SettingsItem">
+
+                    <ImageView
+                        android:id="@+id/image_purify_settings_entry_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_purify_settings"
+                        android:src="@drawable/ic_ai_purify" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_purify_settings" />
+
+                        <TextView
+                            android:id="@+id/text_purify_settings_entry_summary"
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="1" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="›"
+                        android:textColor="@color/ng_settings_arrow"
+                        android:textSize="30sp" />
+
+                </LinearLayout>
+
                 <View style="@style/Ng.SettingsGroupEdgeSpace" />
 
             </io.legado.app.ui.widget.NgGlassLayout>
@@ -605,6 +604,131 @@
 
                 </LinearLayout>
 
+                <View style="@style/Ng.SettingsItemGap" />
+
+                <LinearLayout
+                    android:id="@+id/layout_internal_mcp"
+                    style="@style/Ng.SettingsItem"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:foreground="@null">
+
+                    <ImageView
+                        android:id="@+id/image_internal_mcp_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_internal_mcp"
+                        android:src="@drawable/ic_ai_capability_tool" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_internal_mcp" />
+
+                        <TextView
+                            android:id="@+id/text_internal_mcp_summary"
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="2" />
+
+                    </LinearLayout>
+
+                    <io.legado.app.lib.theme.view.ThemeSwitch
+                        android:id="@+id/switch_internal_mcp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+
+                <View style="@style/Ng.SettingsItemGap" />
+
+                <LinearLayout
+                    android:id="@+id/layout_ai_memory"
+                    style="@style/Ng.SettingsItem"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:foreground="@null">
+
+                    <ImageView
+                        android:id="@+id/image_ai_memory_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_memory"
+                        android:src="@drawable/ic_ai_context_menu" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_memory" />
+
+                        <TextView
+                            android:id="@+id/text_ai_memory_summary"
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="2" />
+
+                    </LinearLayout>
+
+                    <io.legado.app.lib.theme.view.ThemeSwitch
+                        android:id="@+id/switch_ai_memory"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+
+                <View style="@style/Ng.SettingsItemGap" />
+
+                <LinearLayout
+                    android:id="@+id/layout_ai_operation_permission"
+                    style="@style/Ng.SettingsItem">
+
+                    <ImageView
+                        android:id="@+id/image_ai_operation_permission_icon"
+                        style="@style/Ng.SettingsIconImage"
+                        android:layout_gravity="center_vertical"
+                        android:contentDescription="@string/ai_operation_permission"
+                        android:src="@drawable/ic_lock_outline" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Ng.SettingsTitle"
+                            android:text="@string/ai_operation_permission" />
+
+                        <TextView
+                            android:id="@+id/text_ai_operation_permission_summary"
+                            style="@style/Ng.SettingsSummary"
+                            android:layout_marginTop="4dp"
+                            android:maxLines="2" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="›"
+                        android:textColor="@color/ng_settings_arrow"
+                        android:textSize="30sp" />
+
+                </LinearLayout>
+
                 <View style="@style/Ng.SettingsGroupEdgeSpace" />
 
             </io.legado.app.ui.widget.NgGlassLayout>
@@ -693,7 +817,7 @@
                     style="@style/Ng.SettingsIconImage"
                     android:layout_gravity="center_vertical"
                     android:contentDescription="@string/ai_purify_exception_intercept"
-                    android:src="@drawable/ic_ai_provider" />
+                    android:src="@drawable/ic_cfg_web" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -835,7 +959,7 @@
                         style="@style/Ng.SettingsIconImage"
                         android:layout_gravity="center_vertical"
                         android:contentDescription="@string/ai_purify_exception_intercept"
-                        android:src="@drawable/ic_ai_provider" />
+                        android:src="@drawable/ic_cfg_web" />
 
                     <LinearLayout
                         android:layout_width="0dp"
