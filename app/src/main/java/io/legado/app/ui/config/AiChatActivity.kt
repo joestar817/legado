@@ -178,6 +178,7 @@ import io.legado.app.help.ai.AiChatSessionSnapshot
 import io.legado.app.help.ai.AiChatStreamUpdate
 import io.legado.app.help.ai.AiChatTurnResult
 import io.legado.app.help.ai.AiConfig
+import io.legado.app.help.ai.AiMemoryTraceItem
 import io.legado.app.help.ai.AiPendingToolCall
 import io.legado.app.help.ai.AiSkillRegistry
 import io.legado.app.help.ai.AiSkillScope
@@ -386,6 +387,7 @@ private fun AiChatRoute(onBack: () -> Unit) {
     var activeStreamContentTarget by remember { mutableStateOf("") }
     var activeStreamReasoningTarget by remember { mutableStateOf("") }
     var activeStreamToolTraceTarget by remember { mutableStateOf<List<String>>(emptyList()) }
+    var activeStreamMemoryTraceTarget by remember { mutableStateOf<List<AiMemoryTraceItem>>(emptyList()) }
     var selectedDrawerIndex by remember { mutableIntStateOf(2) }
     var configVersion by remember { mutableIntStateOf(0) }
     var previewMode by remember { mutableStateOf(false) }
@@ -488,7 +490,10 @@ private fun AiChatRoute(onBack: () -> Unit) {
                         reasoning = nextReasoning.takeIf { it.isNotBlank() },
                         toolTrace = activeStreamToolTraceTarget
                             .takeIf { it.isNotEmpty() }
-                            ?: message.toolTrace
+                            ?: message.toolTrace,
+                        memoryTrace = activeStreamMemoryTraceTarget
+                            .takeIf { it.isNotEmpty() }
+                            ?: message.memoryTrace
                     )
                 }
             }
@@ -703,6 +708,7 @@ private fun AiChatRoute(onBack: () -> Unit) {
         activeStreamContentTarget = ""
         activeStreamReasoningTarget = ""
         activeStreamToolTraceTarget = emptyList()
+        activeStreamMemoryTraceTarget = emptyList()
         val uploadMessageSizeBeforeSend = uploadMessages.size
         messages += ChatUiMessage(
             id = loadingId,
@@ -726,6 +732,7 @@ private fun AiChatRoute(onBack: () -> Unit) {
                                     activeStreamContentTarget = update.content
                                     activeStreamReasoningTarget = update.reasoning.orEmpty()
                                     activeStreamToolTraceTarget = update.toolTrace
+                                    activeStreamMemoryTraceTarget = update.memoryTrace
                                 }
                             }
                         },
@@ -759,6 +766,7 @@ private fun AiChatRoute(onBack: () -> Unit) {
             activeStreamContentTarget = ""
             activeStreamReasoningTarget = ""
             activeStreamToolTraceTarget = emptyList()
+            activeStreamMemoryTraceTarget = emptyList()
         }
     }
 
@@ -2770,6 +2778,9 @@ private fun RikkaMessageItem(
                 if (message.toolTrace.isNotEmpty()) {
                     ToolTraceEntry(message.toolTrace)
                 }
+                if (message.memoryTrace.isNotEmpty()) {
+                    MemoryTraceEntry(message.memoryTrace)
+                }
             } else {
                 val interactionRender = remember(message.content) {
                     AiChatInteractionParser.parse(message.content)
@@ -2802,6 +2813,9 @@ private fun RikkaMessageItem(
                 }
                 if (message.toolTrace.isNotEmpty()) {
                     ToolTraceEntry(message.toolTrace)
+                }
+                if (message.memoryTrace.isNotEmpty()) {
+                    MemoryTraceEntry(message.memoryTrace)
                 }
                 MessageActions(
                     message = message,
@@ -3767,6 +3781,82 @@ private fun ToolTraceEntry(toolTrace: List<String>) {
 }
 
 @Composable
+private fun MemoryTraceEntry(memoryTrace: List<AiMemoryTraceItem>) {
+    var expanded by remember { mutableStateOf(false) }
+    val latest = memoryTrace.lastOrNull() ?: return
+    val running = memoryTrace.any { it.status == AiMemoryTraceItem.STATUS_RUNNING }
+    val label = when {
+        running -> "正在生成记忆"
+        latest.status == AiMemoryTraceItem.STATUS_SAVED -> latest.detail?.let { "已保存记忆：$it" } ?: "已保存记忆"
+        latest.status == AiMemoryTraceItem.STATUS_FAILED -> "记忆保存失败"
+        else -> latest.title
+    }
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { expanded = !expanded }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = when (latest.status) {
+                AiMemoryTraceItem.STATUS_FAILED -> MaterialTheme.colorScheme.error.copy(alpha = 0.78f)
+                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (running) {
+            ThinkingDots()
+        } else {
+            Icon(
+                imageVector = if (expanded) {
+                    Icons.Rounded.KeyboardArrowDown
+                } else {
+                    Icons.AutoMirrored.Rounded.KeyboardArrowRight
+                },
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+
+    AnimatedVisibility(visible = expanded) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp, bottom = 6.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                memoryTrace.forEach { item ->
+                    val prefix = when (item.status) {
+                        AiMemoryTraceItem.STATUS_RUNNING -> "生成中"
+                        AiMemoryTraceItem.STATUS_SAVED -> "已保存"
+                        AiMemoryTraceItem.STATUS_FAILED -> "失败"
+                        else -> item.status
+                    }
+                    Text(
+                        text = "• $prefix：${item.detail ?: item.title}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun InlineDetailEntry(
     label: String,
     expanded: Boolean,
@@ -4689,6 +4779,7 @@ private fun AiChatTurnResult.toUiMessage(elapsedMs: Long): ChatUiMessage {
         meta = meta,
         reasoning = reasoning,
         toolTrace = toolTrace,
+        memoryTrace = memoryTrace,
         elapsedMs = elapsedMs
     )
 }
@@ -5568,6 +5659,7 @@ private fun ChatUiMessage.toSnapshot(): AiChatMessageSnapshot {
         meta = meta,
         reasoning = reasoning,
         toolTrace = toolTrace,
+        memoryTrace = memoryTrace,
         elapsedMs = elapsedMs,
         favorite = favorite
     )
@@ -5584,6 +5676,7 @@ private fun AiChatMessageSnapshot.toUiMessage(): ChatUiMessage {
         meta = meta,
         reasoning = reasoning,
         toolTrace = toolTrace,
+        memoryTrace = memoryTrace,
         elapsedMs = elapsedMs,
         favorite = favorite
     )
@@ -5596,6 +5689,7 @@ private data class ChatUiMessage(
     val meta: String? = null,
     val reasoning: String? = null,
     val toolTrace: List<String> = emptyList(),
+    val memoryTrace: List<AiMemoryTraceItem> = emptyList(),
     val elapsedMs: Long? = null,
     val favorite: Boolean = false,
     val loading: Boolean = false

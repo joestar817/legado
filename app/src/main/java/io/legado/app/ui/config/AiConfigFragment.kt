@@ -50,6 +50,7 @@ import io.legado.app.databinding.DialogAiModelEditBinding
 import io.legado.app.databinding.FragmentAiConfigBinding
 import io.legado.app.databinding.ItemAiModelBinding
 import io.legado.app.databinding.ItemAiProviderBinding
+import io.legado.app.data.appDb
 import io.legado.app.help.ai.AiConfig
 import io.legado.app.help.ai.AiManager
 import io.legado.app.help.ai.AiModel
@@ -210,12 +211,13 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
             showOperationPermissionDialog()
         }
         binding.layoutAiMemory.setOnClickListener {
-            binding.switchAiMemory.isChecked = !binding.switchAiMemory.isChecked
+            showAiMemoryDialog()
         }
         binding.switchAiMemory.setOnCheckedChangeListener { _, isChecked ->
             if (!ignoreMainFormChanges) {
                 AiConfig.memoryEnabled = isChecked
                 refreshMain()
+                refreshAiMemorySummary()
                 refreshModelSettings()
             }
         }
@@ -1069,11 +1071,154 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
                 R.string.ai_memory_summary_off
             }
         )
+        refreshAiMemorySummary()
         binding.textPurifyEntrySummary.text = getString(
             R.string.ai_model_function_summary,
             purifyModelSummaryText(),
             purifyReasoningSummaryText()
         )
+    }
+
+    private fun refreshAiMemorySummary() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val stats = withContext(Dispatchers.IO) {
+                loadAiMemoryStats()
+            }
+            if (!isAdded) return@launch
+            binding.textAiMemorySummary.text = if (AiConfig.memoryEnabled) {
+                getString(
+                    R.string.ai_memory_summary_on_with_stats,
+                    stats.count,
+                    formatMemorySize(stats.estimatedSize)
+                )
+            } else {
+                getString(
+                    R.string.ai_memory_summary_off_with_stats,
+                    stats.count,
+                    formatMemorySize(stats.estimatedSize)
+                )
+            }
+        }
+    }
+
+    private fun showAiMemoryDialog() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val stats = withContext(Dispatchers.IO) {
+                loadAiMemoryStats()
+            }
+            if (!isAdded) return@launch
+            val context = requireContext()
+            val dialog = Dialog(context)
+            val root = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                background = ContextCompat.getDrawable(context, R.drawable.ng_bg_dialog)
+                clipToOutline = true
+                setPadding(24.dpToPx(), 24.dpToPx(), 24.dpToPx(), 18.dpToPx())
+            }
+            root.addView(TextView(context).apply {
+                text = getString(R.string.ai_memory)
+                setTextColor(ContextCompat.getColor(context, R.color.ng_on_surface))
+                textSize = 24f
+                typeface = Typeface.DEFAULT_BOLD
+            })
+            root.addView(TextView(context).apply {
+                text = if (AiConfig.memoryEnabled) {
+                    getString(R.string.ai_memory_summary_on)
+                } else {
+                    getString(R.string.ai_memory_summary_off)
+                }
+                setTextColor(ContextCompat.getColor(context, R.color.ng_on_surface_variant))
+                textSize = 14f
+                setPadding(0, 8.dpToPx(), 0, 18.dpToPx())
+            })
+            root.addView(createMemoryStatRow(context, getString(R.string.ai_memory_count), stats.count.toString()))
+            root.addView(createMemoryStatRow(context, getString(R.string.ai_memory_size), formatMemorySize(stats.estimatedSize)))
+            root.addView(LinearLayout(context).apply {
+                gravity = Gravity.CENTER_VERTICAL or Gravity.END
+                setPadding(0, 22.dpToPx(), 0, 0)
+                addView(TextView(context).apply {
+                    text = getString(R.string.dialog_cancel)
+                    gravity = Gravity.CENTER
+                    setTextColor(ContextCompat.getColor(context, R.color.ng_primary))
+                    textSize = 14f
+                    includeFontPadding = false
+                    background = ContextCompat.getDrawable(context, R.drawable.ng_bg_button_secondary)
+                    setOnClickListener {
+                        dialog.dismiss()
+                    }
+                }, LinearLayout.LayoutParams(76.dpToPx(), 36.dpToPx()).apply {
+                    rightMargin = 8.dpToPx()
+                })
+                addView(TextView(context).apply {
+                    text = getString(R.string.ai_memory_clear)
+                    gravity = Gravity.CENTER
+                    setTextColor(ContextCompat.getColor(context, R.color.ng_on_primary))
+                    textSize = 14f
+                    includeFontPadding = false
+                    alpha = if (stats.count > 0) 1f else 0.45f
+                    isEnabled = stats.count > 0
+                    background = ContextCompat.getDrawable(context, R.drawable.ng_bg_button_primary)
+                    setOnClickListener {
+                        confirmClearAiMemory(dialog)
+                    }
+                }, LinearLayout.LayoutParams(90.dpToPx(), 36.dpToPx()))
+            })
+            dialog.setContentView(root)
+            dialog.show()
+            dialog.applyNgWindow()
+        }
+    }
+
+    private fun createMemoryStatRow(context: android.content.Context, label: String, value: String): View {
+        return LinearLayout(context).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 8.dpToPx(), 0, 8.dpToPx())
+            addView(TextView(context).apply {
+                text = label
+                setTextColor(ContextCompat.getColor(context, R.color.ng_on_surface_variant))
+                textSize = 15f
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                weight = 1f
+            })
+            addView(TextView(context).apply {
+                text = value
+                setTextColor(ContextCompat.getColor(context, R.color.ng_on_surface))
+                textSize = 15f
+                typeface = Typeface.DEFAULT_BOLD
+            })
+        }
+    }
+
+    private fun confirmClearAiMemory(parentDialog: Dialog) {
+        alert(R.string.ai_memory_clear) {
+            setMessage(R.string.ai_memory_clear_confirm)
+            okButton {
+                viewLifecycleOwner.lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        appDb.agentMemoryDao.clearAll()
+                    }
+                    parentDialog.dismiss()
+                    refreshAiMemorySummary()
+                    Toast.makeText(requireContext(), R.string.ai_memory_cleared, Toast.LENGTH_SHORT).show()
+                }
+            }
+            noButton()
+        }
+    }
+
+    private fun loadAiMemoryStats(): AiMemoryStats {
+        return AiMemoryStats(
+            count = appDb.agentMemoryDao.countAll(),
+            estimatedSize = appDb.agentMemoryDao.estimatedSize()
+        )
+    }
+
+    private fun formatMemorySize(bytes: Long): String {
+        return when {
+            bytes >= 1024L * 1024L -> "%.1f MB".format(bytes / 1024.0 / 1024.0)
+            bytes >= 1024L -> "%.1f KB".format(bytes / 1024.0)
+            else -> "${bytes} B"
+        }
     }
 
     private fun refreshProviders() {
@@ -3316,3 +3461,8 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         return spannable
     }
 }
+
+private data class AiMemoryStats(
+    val count: Int,
+    val estimatedSize: Long
+)

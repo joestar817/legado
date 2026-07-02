@@ -4,6 +4,7 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.google.gson.annotations.SerializedName
 import io.legado.app.help.http.await
 import io.legado.app.web.mcp.McpInternalChannel
 import kotlinx.coroutines.Dispatchers.IO
@@ -49,6 +50,7 @@ class AiChatClient {
         var lastModel: String? = null
         var lastReasoning: String? = null
         var lastFinishReason: String? = null
+        val memoryTrace = mutableListOf<AiMemoryTraceItem>()
         while (true) {
             currentCoroutineContext().ensureActive()
             val stream = setting.streamResponseEnabled
@@ -88,6 +90,7 @@ class AiChatClient {
                     finishReason = lastFinishReason,
                     usage = lastUsage,
                     toolTrace = toolTrace,
+                    memoryTrace = memoryTrace.toList(),
                     warnings = warnings
                 )
             }
@@ -122,6 +125,7 @@ class AiChatClient {
             } else {
                 true
             }
+            val characterMemoryContexts = mutableListOf<CharacterApplyMemoryContext>()
             parsedToolCalls.forEach { call ->
                 val result = if (!writeApproved && call.callId in writeToolCallIds) {
                     writeOperationCanceledResult(call.toolName)
@@ -140,9 +144,12 @@ class AiChatClient {
                     AiChatStreamUpdate(
                         content = content,
                         reasoning = lastReasoning,
-                        toolTrace = toolTrace.toList()
+                        toolTrace = toolTrace.toList(),
+                        memoryTrace = memoryTrace.toList()
                     )
                 )
+                result.toCharacterApplyMemoryContext(call.toolName)
+                    ?.let { characterMemoryContexts += it }
                 requestMessages.add(JsonObject().apply {
                     addProperty("role", "tool")
                     addProperty("tool_call_id", call.callId)
@@ -150,6 +157,24 @@ class AiChatClient {
                     addProperty("content", result.toModelToolContent(call.toolName))
                 })
             }
+            maybeRunCharacterMemoryHook(
+                contexts = characterMemoryContexts,
+                messages = requestMessages,
+                setting = setting,
+                model = model,
+                client = client,
+                memoryTrace = memoryTrace,
+                onStreamUpdate = {
+                    onStreamUpdate(
+                        AiChatStreamUpdate(
+                            content = content,
+                            reasoning = lastReasoning,
+                            toolTrace = toolTrace.toList(),
+                            memoryTrace = memoryTrace.toList()
+                        )
+                    )
+                }
+            )
         }
     }
 
@@ -404,8 +429,6 @@ class AiChatClient {
             return true
         }
         return arguments.booleanOrNull("write") == true ||
-            arguments.booleanOrNull("create") == true ||
-            arguments.booleanOrNull("create_if_missing") == true ||
             arguments.booleanOrNull("overwrite") == true
     }
 
@@ -439,6 +462,285 @@ class AiChatClient {
             )
             addProperty("preview", content.take(MAX_MODEL_TOOL_RESULT_CHARS))
         }.toString()
+    }
+
+    private suspend fun maybeRunCharacterMemoryHook(
+        contexts: List<CharacterApplyMemoryContext>,
+        messages: List<JsonObject>,
+        setting: AiProviderSetting,
+        model: AiModel,
+        client: OkHttpClient,
+        memoryTrace: MutableList<AiMemoryTraceItem>,
+        onStreamUpdate: () -> Unit
+    ) {
+        if (!AiConfig.memoryEnabled) return
+        val mergedContext = contexts.mergeCharacterMemoryContext() ?: return
+        val context = mergedContext.copy(
+            scanData = messages.latestCharacterScanData(mergedContext.workKey)
+        )
+        memoryTrace += AiMemoryTraceItem(
+            status = AiMemoryTraceItem.STATUS_RUNNING,
+            title = "正在生成记忆...",
+            detail = "角色卡已写入，正在总结本次操作"
+        )
+        onStreamUpdate()
+        val traceIndex = memoryTrace.lastIndex
+        val finalTrace = runCatching {
+            val generated = generateCharacterApplyMemory(
+                context = context,
+                setting = setting,
+                model = model,
+                client = client
+            )
+            val arguments = generated.toMemoryUpsertArguments(context)
+            val writeResult = McpInternalChannel.callTool("agent_memory_upsert", arguments)
+            check(writeResult.structuredContentOk()) { "记忆写入失败" }
+            AiMemoryTraceItem(
+                status = AiMemoryTraceItem.STATUS_SAVED,
+                title = "已保存记忆",
+                detail = generated.title
+            )
+        }.getOrElse {
+            AiMemoryTraceItem(
+                status = AiMemoryTraceItem.STATUS_FAILED,
+                title = "记忆保存失败",
+                detail = it.localizedMessage ?: it.toString()
+            )
+        }
+        if (traceIndex in memoryTrace.indices) {
+            memoryTrace[traceIndex] = finalTrace
+        } else {
+            memoryTrace += finalTrace
+        }
+        onStreamUpdate()
+    }
+
+    private suspend fun generateCharacterApplyMemory(
+        context: CharacterApplyMemoryContext,
+        setting: AiProviderSetting,
+        model: AiModel,
+        client: OkHttpClient
+    ): GeneratedMemory {
+        val memoryMessages = listOf(
+            JsonObject().apply {
+                addProperty("role", "system")
+                addProperty(
+                    "content",
+                    """
+                    你是阅读 App 的 AI 记忆总结器。
+                    只根据用户已经确认并已成功执行的操作生成一条短记忆。
+                    只返回 JSON，不要 Markdown，不要解释。
+                    JSON 字段：
+                    - title：20 字以内短标题
+                    - content：120 字以内，说明对象、已完成结果、后续有用线索
+                    - tags：字符串数组，最多 5 个
+                    - confidence：0 到 1，已确认成功操作一般为 1
+                    不要保存章节原文、长日志、隐私、API Key、Cookie 或完整业务数据。
+                    """.trimIndent()
+                )
+            },
+            JsonObject().apply {
+                addProperty("role", "user")
+                addProperty(
+                    "content",
+                    """
+                    角色卡写入已成功，请为后续 AI 助理生成一条记忆。
+
+                    书籍对象：${context.subject}
+                    work_key：${context.workKey}
+                    已写入角色数量：${context.updatedCount}
+                    已写入角色：${context.characterNames.joinToString("、").ifBlank { "未提供名称" }}
+                    扫描元数据：${context.scanData?.toString() ?: "未提供"}
+
+                    返回 JSON：
+                    {"title":"","content":"","tags":[],"confidence":1}
+                    """.trimIndent()
+                )
+            }
+        )
+        val body = buildRequestBody(
+            model = model,
+            messages = memoryMessages,
+            tools = emptyList(),
+            params = AiTextParams(temperature = 0f, maxTokens = 512, disableThinking = true),
+            stream = false
+        )
+        val request = Request.Builder()
+            .url("${setting.baseUrl.trimEndSlash()}${setting.chatCompletionsPath.ensureStartSlash()}")
+            .apply {
+                if (setting.apiKey.isNotBlank()) {
+                    addHeader("Authorization", "Bearer ${setting.apiKey}")
+                }
+            }
+            .addHeader("Content-Type", "application/json")
+            .post(jsonBody(body))
+            .build()
+        val reasoningKey = AiModelRegistry.capabilities(model.id)
+            .reasoning
+            .reasoningOutputField
+            .ifBlank { "reasoning_content" }
+        val completion = client.executeJsonChat(request, reasoningKey)
+        val json = completion.content.extractJsonObject()
+        return GeneratedMemory(
+            title = json.stringOrNull("title")
+                ?.trim()
+                ?.take(40)
+                ?.takeIf { it.isNotBlank() }
+                ?: "角色卡已写入",
+            content = json.stringOrNull("content")
+                ?.trim()
+                ?.take(240)
+                ?.takeIf { it.isNotBlank() }
+                ?: "已为${context.subject}写入 ${context.updatedCount} 张角色卡。",
+            tags = json.arrayOrNull("tags")
+                ?.mapNotNull { it.takeIf { element -> element.isJsonPrimitive }?.asString?.trim() }
+                ?.filter { it.isNotBlank() }
+                ?.take(5)
+                ?.takeIf { it.isNotEmpty() }
+                ?: listOf("角色卡", "已写入"),
+            confidence = json.get("confidence")
+                ?.takeIf { it.isJsonPrimitive }
+                ?.asFloat
+                ?.coerceIn(0f, 1f)
+                ?: 1f
+        )
+    }
+
+    private fun GeneratedMemory.toMemoryUpsertArguments(context: CharacterApplyMemoryContext): JsonObject {
+        return JsonObject().apply {
+            addProperty("scope_type", "book")
+            addProperty("scope_key", context.workKey)
+            addProperty("subject", context.subject)
+            addProperty("domain", "character_card")
+            addProperty("memory_type", "checkpoint")
+            addProperty("title", title)
+            addProperty("content", content)
+            add("tags", JsonArray().apply {
+                tags.forEach { add(it) }
+            })
+            addProperty("confidence", confidence)
+            addProperty("source", "post_action_hook")
+            add("data", JsonObject().apply {
+                context.scanData?.entrySet()?.forEach { (key, value) ->
+                    add(key, value.deepCopy())
+                }
+                addProperty("source_tool", "character_write_hook")
+                addProperty("updated_count", context.updatedCount)
+                add("character_names", JsonArray().apply {
+                    context.characterNames.forEach { add(it) }
+                })
+            })
+        }
+    }
+
+    private fun JsonObject.toCharacterApplyMemoryContext(toolName: String): CharacterApplyMemoryContext? {
+        if (toolName !in CHARACTER_MEMORY_HOOK_TOOLS) return null
+        if (!structuredContentOk()) return null
+        val data = objectOrNull("structuredContent")
+            ?.objectOrNull("normalized_data")
+            ?: return null
+        val characters = buildList {
+            data.arrayOrNull("updated")?.forEach { element ->
+                element.takeIf { it.isJsonObject }?.asJsonObject?.let { add(it) }
+            }
+            data.objectOrNull("character")?.let { add(it) }
+        }
+        if (characters.isEmpty()) return null
+        val workKey = data.stringOrNull("work_key")?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: characters.firstNotNullOfOrNull { it.stringOrNull("work_key")?.trim() }
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+        val names = characters.mapNotNull { it.stringOrNull("name")?.trim()?.takeIf { name -> name.isNotBlank() } }
+        val updatedCount = data.get("updated_count")
+            ?.takeIf { it.isJsonPrimitive }
+            ?.asInt
+            ?: characters.size
+        return CharacterApplyMemoryContext(
+            workKey = workKey,
+            subject = workKey.toMemorySubject(),
+            updatedCount = updatedCount,
+            characterNames = names.distinct().take(20)
+        )
+    }
+
+    private fun List<JsonObject>.latestCharacterScanData(workKey: String): JsonObject? {
+        asReversed().forEach { message ->
+            if (message.stringOrNull("role") != "assistant") return@forEach
+            val content = message.stringOrNull("content").orEmpty()
+            val matches = CHARACTER_SCAN_META_BLOCK_REGEX.findAll(content).toList()
+            matches.asReversed().forEach { match ->
+                val meta = runCatching {
+                    JsonParser.parseString(match.groupValues[1].trim())
+                        .takeIf { it.isJsonObject }
+                        ?.asJsonObject
+                }.getOrNull() ?: return@forEach
+                val metaWorkKey = meta.stringOrNull("work_key")
+                    ?: meta.stringOrNull("workKey")
+                    ?: meta.objectOrNull("book")?.stringOrNull("work_key")
+                    ?: meta.objectOrNull("book")?.stringOrNull("workKey")
+                if (metaWorkKey.isNullOrBlank() || metaWorkKey == workKey) {
+                    return meta
+                }
+            }
+        }
+        return null
+    }
+
+    private fun List<CharacterApplyMemoryContext>.mergeCharacterMemoryContext(): CharacterApplyMemoryContext? {
+        if (isEmpty()) return null
+        val grouped = groupBy { it.workKey }
+        val (_, contexts) = grouped.maxByOrNull { (_, items) -> items.sumOf { it.updatedCount } } ?: return null
+        val first = contexts.first()
+        val names = contexts.flatMap { it.characterNames }
+            .distinct()
+            .take(20)
+        return CharacterApplyMemoryContext(
+            workKey = first.workKey,
+            subject = first.subject,
+            updatedCount = names.size.takeIf { it > 0 } ?: contexts.sumOf { it.updatedCount },
+            characterNames = names
+        )
+    }
+
+    private fun JsonObject.structuredContentOk(): Boolean {
+        return objectOrNull("structuredContent")
+            ?.get("ok")
+            ?.takeIf { it.isJsonPrimitive }
+            ?.asBoolean == true
+    }
+
+    private fun String.extractJsonObject(): JsonObject {
+        val trimmed = trim()
+            .removePrefix("```json")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+        return runCatching {
+            JsonParser.parseString(trimmed).asJsonObject
+        }.getOrElse {
+            val start = trimmed.indexOf('{')
+            val end = trimmed.lastIndexOf('}')
+            if (start >= 0 && end > start) {
+                JsonParser.parseString(trimmed.substring(start, end + 1)).asJsonObject
+            } else {
+                throw it
+            }
+        }
+    }
+
+    private fun String.toMemorySubject(): String {
+        val parts = replace("\\n", "\n")
+            .replace("\r\n", "\n")
+            .replace('\r', '\n')
+            .split('\n')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        return when {
+            parts.size >= 2 -> "《${parts[0]}》${parts[1]}"
+            parts.size == 1 -> parts[0]
+            else -> this
+        }
     }
 
     private fun JsonObject.toChatUsage(): AiChatUsage {
@@ -509,6 +811,12 @@ class AiChatClient {
     companion object {
         private const val MCP_TOOL_PREFIX = "mcp__legado__"
         private const val MAX_MODEL_TOOL_RESULT_CHARS = 120_000
+        private val CHARACTER_SCAN_META_BLOCK_REGEX = Regex(
+            pattern = """(?s)```[ \t]*(?:legado-character-scan|character_scan_meta)[^\r\n]*\r?\n(.*?)\r?\n```"""
+        )
+        private val CHARACTER_MEMORY_HOOK_TOOLS = setOf(
+            "bookshelf_character_upsert"
+        )
         private val AGENT_SYSTEM_PROMPT = """
             你是 Legado / 阅读NG 内置 AI 助手。回答要简洁直接。
 
@@ -533,6 +841,7 @@ class AiChatClient {
             - 代码块必须完整闭合，必须是合法 JSON，id 稳定简短，按钮 label 要短。
             - 交互块不能替代正文说明；正文先说明依据、结果和风险。
             - 如果正文说“请选择”“请确认”“点击按钮”，必须紧跟一个完整的 legado-interaction 代码块；不要只写提示语。
+            - 领域 Skill 可能要求输出其它 App 元数据代码块，例如 ```character_scan_meta。按 Skill 要求输出即可；这类元数据会被 App 隐藏，不要在正文里解释其内部字段。
             - single_choice 示例：
             ```legado-interaction
             {
@@ -577,15 +886,12 @@ class AiChatClient {
             - 用户明确要求查询历史上下文，或后续 App 通过 hook 要求处理记忆时，先调用 agent_memory_status_get 检查开关。
             - 如果 enabled=false，不要调用任何记忆检索或写入工具。
             - 如果 enabled=true，并且任务有明确对象，先用 agent_memory_search 检索该对象相关记忆。scope_key 优先使用稳定自然键，例如书名+作者、书源名称+关键地址；不要只依赖易变化的 bookUrl。
-            - 普通分析、预览、失败操作或用户未确认前不要保存记忆。
+            - 记忆写入主要由 App 在已确认业务操作成功后的 hook 触发；普通分析、预览、失败操作或用户未确认前不要保存记忆。
             - 不要把角色卡、书籍、书源、规则等业务写入工具当作记忆工具；只有 agent_memory_upsert 才代表记忆已保存。
             - 保存内容要短，记录对象、业务域、已应用结果、采样范围或后续建议，避免存入整段原文。
         """.trimIndent()
 
         private val WRITE_CONFIRMATION_REQUIRED_TOOLS = setOf(
-            "bookshelf_character_draft_upsert",
-            "bookshelf_character_draft_apply",
-            "bookshelf_character_draft_rollback",
             "bookshelf_character_upsert",
             "bookshelf_character_delete",
             "bookshelf_character_set_enabled",
@@ -635,17 +941,49 @@ data class AiChatTurnResult(
     val finishReason: String?,
     val usage: AiChatUsage?,
     val toolTrace: List<String>,
+    val memoryTrace: List<AiMemoryTraceItem> = emptyList(),
     val warnings: List<String>
 )
 
 data class AiChatStreamUpdate(
     val content: String,
     val reasoning: String?,
-    val toolTrace: List<String> = emptyList()
+    val toolTrace: List<String> = emptyList(),
+    val memoryTrace: List<AiMemoryTraceItem> = emptyList()
 )
+
+data class AiMemoryTraceItem(
+    @SerializedName("status")
+    val status: String,
+    @SerializedName("title")
+    val title: String,
+    @SerializedName("detail")
+    val detail: String? = null
+) {
+    companion object {
+        const val STATUS_RUNNING = "running"
+        const val STATUS_SAVED = "saved"
+        const val STATUS_FAILED = "failed"
+    }
+}
 
 data class AiChatUsage(
     val promptTokens: Int?,
     val completionTokens: Int?,
     val totalTokens: Int?
+)
+
+private data class CharacterApplyMemoryContext(
+    val workKey: String,
+    val subject: String,
+    val updatedCount: Int,
+    val characterNames: List<String>,
+    val scanData: JsonObject? = null
+)
+
+private data class GeneratedMemory(
+    val title: String,
+    val content: String,
+    val tags: List<String>,
+    val confidence: Float
 )

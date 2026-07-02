@@ -239,6 +239,8 @@ data class AiChatMessageSnapshot(
     val reasoning: String? = null,
     @SerializedName("tool_trace")
     val toolTrace: List<String> = emptyList(),
+    @SerializedName("memory_trace")
+    val memoryTrace: List<AiMemoryTraceItem> = emptyList(),
     @SerializedName("elapsed_ms")
     val elapsedMs: Long? = null,
     @SerializedName("favorite")

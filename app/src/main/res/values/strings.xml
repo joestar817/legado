@@ -188,6 +188,13 @@
     <string name="ai_memory">Memory system</string>
     <string name="ai_memory_summary_off">Off. AI will not read or write memories.</string>
     <string name="ai_memory_summary_on">On. AI can read and write memories through MCP.</string>
+    <string name="ai_memory_summary_off_with_stats">Off · %1$d items · %2$s</string>
+    <string name="ai_memory_summary_on_with_stats">On · %1$d items · %2$s</string>
+    <string name="ai_memory_count">Memory count</string>
+    <string name="ai_memory_size">Estimated size</string>
+    <string name="ai_memory_clear">Clear memory</string>
+    <string name="ai_memory_clear_confirm">Clear all AI assistant memories? Chat history and business data will not be deleted.</string>
+    <string name="ai_memory_cleared">Memory cleared</string>
     <string name="ai_chat">AI chat</string>
     <string name="ai_chat_fab">Chat floating button</string>
     <string name="ai_chat_fab_summary_off">Off. Home entry hidden.</string>

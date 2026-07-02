@@ -187,6 +187,13 @@
     <string name="ai_memory">记忆系统</string>
     <string name="ai_memory_summary_off">已关闭，AI 不读写记忆</string>
     <string name="ai_memory_summary_on">已开启，AI 可通过 MCP 读写记忆</string>
+    <string name="ai_memory_summary_off_with_stats">已关闭 · %1$d 条 · %2$s</string>
+    <string name="ai_memory_summary_on_with_stats">已开启 · %1$d 条 · %2$s</string>
+    <string name="ai_memory_count">记忆条数</string>
+    <string name="ai_memory_size">估算大小</string>
+    <string name="ai_memory_clear">清除记忆</string>
+    <string name="ai_memory_clear_confirm">确定清除所有 AI 助理记忆吗？聊天历史和业务数据不会被删除。</string>
+    <string name="ai_memory_cleared">记忆已清除</string>
     <string name="ai_chat">AI 聊天</string>
     <string name="ai_chat_fab">聊天悬浮按钮</string>
     <string name="ai_chat_fab_summary_off">已关闭，首页不显示入口</string>

@@ -72,9 +72,29 @@ interface AgentMemoryDao {
     @Query("select * from agentMemories where id = :id")
     fun get(id: String): AgentMemory?
 
+    @Query("select count(*) from agentMemories")
+    fun countAll(): Int
+
+    @Query(
+        """
+        select coalesce(sum(
+            length(id) + length(scopeType) + length(scopeKey) + length(subject)
+            + length(domain) + length(memoryType) + length(title) + length(content)
+            + length(dataJson) + length(tags) + length(source) + length(status)
+        ), 0) from agentMemories
+        """
+    )
+    fun estimatedSize(): Long
+
+    @Query("select max(updatedAt) from agentMemories")
+    fun lastUpdatedAt(): Long?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun upsert(memory: AgentMemory)
 
     @Query("update agentMemories set status = :status, updatedAt = :updatedAt where id in (:ids)")
     fun updateStatus(ids: List<String>, status: String, updatedAt: Long): Int
+
+    @Query("delete from agentMemories")
+    fun clearAll(): Int
 }

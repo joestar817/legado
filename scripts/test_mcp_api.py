@@ -58,9 +58,6 @@ EXPECTED_TOOLS = {
     "bookshelf_character_upsert",
     "bookshelf_character_delete",
     "bookshelf_character_set_enabled",
-    "bookshelf_character_draft_upsert",
-    "bookshelf_character_draft_apply",
-    "bookshelf_character_draft_rollback",
     "bookshelf_replace_rule_list",
     "bookshelf_replace_rule_get",
     "bookshelf_replace_rule_upsert",
@@ -731,7 +728,7 @@ class NativeMcpApiTest(unittest.TestCase):
 
         stamp = int(time.time())
         character = self.client.call_tool(
-            "bookshelf_character_draft_upsert",
+            "bookshelf_character_upsert",
             {
                 "book_url": self.first_book_url,
                 "character": {
@@ -749,20 +746,20 @@ class NativeMcpApiTest(unittest.TestCase):
         self.assertTrue(character["ok"], character.get("warnings"))
         character_id = character["normalized_data"]["character"]["id"]
 
-        character_apply = self.client.call_tool(
-            "bookshelf_character_draft_apply",
+        character_enabled = self.client.call_tool(
+            "bookshelf_character_set_enabled",
             {"ids": [character_id], "enabled": True},
         )
-        self.assert_tool_ok_shape(character_apply)
-        self.assertTrue(character_apply["ok"], character_apply.get("warnings"))
-        self.assertEqual(character_apply["normalized_data"].get("updated_count"), 1)
+        self.assert_tool_ok_shape(character_enabled)
+        self.assertTrue(character_enabled["ok"], character_enabled.get("warnings"))
+        self.assertEqual(character_enabled["normalized_data"].get("updated_count"), 1)
 
-        character_rollback = self.client.call_tool(
-            "bookshelf_character_draft_rollback",
+        character_delete = self.client.call_tool(
+            "bookshelf_character_delete",
             {"ids": [character_id]},
         )
-        self.assert_tool_ok_shape(character_rollback)
-        self.assertTrue(character_rollback["ok"], character_rollback.get("warnings"))
+        self.assert_tool_ok_shape(character_delete)
+        self.assertTrue(character_delete["ok"], character_delete.get("warnings"))
         self.assertEqual(character_rollback["normalized_data"].get("deleted_count"), 1)
 
         rule = self.client.call_tool(

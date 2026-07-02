@@ -59,15 +59,12 @@ MCP 现在有两条通道：
 | 书架 | `bookshelf_search` | tool | 书架模块下的跨源搜索别名，等价于 `book_search`。 |
 | 书架 | `bookshelf_book_sources_get` | tool | 获取当前书名/作者的可用来源候选。 |
 | 书架 | `bookshelf_change_source_preview` | tool | 预览换源候选，不直接应用换源。 |
-| 书架/角色卡 | `bookshelf_character_profile_get` | tool | 获取当前书籍角色资料集信息；`create=true` 会创建档案，属于写操作。 |
+| 书架/角色卡 | `bookshelf_character_profile_get` | tool | 获取当前书籍角色资料集信息；只读，不创建档案。 |
 | 书架/角色卡 | `bookshelf_character_list` | tool | 列出当前书籍角色。 |
 | 书架/角色卡 | `bookshelf_character_get` | tool | 按角色 ID 获取角色详情。 |
 | 书架/角色卡 | `bookshelf_character_upsert` | tool | 新增或更新角色卡；写接口。 |
 | 书架/角色卡 | `bookshelf_character_delete` | tool | 按角色 ID 删除角色卡；写接口。 |
 | 书架/角色卡 | `bookshelf_character_set_enabled` | tool | 按角色 ID 启用或停用角色卡；写接口。 |
-| 书架/角色卡 | `bookshelf_character_draft_upsert` | tool | 写入草稿状态角色记录；不是聊天预览缓存，属于写接口。 |
-| 书架/角色卡 | `bookshelf_character_draft_apply` | tool | 启用或禁用草稿状态角色记录；写接口。 |
-| 书架/角色卡 | `bookshelf_character_draft_rollback` | tool | 删除草稿状态角色记录；写接口。 |
 | 书架/替换规则 | `bookshelf_replace_rule_list` | tool | 列出当前书籍相关替换规则。 |
 | 书架/替换规则 | `bookshelf_replace_rule_get` | tool | 按 ID 获取替换规则详情。 |
 | 书架/替换规则 | `bookshelf_replace_rule_upsert` | tool | 新增或更新替换规则；写接口。 |
@@ -322,9 +319,6 @@ curl -s http://192.0.2.10:1124/mcp \
 - `bookshelf_character_upsert`
 - `bookshelf_character_delete`
 - `bookshelf_character_set_enabled`
-- `bookshelf_character_draft_upsert`
-- `bookshelf_character_draft_apply`
-- `bookshelf_character_draft_rollback`
 - `bookshelf_replace_rule_list`
 - `bookshelf_replace_rule_get`
 - `bookshelf_replace_rule_upsert`
@@ -702,15 +696,12 @@ curl -s http://192.0.2.10:1124/mcp \
 
 #### 角色卡
 
-- `bookshelf_character_profile_get`：获取角色档案；传 `create=true` 且提供书籍身份时会创建档案，属于写操作。
+- `bookshelf_character_profile_get`：获取角色档案；只读，不创建档案。
 - `bookshelf_character_list`：列出一本书的角色卡。
 - `bookshelf_character_get`：按角色 `id` 获取单张角色卡。
 - `bookshelf_character_upsert`：创建或更新角色卡。
 - `bookshelf_character_delete`：按 `ids` 删除角色卡。
 - `bookshelf_character_set_enabled`：按 `ids` 启用或禁用角色卡。
-- `bookshelf_character_draft_upsert`：写入 AI/导入来源的草稿状态角色记录；这会落库，不是聊天预览缓存。
-- `bookshelf_character_draft_apply`：按 `ids` 启用或禁用已存在的草稿状态角色记录。
-- `bookshelf_character_draft_rollback`：删除指定草稿状态角色记录。
 
 #### 替换规则
 

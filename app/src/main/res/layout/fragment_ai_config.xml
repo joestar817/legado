@@ -650,10 +650,7 @@
 
                 <LinearLayout
                     android:id="@+id/layout_ai_memory"
-                    style="@style/Ng.SettingsItem"
-                    android:clickable="false"
-                    android:focusable="false"
-                    android:foreground="@null">
+                    style="@style/Ng.SettingsItem">
 
                     <ImageView
                         android:id="@+id/image_ai_memory_icon"

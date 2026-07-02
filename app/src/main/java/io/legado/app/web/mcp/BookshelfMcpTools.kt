@@ -296,13 +296,12 @@ object BookshelfMcpTools {
             ),
             tool(
                 name = "bookshelf_character_profile_get",
-                description = "Get the character profile for one book/work. If create=true is supplied this is a write operation because it creates a profile row.",
+                description = "Get the character profile for one book/work. This is read-only and never creates profile rows.",
                 properties = mapOf(
                     "work_key" to stringSchema("Stable work identity. Prefer this over book_url for character profiles."),
                     "book_url" to stringSchema("Current Book.bookUrl. Source-specific and may change after changing source."),
                     "name" to stringSchema("Book.name"),
-                    "author" to stringSchema("Book.author"),
-                    "create" to booleanSchema("Create profile when book identity is available")
+                    "author" to stringSchema("Book.author")
                 )
             ),
             tool(
@@ -346,33 +345,6 @@ object BookshelfMcpTools {
                     "ids" to arraySchema("BookCharacter.id list"),
                     "enabled" to booleanSchema("Default true")
                 ),
-                required = listOf("ids")
-            ),
-            tool(
-                name = "bookshelf_character_draft_upsert",
-                description = "Write an AI/imported character record in draft state for one book/work. This persists data and is not a chat preview cache.",
-                properties = mapOf(
-                    "work_key" to stringSchema("Stable work identity. Prefer this over book_url for character profiles."),
-                    "book_url" to stringSchema("Current Book.bookUrl. Source-specific and may change after changing source."),
-                    "name" to stringSchema("Book.name"),
-                    "author" to stringSchema("Book.author"),
-                    "character" to mapOf("type" to "object")
-                ),
-                required = listOf("character")
-            ),
-            tool(
-                name = "bookshelf_character_draft_apply",
-                description = "Enable existing character draft records by id. This is a write operation and should only be called after explicit user confirmation.",
-                properties = mapOf(
-                    "ids" to arraySchema("BookCharacter.id list"),
-                    "enabled" to booleanSchema("Default true")
-                ),
-                required = listOf("ids")
-            ),
-            tool(
-                name = "bookshelf_character_draft_rollback",
-                description = "Delete character draft records by id. This is a write operation intended for rollback after explicit user request.",
-                properties = mapOf("ids" to arraySchema("BookCharacter.id list")),
                 required = listOf("ids")
             ),
             tool(
@@ -521,9 +493,6 @@ object BookshelfMcpTools {
             "bookshelf_character_upsert" -> upsertCharacter(arguments)
             "bookshelf_character_delete" -> deleteCharacters(arguments)
             "bookshelf_character_set_enabled" -> setCharactersEnabled(arguments)
-            "bookshelf_character_draft_upsert" -> upsertCharacterDraft(arguments)
-            "bookshelf_character_draft_apply" -> applyCharacterDraft(arguments)
-            "bookshelf_character_draft_rollback" -> rollbackCharacterDraft(arguments)
             "bookshelf_replace_rule_list" -> listReplaceRules(arguments)
             "bookshelf_replace_rule_get" -> getReplaceRule(arguments)
             "bookshelf_replace_rule_upsert" -> upsertReplaceRule(arguments)
@@ -1249,16 +1218,7 @@ object BookshelfMcpTools {
 
     private fun getCharacterProfile(arguments: JsonObject): Map<String, Any?> {
         val identity = resolveWorkIdentity(arguments)
-        val create = arguments.get("create").asBooleanOrNull() ?: false
-        val profile = if (create && identity.book != null) {
-            appDb.bookCharacterDao.getOrCreateProfile(
-                identity.book.name,
-                identity.book.author,
-                identity.book.bookUrl
-            )
-        } else {
-            appDb.bookCharacterDao.getProfile(identity.workKey)
-        }
+        val profile = appDb.bookCharacterDao.getProfile(identity.workKey)
         return toolResult(
             ok = profile != null,
             upstreamEndpoint = "native://bookshelf/characterProfile",
@@ -1267,7 +1227,7 @@ object BookshelfMcpTools {
                 "work_key" to identity.workKey
             ),
             warnings = if (profile == null) {
-                listOf("未找到角色档案；传入 create=true 且提供 work_key、book_url 或 name/author 可创建")
+                listOf("未找到角色档案；写入角色卡时会由 bookshelf_character_upsert 创建必要档案")
             } else {
                 emptyList()
             }
@@ -1308,13 +1268,13 @@ object BookshelfMcpTools {
     }
 
     private fun upsertCharacter(arguments: JsonObject): Map<String, Any?> {
-        return withEndpoint(upsertCharacterDraft(arguments), "native://bookshelf/characterUpsert")
-    }
-
-    private fun upsertCharacterDraft(arguments: JsonObject): Map<String, Any?> {
         val characterJson = arguments.get("character")?.takeIf { it.isJsonObject }?.asJsonObject
             ?: throw IllegalArgumentException("character is required")
         val identity = resolveWorkIdentity(arguments)
+        return saveCharacter(identity, characterJson)
+    }
+
+    private fun saveCharacter(identity: WorkIdentity, characterJson: JsonObject): Map<String, Any?> {
         if (identity.book != null) {
             appDb.bookCharacterDao.getOrCreateProfile(
                 identity.book.name,
@@ -1322,7 +1282,7 @@ object BookshelfMcpTools {
                 identity.book.bookUrl
             )
         } else if (appDb.bookCharacterDao.getProfile(identity.workKey) == null) {
-            throw IllegalArgumentException("profile is missing; provide book_url or call bookshelf_character_profile_get with create=true first")
+            throw IllegalArgumentException("profile is missing; provide book_url or name/author so bookshelf_character_upsert can create the character profile")
         }
         val now = System.currentTimeMillis()
         val id = characterJson.get("id").asLongOrNull() ?: 0L
@@ -1383,7 +1343,7 @@ object BookshelfMcpTools {
         appDb.bookCharacterDao.updateCharacterCount(identity.workKey)
         return toolResult(
             ok = true,
-            upstreamEndpoint = "native://bookshelf/characterDraftUpsert",
+            upstreamEndpoint = "native://bookshelf/characterUpsert",
             normalizedData = mapOf(
                 "character" to appDb.bookCharacterDao.getCharacter(savedId)?.toMcpMap(),
                 "work_key" to identity.workKey
@@ -1392,10 +1352,6 @@ object BookshelfMcpTools {
     }
 
     private fun setCharactersEnabled(arguments: JsonObject): Map<String, Any?> {
-        return withEndpoint(applyCharacterDraft(arguments), "native://bookshelf/characterSetEnabled")
-    }
-
-    private fun applyCharacterDraft(arguments: JsonObject): Map<String, Any?> {
         val ids = arguments.get("ids").asLongList()
         val enabled = arguments.get("enabled").asBooleanOrNull() ?: true
         val now = System.currentTimeMillis()
@@ -1405,10 +1361,10 @@ object BookshelfMcpTools {
                 it.updatedAt = now
                 appDb.bookCharacterDao.updateCharacter(it)
                 appDb.bookCharacterDao.updateCharacterCount(it.workKey)
-            }
+        }
         return toolResult(
             ok = true,
-            upstreamEndpoint = "native://bookshelf/characterDraftApply",
+            upstreamEndpoint = "native://bookshelf/characterSetEnabled",
             normalizedData = mapOf(
                 "requested_ids" to ids,
                 "updated" to changed.map { it.toMcpMap() },
@@ -1419,10 +1375,6 @@ object BookshelfMcpTools {
     }
 
     private fun deleteCharacters(arguments: JsonObject): Map<String, Any?> {
-        return withEndpoint(rollbackCharacterDraft(arguments), "native://bookshelf/characterDelete")
-    }
-
-    private fun rollbackCharacterDraft(arguments: JsonObject): Map<String, Any?> {
         val ids = arguments.get("ids").asLongList()
         val characters = ids.mapNotNull { appDb.bookCharacterDao.getCharacter(it) }
         val workKeys = characters.map { it.workKey }.toSet()
@@ -1434,7 +1386,7 @@ object BookshelfMcpTools {
         }
         return toolResult(
             ok = true,
-            upstreamEndpoint = "native://bookshelf/characterDraftRollback",
+            upstreamEndpoint = "native://bookshelf/characterDelete",
             normalizedData = mapOf(
                 "requested_ids" to ids,
                 "deleted_count" to characters.size,

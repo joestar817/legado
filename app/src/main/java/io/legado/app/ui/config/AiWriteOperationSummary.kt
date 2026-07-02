@@ -56,8 +56,7 @@ internal fun AiPendingToolCall.toWriteOperationSummary(): WriteOperationSummary 
     val title: String
     val description: String
     when (toolName) {
-        "bookshelf_character_upsert",
-        "bookshelf_character_draft_upsert" -> {
+        "bookshelf_character_upsert" -> {
             title = "写入角色卡"
             description = buildObjectDescription(
                 action = "创建或更新角色卡",
@@ -74,29 +73,14 @@ internal fun AiPendingToolCall.toWriteOperationSummary(): WriteOperationSummary 
                 secondary = args.workLabel()
             )
         }
-        "bookshelf_character_set_enabled",
-        "bookshelf_character_draft_apply" -> {
-            title = if (toolName == "bookshelf_character_draft_apply") {
-                "应用角色卡"
-            } else if (args.booleanOrNull("enabled") == false) {
+        "bookshelf_character_set_enabled" -> {
+            title = if (args.booleanOrNull("enabled") == false) {
                 "禁用角色卡"
             } else {
                 "启用角色卡"
             }
             description = buildObjectDescription(
-                action = if (toolName == "bookshelf_character_draft_apply") {
-                    "确认写入并启用角色卡"
-                } else {
-                    "修改角色卡启用状态"
-                },
-                primary = args.idsLabel(),
-                secondary = args.workLabel()
-            )
-        }
-        "bookshelf_character_draft_rollback" -> {
-            title = "回滚角色卡"
-            description = buildObjectDescription(
-                action = "删除未启用的角色卡记录",
+                action = "修改角色卡启用状态",
                 primary = args.idsLabel(),
                 secondary = args.workLabel()
             )
