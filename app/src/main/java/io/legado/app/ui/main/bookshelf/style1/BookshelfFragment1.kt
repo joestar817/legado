@@ -62,12 +62,11 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
         private val sortValues = intArrayOf(4, 0, 1, 2, 3, 5)
         private val bookshelfMenuActions = listOf(
             NgActionPopupItem(R.id.menu_update_toc, R.string.update_toc, R.drawable.ic_refresh_black_24dp),
-            NgActionPopupItem(R.id.menu_ai_assistant, R.string.ai_assistant, R.drawable.ic_ai),
+            NgActionPopupItem(R.id.menu_ai_assistant, R.string.bookshelf_management, R.drawable.ic_ai),
             NgActionPopupItem(R.id.menu_add_local, R.string.book_local, R.drawable.ic_add, dividerBefore = true),
             NgActionPopupItem(R.id.menu_remote, R.string.add_remote_book, R.drawable.ic_add),
             NgActionPopupItem(R.id.menu_add_url, R.string.add_url, R.drawable.ic_add_online),
-            NgActionPopupItem(R.id.menu_bookshelf_manage, R.string.bookshelf_management, R.drawable.ic_arrange, dividerBefore = true),
-            NgActionPopupItem(R.id.menu_download, R.string.cache_export, R.drawable.ic_download_line),
+            NgActionPopupItem(R.id.menu_download, R.string.cache_export, R.drawable.ic_download_line, dividerBefore = true),
             NgActionPopupItem(R.id.menu_group_manage, R.string.group_manage, R.drawable.ic_groups),
             NgActionPopupItem(R.id.menu_bookshelf_layout, R.string.bookshelf_layout, R.drawable.ic_view_quilt),
             NgActionPopupItem(R.id.menu_export_bookshelf, R.string.export_bookshelf, R.drawable.ic_export, dividerBefore = true),

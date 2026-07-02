@@ -89,8 +89,8 @@
                     android:layout_height="match_parent"
                     android:gravity="center"
                     android:includeFontPadding="false"
-                    android:minWidth="36dp"
-                    android:text="@string/edit"
+                    android:minWidth="48dp"
+                    android:text="@string/manage"
                     android:textColor="@color/tv_text_summary"
                     android:textSize="14sp" />
 

@@ -32,6 +32,7 @@
     <string name="dynamic_loading">正在加载</string>
     <string name="draw">提醒</string>
     <string name="edit">编辑</string>
+    <string name="manage">管理</string>
     <string name="more">更多</string>
     <string name="delete">删除</string>
     <string name="delete_select_group">删除当前分组</string>
