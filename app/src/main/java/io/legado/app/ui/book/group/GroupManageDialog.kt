@@ -20,19 +20,17 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookGroup
-import io.legado.app.databinding.DialogRecyclerViewBinding
+import io.legado.app.databinding.DialogBookGroupPickerBinding
 import io.legado.app.databinding.ItemBookGroupManageBinding
-import io.legado.app.lib.theme.accentColor
-import io.legado.app.lib.theme.backgroundColor
-import io.legado.app.lib.theme.primaryColor
+import io.legado.app.ui.widget.dialog.applyNgDialogWindow
+import io.legado.app.ui.widget.dialog.ngDialogMaxHeight
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
-import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.applyTint
-import io.legado.app.utils.setLayout
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
-import io.legado.app.utils.visible
+import io.legado.app.utils.gone
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
@@ -42,21 +40,21 @@ import kotlinx.coroutines.launch
 /**
  * 书籍分组管理
  */
-class GroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
+class GroupManageDialog : BaseDialogFragment(R.layout.dialog_book_group_picker),
     Toolbar.OnMenuItemClickListener {
 
     private val viewModel: GroupViewModel by viewModels()
-    private val binding by viewBinding(DialogRecyclerViewBinding::bind)
+    private val binding by viewBinding(DialogBookGroupPickerBinding::bind)
     private val adapter by lazy { GroupAdapter(requireContext()) }
     private lateinit var itemTouchHelper: ItemTouchHelper
 
     override fun onStart() {
         super.onStart()
-        setLayout(0.9f, 0.9f)
+        applyNgDialogWindow(height = ngDialogMaxHeight(0.9f))
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        binding.toolBar.setBackgroundColor(primaryColor)
+        view.setBackgroundResource(R.drawable.ng_bg_dialog)
         binding.toolBar.setTitle(R.string.group_manage)
         initView()
         initData()
@@ -65,14 +63,14 @@ class GroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
 
     private fun initView() {
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
-        binding.recyclerView.addItemDecoration(VerticalDivider(requireContext()))
+        val listPadding = 6.dpToPx()
+        binding.recyclerView.setPadding(listPadding, listPadding, listPadding, 0)
         binding.recyclerView.adapter = adapter
         val itemTouchCallback = ItemTouchCallback(adapter)
         itemTouchCallback.isCanDrag = true
         itemTouchHelper = ItemTouchHelper(itemTouchCallback)
         itemTouchHelper.attachToRecyclerView(binding.recyclerView)
-        binding.tvOk.setTextColor(requireContext().accentColor)
-        binding.tvOk.visible()
+        binding.tvCancel.gone()
         binding.tvOk.setOnClickListener {
             dismissAllowingStateLoss()
         }
@@ -124,7 +122,6 @@ class GroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
             payloads: MutableList<Any>
         ) {
             binding.run {
-                root.setBackgroundColor(context.backgroundColor)
                 tvGroup.text = item.getManageName(context)
                 swShow.isChecked = item.show
             }

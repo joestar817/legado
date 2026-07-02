@@ -1,28 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="@color/background"
+    style="@style/Ng.ProviderCard"
+    android:layout_marginBottom="3dp"
+    android:background="@drawable/ng_bg_book_group_manage_card"
     android:gravity="center_vertical"
+    android:minHeight="66dp"
     android:orientation="horizontal"
-    android:padding="8dp">
+    android:paddingEnd="12dp">
 
     <ImageButton
         android:id="@+id/iv_drag_handle"
-        android:layout_width="40dp"
-        android:layout_height="48dp"
+        android:layout_width="54dp"
+        android:layout_height="match_parent"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/sort"
-        android:padding="8dp"
-        android:src="@drawable/ic_drag_handle" />
+        android:paddingStart="14dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="18dp"
+        android:src="@drawable/ic_drag_handle"
+        android:tint="@color/ng_on_surface_variant" />
 
     <TextView
         android:id="@+id/tv_group"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="2dp"
         android:layout_weight="1"
-        android:textColor="@color/secondaryText"
+        android:ellipsize="end"
+        android:singleLine="true"
+        android:textColor="@color/ng_on_surface"
+        android:textSize="16sp"
         tools:text="group" />
 
     <TextView
@@ -32,13 +41,14 @@
         android:background="?attr/selectableItemBackground"
         android:padding="8dp"
         android:text="@string/edit"
-        android:textColor="@color/secondaryText" />
+        android:textColor="@color/ng_on_surface_variant"
+        android:textSize="15sp" />
 
     <io.legado.app.lib.theme.view.ThemeSwitch
         android:id="@+id/sw_show"
-        android:minWidth="48dp"
-        android:minHeight="48dp"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:minWidth="48dp"
+        android:minHeight="48dp" />
 
 </LinearLayout>
