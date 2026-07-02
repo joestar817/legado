@@ -48,6 +48,8 @@ MCP 现在有两条通道：
 | 书架 | `bookshelf_chapter_content_get` | tool | 读取本地或已缓存章节正文，不主动联网抓取。 |
 | 书架 | `bookshelf_text_window_get` | tool | 按当前位置读取章节正文窗口。 |
 | 书架 | `bookshelf_cache_status_get` | tool | 获取书籍章节缓存状态。 |
+| 书架 | `bookshelf_cache_download` | tool | 批量触发指定章节离线缓存；写/联网接口。 |
+| 书架 | `bookshelf_cache_clear` | tool | 清理指定章节或整本书正文缓存；写接口。 |
 | 书架/书签 | `bookshelf_bookmark_list` | tool | 分页列出全局或指定书籍的书签。 |
 | 书架/书签 | `bookshelf_bookmark_get` | tool | 按书签时间主键获取书签详情。 |
 | 书架/书签 | `bookshelf_bookmark_upsert` | tool | 新增或更新书签；写接口。 |
@@ -648,6 +650,8 @@ curl -s http://192.0.2.10:1124/mcp \
 - `bookshelf_chapter_content_get`：读取单章已缓存/本地正文，书籍可用 `work_key`、`name + author` 或 `book_url` 定位，支持 `char_limit`。
 - `bookshelf_text_window_get`：读取连续章节窗口，适合给 AI 取上下文，书籍可用 `work_key`、`name + author` 或 `book_url` 定位。
 - `bookshelf_cache_status_get`：检查章节范围的正文缓存状态，书籍可用 `work_key`、`name + author` 或 `book_url` 定位。
+- `bookshelf_cache_download`：批量触发指定章节离线缓存，支持 `chapter_indexes`、`ranges[{start,end}]` 或 `start/end`；`start` 包含、`end` 不包含。`refresh_existing=true` 会先删除选中章节正文缓存再重新入队下载。
+- `bookshelf_cache_clear`：清理指定章节正文缓存，支持 `chapter_indexes`、`ranges[{start,end}]` 或 `start/end`；如需清理整本书缓存，必须显式传 `clear_book=true`。
 
 `bookshelf_chapter_list` 体积约束：
 
@@ -662,6 +666,14 @@ curl -s http://192.0.2.10:1124/mcp \
 curl -s http://192.0.2.10:1124/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":41,"method":"tools/call","params":{"name":"bookshelf_chapter_list","arguments":{"work_key":"书名\n作者","start":0,"limit":20,"include_cache_status":true}}}'
+```
+
+重新缓存一组异常章节：
+
+```bash
+curl -s http://192.0.2.10:1124/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":411,"method":"tools/call","params":{"name":"bookshelf_cache_download","arguments":{"work_key":"书名\n作者","chapter_indexes":[2,5,7],"refresh_existing":true}}}'
 ```
 
 #### 书签

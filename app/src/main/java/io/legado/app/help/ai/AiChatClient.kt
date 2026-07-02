@@ -901,6 +901,8 @@ class AiChatClient {
             "bookshelf_book_upsert",
             "bookshelf_book_delete",
             "bookshelf_book_group_update",
+            "bookshelf_cache_download",
+            "bookshelf_cache_clear",
             "bookshelf_group_upsert",
             "bookshelf_group_delete",
             "replace_rule_upsert",

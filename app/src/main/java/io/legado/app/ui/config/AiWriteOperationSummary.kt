@@ -111,6 +111,26 @@ internal fun AiPendingToolCall.toWriteOperationSummary(): WriteOperationSummary 
                     ?: args.numberListLabel("group_ids", "groupIds")
             )
         }
+        "bookshelf_cache_download" -> {
+            title = if (args.booleanOrNull("refresh_existing") == true) "刷新章节缓存" else "缓存章节"
+            description = buildObjectDescription(
+                action = if (args.booleanOrNull("refresh_existing") == true) {
+                    "清理并重新缓存指定章节"
+                } else {
+                    "触发指定章节离线缓存"
+                },
+                primary = args.cacheChapterSelectionLabel(),
+                secondary = args.workLabel()
+            )
+        }
+        "bookshelf_cache_clear" -> {
+            title = "清理章节缓存"
+            description = buildObjectDescription(
+                action = "删除本地章节正文缓存",
+                primary = args.cacheChapterSelectionLabel(),
+                secondary = args.workLabel()
+            )
+        }
         "bookshelf_group_upsert" -> {
             title = "写入书架分组"
             val group = args.objectOrNull("group")
@@ -410,6 +430,32 @@ private fun JsonObject.characterLabel(): String? {
                 ?: item.stringOrNull("roleName")
         }
     }.takeIf { it.isNotEmpty() }?.joinToPreview()
+}
+
+private fun JsonObject.cacheChapterSelectionLabel(): String? {
+    if (booleanOrNull("clear_book") == true) {
+        return "整本书缓存"
+    }
+    numberListLabel("chapter_indexes", "chapterIndexes")?.let { return "章节 $it" }
+    get("ranges")?.takeIf { it.isJsonArray }?.asJsonArray?.let { ranges ->
+        if (ranges.size() > 0) {
+            val labels = ranges.mapNotNull { item ->
+                item.takeIf { it.isJsonObject }?.asJsonObject?.let { range ->
+                    val start = range.stringOrNull("start")
+                    val end = range.stringOrNull("end")
+                    if (start != null && end != null) "$start-$end" else start
+                }
+            }
+            if (labels.isNotEmpty()) return labels.joinToPreview()
+        }
+    }
+    val start = stringOrNull("start")
+    val end = stringOrNull("end")
+    return when {
+        start != null && end != null -> "章节 $start-$end"
+        start != null -> "章节 $start"
+        else -> null
+    }
 }
 
 private fun JsonObject.idsLabel(): String? {

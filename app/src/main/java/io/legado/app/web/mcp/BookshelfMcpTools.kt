@@ -24,7 +24,9 @@ import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.isVideo
 import io.legado.app.model.ReadBook
+import io.legado.app.model.CacheBook
 import io.legado.app.utils.GSON
+import splitties.init.appCtx
 import kotlin.math.max
 import kotlin.math.min
 
@@ -191,6 +193,36 @@ object BookshelfMcpTools {
                     "author" to stringSchema("Book.author"),
                     "start" to numberSchema("Optional inclusive chapter index"),
                     "end" to numberSchema("Optional exclusive chapter index")
+                )
+            ),
+            tool(
+                name = "bookshelf_cache_download",
+                description = "Start offline caching for selected chapters. This may perform network requests. Use chapter_indexes or ranges; ranges use start inclusive and end exclusive. Set refresh_existing=true to delete selected cached chapter text before downloading.",
+                properties = mapOf(
+                    "work_key" to stringSchema("Stable work identity. Prefer this when available."),
+                    "book_url" to stringSchema("Current Book.bookUrl. Source-specific and may change after changing source."),
+                    "name" to stringSchema("Book.name"),
+                    "author" to stringSchema("Book.author"),
+                    "chapter_indexes" to arraySchema("BookChapter.index list returned by bookshelf_chapter_list. Zero-based indexes."),
+                    "ranges" to arraySchema("Array of {start,end}; start inclusive, end exclusive, using BookChapter.index"),
+                    "start" to numberSchema("Optional inclusive chapter index for one range"),
+                    "end" to numberSchema("Optional exclusive chapter index for one range"),
+                    "refresh_existing" to booleanSchema("Default false. When true, delete selected cached chapter text before enqueuing cache download.")
+                )
+            ),
+            tool(
+                name = "bookshelf_cache_clear",
+                description = "Clear cached chapter text for one book. Pass chapter_indexes/ranges/start/end to clear selected chapters, or clear_book=true to clear the whole book cache folder.",
+                properties = mapOf(
+                    "work_key" to stringSchema("Stable work identity. Prefer this when available."),
+                    "book_url" to stringSchema("Current Book.bookUrl. Source-specific and may change after changing source."),
+                    "name" to stringSchema("Book.name"),
+                    "author" to stringSchema("Book.author"),
+                    "chapter_indexes" to arraySchema("BookChapter.index list returned by bookshelf_chapter_list. Zero-based indexes."),
+                    "ranges" to arraySchema("Array of {start,end}; start inclusive, end exclusive, using BookChapter.index"),
+                    "start" to numberSchema("Optional inclusive chapter index for one range"),
+                    "end" to numberSchema("Optional exclusive chapter index for one range"),
+                    "clear_book" to booleanSchema("Required true when no chapter selection is supplied. Clears the whole book cache folder.")
                 )
             ),
             tool(
@@ -477,6 +509,8 @@ object BookshelfMcpTools {
             "bookshelf_chapter_content_get" -> getChapterContent(arguments)
             "bookshelf_text_window_get" -> getTextWindow(arguments)
             "bookshelf_cache_status_get" -> getCacheStatus(arguments)
+            "bookshelf_cache_download" -> downloadCache(arguments)
+            "bookshelf_cache_clear" -> clearCache(arguments)
             "bookshelf_bookmark_list" -> listBookmarks(arguments)
             "bookshelf_bookmark_get" -> getBookmark(arguments)
             "bookshelf_bookmark_upsert" -> upsertBookmark(arguments)
@@ -980,6 +1014,88 @@ object BookshelfMcpTools {
                 "truncated_by_mcp" to (end - start > statuses.size),
                 "chapters" to statuses
             )
+        )
+    }
+
+    private fun downloadCache(arguments: JsonObject): Map<String, Any?> {
+        val book = resolveBook(arguments)
+            ?: return notFound("native://bookshelf/cacheDownload", "未找到书籍，请检查 work_key、book_url 或 name/author")
+        if (book.isLocal) {
+            return toolResult(
+                ok = false,
+                upstreamEndpoint = "native://bookshelf/cacheDownload",
+                normalizedData = mapOf("book" to book.toMcpSummary()),
+                warnings = listOf("本地书籍正文由本地文件读取，不支持触发离线章节缓存")
+            )
+        }
+        val selection = selectChapters(arguments, book, allowWholeBook = false)
+        if (selection.chapters.isEmpty()) {
+            throw IllegalArgumentException("chapter_indexes, ranges, or start/end is required")
+        }
+        val refreshExisting = arguments.get("refresh_existing").asBooleanOrNull() ?: false
+        if (refreshExisting) {
+            selection.chapters.forEach { chapter ->
+                BookHelp.delContent(book, chapter)
+            }
+        }
+        val queuedRanges = selection.chapters
+            .map { it.index }
+            .sorted()
+            .toExclusiveRanges()
+        queuedRanges.forEach { range ->
+            CacheBook.start(appCtx, book, range.first, range.last - 1)
+        }
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookshelf/cacheDownload",
+            normalizedData = mapOf(
+                "book" to book.toMcpSummary(),
+                "requested_chapter_count" to selection.requestedCount,
+                "queued_chapter_count" to selection.chapters.size,
+                "queued_ranges" to queuedRanges.map { mapOf("start" to it.first, "end" to it.last) },
+                "refresh_existing" to refreshExisting,
+                "chapter_indexes" to selection.chapters.map { it.index }.take(MAX_CACHE_STATUS_CHAPTERS),
+                "truncated_by_mcp" to (selection.chapters.size > MAX_CACHE_STATUS_CHAPTERS)
+            ),
+            warnings = selection.warnings
+        )
+    }
+
+    private fun clearCache(arguments: JsonObject): Map<String, Any?> {
+        val book = resolveBook(arguments)
+            ?: return notFound("native://bookshelf/cacheClear", "未找到书籍，请检查 work_key、book_url 或 name/author")
+        if (book.isLocal) {
+            return toolResult(
+                ok = false,
+                upstreamEndpoint = "native://bookshelf/cacheClear",
+                normalizedData = mapOf("book" to book.toMcpSummary()),
+                warnings = listOf("本地书籍正文来自本地文件，不能通过章节缓存清理删除")
+            )
+        }
+        val clearBook = arguments.get("clear_book").asBooleanOrNull() ?: false
+        val selection = selectChapters(arguments, book, allowWholeBook = clearBook)
+        if (selection.chapters.isEmpty()) {
+            throw IllegalArgumentException("chapter_indexes/ranges/start/end is required, or pass clear_book=true to clear the whole book cache")
+        }
+        if (clearBook && !selection.hasExplicitSelection) {
+            BookHelp.clearCache(book)
+        } else {
+            selection.chapters.forEach { chapter ->
+                BookHelp.delContent(book, chapter)
+            }
+        }
+        return toolResult(
+            ok = true,
+            upstreamEndpoint = "native://bookshelf/cacheClear",
+            normalizedData = mapOf(
+                "book" to book.toMcpSummary(),
+                "cleared_scope" to if (clearBook && !selection.hasExplicitSelection) "book" else "chapters",
+                "requested_chapter_count" to selection.requestedCount,
+                "cleared_chapter_count" to selection.chapters.size,
+                "chapter_indexes" to selection.chapters.map { it.index }.take(MAX_CACHE_STATUS_CHAPTERS),
+                "truncated_by_mcp" to (selection.chapters.size > MAX_CACHE_STATUS_CHAPTERS)
+            ),
+            warnings = selection.warnings
         )
     }
 
@@ -1654,9 +1770,123 @@ object BookshelfMcpTools {
             .replace('\r', '\n')
     }
 
+    private fun selectChapters(
+        arguments: JsonObject,
+        book: Book,
+        allowWholeBook: Boolean
+    ): ChapterSelection {
+        val all = appDb.bookChapterDao.getChapterList(book.bookUrl)
+        val allByIndex = all.associateBy { it.index }
+        val selectedIndexes = linkedSetOf<Int>()
+        val explicitIndexes = linkedSetOf<Int>()
+        val warnings = mutableListOf<String>()
+        var hasExplicitSelection = false
+
+        fun addIndex(index: Int) {
+            hasExplicitSelection = true
+            explicitIndexes.add(index)
+            if (allByIndex.containsKey(index)) {
+                selectedIndexes.add(index)
+            }
+        }
+
+        fun addRange(rawStart: Int, rawEnd: Int) {
+            hasExplicitSelection = true
+            if (all.isEmpty()) return
+            if (rawEnd <= rawStart) {
+                warnings.add("忽略空章节范围 start=$rawStart end=$rawEnd")
+                return
+            }
+            val minIndex = all.minOf { it.index }
+            val maxExclusive = all.maxOf { it.index } + 1
+            val start = rawStart.coerceAtLeast(minIndex)
+            val end = rawEnd.coerceIn(start, maxExclusive)
+            if (start >= end) {
+                warnings.add("章节范围超出目录 start=$rawStart end=$rawEnd")
+                return
+            }
+            all.asSequence()
+                .filter { it.index in start until end }
+                .map { it.index }
+                .forEach {
+                    explicitIndexes.add(it)
+                    selectedIndexes.add(it)
+                }
+        }
+
+        arguments.get("chapter_indexes").asIntListOrEmpty().forEach(::addIndex)
+        arguments.get("chapterIndexes").asIntListOrEmpty().forEach(::addIndex)
+
+        arguments.get("ranges")?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { item ->
+            val range = item.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
+            val start = range.get("start").asIntOrNull()
+            val end = range.get("end").asIntOrNull()
+            if (start == null) {
+                warnings.add("忽略缺少 start 的章节范围")
+            } else {
+                addRange(start, end ?: (start + 1))
+            }
+        }
+
+        val start = arguments.get("start").asIntOrNull()
+        val end = arguments.get("end").asIntOrNull()
+        if (start != null || end != null) {
+            addRange(start ?: 0, end ?: ((start ?: 0) + 1))
+        }
+
+        if (!hasExplicitSelection && allowWholeBook) {
+            all.forEach { chapter ->
+                selectedIndexes.add(chapter.index)
+            }
+        }
+
+        val missingIndexes = explicitIndexes.filterNot { allByIndex.containsKey(it) }
+        if (missingIndexes.isNotEmpty()) {
+            warnings.add(
+                "忽略不存在的章节 index: " +
+                        missingIndexes.take(10).joinToString(",") +
+                        if (missingIndexes.size > 10) " 等 ${missingIndexes.size} 项" else ""
+            )
+        }
+
+        val chapters = selectedIndexes.mapNotNull { allByIndex[it] }
+            .sortedBy { it.index }
+        return ChapterSelection(
+            chapters = chapters,
+            requestedCount = if (hasExplicitSelection) explicitIndexes.size else chapters.size,
+            hasExplicitSelection = hasExplicitSelection,
+            warnings = warnings
+        )
+    }
+
+    private fun List<Int>.toExclusiveRanges(): List<IntRange> {
+        if (isEmpty()) return emptyList()
+        val ranges = mutableListOf<IntRange>()
+        var start = first()
+        var previous = first()
+        drop(1).forEach { index ->
+            if (index == previous + 1) {
+                previous = index
+            } else {
+                ranges.add(start..(previous + 1))
+                start = index
+                previous = index
+            }
+        }
+        ranges.add(start..(previous + 1))
+        return ranges
+    }
+
     private data class WorkIdentity(
         val workKey: String,
         val book: Book?
+    )
+
+    private data class ChapterSelection(
+        val chapters: List<BookChapter>,
+        val requestedCount: Int,
+        val hasExplicitSelection: Boolean,
+        val warnings: List<String>
     )
 
     private data class LimitedText(
@@ -2030,6 +2260,15 @@ object BookshelfMcpTools {
                 .filter { it.isNotEmpty() }
 
             else -> null
+        }
+    }
+
+    private fun JsonElement?.asIntListOrEmpty(): List<Int> {
+        val element = this ?: return emptyList()
+        return when {
+            element.isJsonArray -> element.asJsonArray.mapNotNull { it.asIntOrNull() }
+            element.isJsonPrimitive -> listOfNotNull(element.asIntOrNull())
+            else -> emptyList()
         }
     }
 

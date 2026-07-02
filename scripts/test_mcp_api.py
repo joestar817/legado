@@ -41,6 +41,8 @@ EXPECTED_TOOLS = {
     "bookshelf_chapter_content_get",
     "bookshelf_text_window_get",
     "bookshelf_cache_status_get",
+    "bookshelf_cache_download",
+    "bookshelf_cache_clear",
     "bookshelf_bookmark_list",
     "bookshelf_bookmark_get",
     "bookshelf_bookmark_upsert",
