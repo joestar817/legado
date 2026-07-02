@@ -58,6 +58,19 @@ object AiChatHistoryStore {
         }
     }
 
+    fun deleteSessions(sessionIds: Collection<String>) {
+        synchronized(lock) {
+            sessionIds
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .forEach { sessionId ->
+                    appDb.aiChatDao.deleteMessageNodes(sessionId)
+                    appDb.aiChatDao.deleteConversation(sessionId)
+                }
+        }
+    }
+
     private fun historyFile(): File {
         return File(appCtx.filesDir, FILE_NAME)
     }

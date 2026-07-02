@@ -94,6 +94,11 @@ import java.text.DecimalFormat
 
 class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHandler {
 
+    companion object {
+        const val EXTRA_INITIAL_PAGE = "initialPage"
+        const val PAGE_ASSISTANT = "assistant"
+    }
+
     private enum class Page {
         MAIN,
         PROVIDERS,
@@ -153,7 +158,12 @@ class AiConfigFragment : BaseFragment(R.layout.fragment_ai_config), ConfigBackHa
         initPromptDetail()
         initModelSettings()
         initPurifySettings()
+        val initialPage = activity?.intent?.getStringExtra(EXTRA_INITIAL_PAGE)
         showMain()
+        if (initialPage == PAGE_ASSISTANT) {
+            activity?.intent?.removeExtra(EXTRA_INITIAL_PAGE)
+            showAssistantModelSettings()
+        }
     }
 
     override fun onResume() {

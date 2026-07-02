@@ -75,6 +75,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.CallSplit
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AddComment
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Check
@@ -83,6 +84,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.MoreVert
@@ -93,6 +95,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Image as ImageIcon
@@ -207,6 +210,9 @@ import kotlin.math.roundToInt
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -385,12 +391,17 @@ private fun AiChatRoute(onBack: () -> Unit) {
     var previewMode by remember { mutableStateOf(false) }
     var globalSearchMode by remember { mutableStateOf(false) }
     var globalSearchQuery by remember { mutableStateOf("") }
+    var statsMode by remember { mutableStateOf(false) }
     var exportSelectionMode by remember { mutableStateOf(false) }
     var exportFormatDialog by remember { mutableStateOf(false) }
     var showContextAttachmentSheet by remember { mutableStateOf(false) }
     var showSkillAttachmentSheet by remember { mutableStateOf(false) }
     var contextPreviewAttachments by remember { mutableStateOf<List<AiChatInputAttachment>>(emptyList()) }
+    var historyLoaded by remember { mutableStateOf(false) }
+    var historyManageMode by remember { mutableStateOf(false) }
+    var pendingDeleteHistoryIds by remember { mutableStateOf<List<String>>(emptyList()) }
     val selectedExportMessageIds = remember { mutableStateListOf<String>() }
+    val selectedHistoryIds = remember { mutableStateListOf<String>() }
     val selectedModelLabel = remember(configVersion) {
         AiAssistantConfigUi.selectedModelLabel()
     }
@@ -425,24 +436,15 @@ private fun AiChatRoute(onBack: () -> Unit) {
         }
         sessions.clear()
         sessions += history.sessions
+        historyLoaded = true
         if (sending || messages.isNotEmpty()) {
             return@LaunchedEffect
         }
-        val activeSession = history.activeSessionId
-            ?.let { activeId -> history.sessions.firstOrNull { it.id == activeId } }
-            ?: history.sessions.firstOrNull()
-        if (entryAttachments.isNotEmpty()) {
-            activeSessionId = UUID.randomUUID().toString()
-            uploadMessages.clear()
-            uploadMessages += chatClient.newSystemMessage()
-            messages.clear()
-            selectedDrawerIndex = 2
-        } else if (activeSession != null) {
-            activeSessionId = activeSession.id
-            messages.replaceWith(activeSession.messages.map { it.toUiMessage() })
-            uploadMessages.replaceUploadMessages(activeSession, chatClient)
-            inputAttachments.replaceWith(buildSkillInputAttachments(activeSession.loadedSkillIds))
-        }
+        activeSessionId = UUID.randomUUID().toString()
+        uploadMessages.clear()
+        uploadMessages += chatClient.newSystemMessage()
+        messages.clear()
+        selectedDrawerIndex = 2
     }
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -501,6 +503,10 @@ private fun AiChatRoute(onBack: () -> Unit) {
         globalSearchQuery = ""
         selectedDrawerIndex = 2
     }
+    BackHandler(enabled = statsMode) {
+        statsMode = false
+        selectedDrawerIndex = 2
+    }
     BackHandler(enabled = previewMode) {
         previewMode = false
     }
@@ -509,9 +515,20 @@ private fun AiChatRoute(onBack: () -> Unit) {
         exportFormatDialog = false
         selectedExportMessageIds.clear()
     }
+    BackHandler(enabled = historyManageMode) {
+        historyManageMode = false
+        selectedHistoryIds.clear()
+    }
 
     fun placeholder(label: String) {
         Toast.makeText(context, "$label 后续接入", Toast.LENGTH_SHORT).show()
+    }
+
+    fun openAssistantSettings() {
+        context.startActivity(Intent(context, ConfigActivity::class.java).apply {
+            putExtra("configTag", ConfigTag.AI_CONFIG)
+            putExtra(AiConfigFragment.EXTRA_INITIAL_PAGE, AiConfigFragment.PAGE_ASSISTANT)
+        })
     }
 
     fun saveHistory(activeId: String? = activeSessionId) {
@@ -911,29 +928,52 @@ private fun AiChatRoute(onBack: () -> Unit) {
         Toast.makeText(context, "已创建分支", Toast.LENGTH_SHORT).show()
     }
 
+    fun pinSessions(sessionIds: Collection<String>) {
+        val targetIds = sessionIds
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .toSet()
+        if (targetIds.isEmpty()) {
+            return
+        }
+        val now = System.currentTimeMillis()
+        sessions.indices.forEach { index ->
+            if (sessions[index].id in targetIds) {
+                sessions[index] = sessions[index].copy(
+                    isPinned = true,
+                    updatedAt = now
+                )
+            }
+        }
+        sessions.sortChatSessions()
+        saveHistory(activeSessionId)
+        Toast.makeText(context, "已置顶 ${targetIds.size} 条聊天记录", Toast.LENGTH_SHORT).show()
+    }
+
     fun pinSession(sessionId: String?) {
         if (sessionId.isNullOrBlank()) {
             persistActiveSession()
         }
         val targetId = sessionId ?: activeSessionId ?: return
-        val index = sessions.indexOfFirst { it.id == targetId }
-        if (index < 0) {
-            return
-        }
-        sessions[index] = sessions[index].copy(
-            isPinned = true,
-            updatedAt = System.currentTimeMillis()
-        )
-        sessions.sortChatSessions()
-        saveHistory(activeSessionId)
-        Toast.makeText(context, "已置顶", Toast.LENGTH_SHORT).show()
+        pinSessions(listOf(targetId))
     }
 
-    fun deleteSession(session: AiChatSessionSnapshot) {
-        val wasActive = session.id == activeSessionId
-        sessions.removeAll { it.id == session.id }
+    fun deleteSessions(sessionIds: Collection<String>) {
+        val targetIds = sessionIds
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .toSet()
+        if (targetIds.isEmpty()) {
+            return
+        }
+        val wasActive = activeSessionId in targetIds
+        val deleteCount = sessions.count { it.id in targetIds }
+        sessions.removeAll { it.id in targetIds }
+        selectedHistoryIds.removeAll(targetIds)
         scope.launch(Dispatchers.IO) {
-            AiChatHistoryStore.deleteSession(session.id)
+            AiChatHistoryStore.deleteSessions(targetIds)
         }
         if (wasActive) {
             val nextSession = sessions.firstOrNull()
@@ -949,7 +989,10 @@ private fun AiChatRoute(onBack: () -> Unit) {
         } else {
             saveHistory(activeSessionId)
         }
-        Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
+        if (selectedHistoryIds.isEmpty()) {
+            historyManageMode = false
+        }
+        Toast.makeText(context, "已删除 $deleteCount 条聊天记录", Toast.LENGTH_SHORT).show()
     }
 
     fun deleteFavorite(item: DrawerFavoriteItem) {
@@ -986,17 +1029,55 @@ private fun AiChatRoute(onBack: () -> Unit) {
             ThemeConfig.getBgImage(context, context.resources.displayMetrics)
         }.getOrNull()
     }
+    val sessionSnapshots = sessions.toList()
+    val currentMessageSnapshots = messages.toList()
+    val drawerHistoryGroups = remember(sessionSnapshots) {
+        buildDrawerHistoryGroups(sessionSnapshots)
+    }
+    val drawerFavoriteItems = remember(sessionSnapshots, activeSessionId, currentMessageSnapshots) {
+        buildDrawerFavoriteItems(sessionSnapshots, activeSessionId, currentMessageSnapshots)
+    }
+    if (pendingDeleteHistoryIds.isNotEmpty()) {
+        val deleteCount = pendingDeleteHistoryIds.size
+        AlertDialog(
+            onDismissRequest = { pendingDeleteHistoryIds = emptyList() },
+            title = { Text("删除聊天记录") },
+            text = { Text("确定删除 $deleteCount 条聊天记录？删除后不可恢复。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val ids = pendingDeleteHistoryIds
+                        pendingDeleteHistoryIds = emptyList()
+                        deleteSessions(ids)
+                    }
+                ) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteHistoryIds = emptyList() }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             RikkaChatDrawer(
                 selectedIndex = selectedDrawerIndex,
-                sessions = sessions,
+                historyGroups = drawerHistoryGroups,
+                historyLoaded = historyLoaded,
+                drawerOpen = drawerState.isOpen,
                 activeSessionId = activeSessionId,
-                favoriteItems = buildDrawerFavoriteItems(sessions, activeSessionId, messages),
+                favoriteItems = drawerFavoriteItems,
                 backgroundDrawable = chatBackgroundDrawable,
+                historyManageMode = historyManageMode,
+                selectedHistoryIds = selectedHistoryIds.toSet(),
                 onSelect = {
                     selectedDrawerIndex = it
+                    historyManageMode = false
+                    selectedHistoryIds.clear()
                     if (it == 1) {
                         previewMode = false
                         globalSearchMode = true
@@ -1012,11 +1093,51 @@ private fun AiChatRoute(onBack: () -> Unit) {
                 onPinSession = { session ->
                     pinSession(session.id)
                 },
-                onDeleteSession = ::deleteSession,
+                onDeleteSession = { session ->
+                    pendingDeleteHistoryIds = listOf(session.id)
+                },
+                onPinHistoryGroup = { group ->
+                    pinSessions(group.items.map { it.session.id })
+                },
+                onDeleteHistoryGroup = { group ->
+                    pendingDeleteHistoryIds = group.items.map { it.session.id }
+                },
+                onToggleHistoryManage = {
+                    historyManageMode = !historyManageMode
+                    selectedHistoryIds.clear()
+                },
+                onToggleHistorySelection = { session ->
+                    if (session.id in selectedHistoryIds) {
+                        selectedHistoryIds.remove(session.id)
+                    } else {
+                        selectedHistoryIds.add(session.id)
+                    }
+                },
+                onSelectAllHistory = {
+                    selectedHistoryIds.clear()
+                    selectedHistoryIds.addAll(drawerHistoryGroups.flatMap { group ->
+                        group.items.map { it.session.id }
+                    })
+                },
+                onDeleteSelectedHistory = {
+                    pendingDeleteHistoryIds = selectedHistoryIds.toList()
+                },
                 onPinFavorite = { item ->
                     pinSession(item.session?.id)
                 },
                 onDeleteFavorite = ::deleteFavorite,
+                onOpenStats = {
+                    persistActiveSession()
+                    statsMode = true
+                    globalSearchMode = false
+                    previewMode = false
+                    selectedDrawerIndex = 2
+                    scope.launch { drawerState.close() }
+                },
+                onOpenSettings = {
+                    scope.launch { drawerState.close() }
+                    openAssistantSettings()
+                },
                 onNewChat = {
                     startNewChat()
                     scope.launch { drawerState.close() }
@@ -1071,6 +1192,16 @@ private fun AiChatRoute(onBack: () -> Unit) {
                         scope.launch {
                             listState.animateScrollToItem(result.messageIndex.coerceAtLeast(0))
                         }
+                    }
+                )
+            } else if (statsMode) {
+                AiChatStatsPage(
+                    stats = remember(sessionSnapshots, activeSessionId, currentMessageSnapshots) {
+                        buildAiChatStats(sessionSnapshots, activeSessionId, currentMessageSnapshots)
+                    },
+                    onBack = {
+                        statsMode = false
+                        selectedDrawerIndex = 2
                     }
                 )
             } else {
@@ -1296,6 +1427,286 @@ private fun AiChatRoute(onBack: () -> Unit) {
 }
 
 @Composable
+private fun AiChatStatsPage(
+    stats: AiChatStats,
+    onBack: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding(),
+        contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item(key = "stats_header") {
+            Column {
+                Surface(
+                    onClick = onBack,
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f)
+                ) {
+                    Box(
+                        modifier = Modifier.size(56.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
+                    }
+                }
+                Spacer(Modifier.height(26.dp))
+                Text(
+                    text = "统计",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+        item(key = "token_activity") {
+            AiTokenActivityCard(stats.tokenActivityPerDay)
+        }
+        item(key = "stats_grid") {
+            AiChatStatsGrid(stats)
+        }
+    }
+}
+
+@Composable
+private fun AiTokenActivityCard(tokenActivityPerDay: Map<LocalDate, Long>) {
+    var mode by remember { mutableStateOf(TokenActivityMode.DAILY) }
+    val bars = remember(tokenActivityPerDay, mode) {
+        buildTokenActivityBars(tokenActivityPerDay, mode)
+    }
+    var selectedIndex by remember(bars) {
+        mutableIntStateOf(
+            bars.indexOfFirst { it.defaultSelected }
+                .takeIf { it >= 0 }
+                ?: bars.lastIndex
+        )
+    }
+    val selectedBar = bars.getOrNull(selectedIndex)
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+        ),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Token 活动",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                TokenActivityMode.entries.forEach { item ->
+                    TokenActivityModeLabel(
+                        text = item.title,
+                        selected = mode == item,
+                        onClick = { mode = item }
+                    )
+                }
+            }
+            Text(
+                text = selectedBar?.let {
+                    "${it.rangeLabel} · ${formatAiStatTokens(it.value)} Token"
+                } ?: "暂无 Token 活动",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+            )
+            TokenActivityBarChart(
+                bars = bars,
+                selectedIndex = selectedIndex,
+                onSelect = { selectedIndex = it }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TokenActivityModeLabel(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (selected) 0.90f else 0.46f),
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
+private fun TokenActivityBarChart(
+    bars: List<TokenActivityBar>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit
+) {
+    val scrollState = rememberScrollState(initial = Int.MAX_VALUE)
+    val maxValue = bars.maxOfOrNull { it.value } ?: 0L
+    Row(
+        modifier = Modifier.horizontalScroll(scrollState),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        bars.forEachIndexed { index, bar ->
+            val selected = index == selectedIndex
+            Column(
+                modifier = Modifier
+                    .width(22.dp)
+                    .clickable { onSelect(index) },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier.height(116.dp),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    val heightRatio = if (maxValue > 0L) {
+                        bar.value.toFloat() / maxValue.toFloat()
+                    } else {
+                        0f
+                    }
+                    val barHeight = if (bar.value > 0L) {
+                        (10.dp + 104.dp * heightRatio).coerceAtMost(114.dp)
+                    } else {
+                        6.dp
+                    }
+                    Box(
+                        modifier = Modifier
+                            .width(if (selected) 14.dp else 12.dp)
+                            .height(barHeight)
+                            .clip(RoundedCornerShape(topStart = 7.dp, topEnd = 7.dp))
+                            .background(
+                                if (bar.value <= 0L) {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+                                } else if (selected) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.88f)
+                                } else {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+                                }
+                            )
+                    )
+                }
+                Text(
+                    text = bar.axisLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (selected) 0.90f else 0.56f),
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AiChatStatsGrid(stats: AiChatStats) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            AiStatCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Rounded.History,
+                label = "总对话数",
+                value = formatAiStatCount(stats.totalConversations.toLong())
+            )
+            AiStatCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Rounded.Description,
+                label = "总消息数",
+                value = formatAiStatCount(stats.totalMessages.toLong())
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            AiStatCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Rounded.Psychology,
+                label = "输入 Token",
+                value = formatAiStatTokens(stats.totalPromptTokens)
+            )
+            AiStatCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Rounded.Psychology,
+                label = "输出 Token",
+                value = formatAiStatTokens(stats.totalCompletionTokens)
+            )
+        }
+        if (stats.totalElapsedMs > 0L) {
+            AiStatCard(
+                modifier = Modifier.fillMaxWidth(),
+                iconRes = R.drawable.ic_mingcute_time_line,
+                label = "生成耗时",
+                value = formatAiStatDuration(stats.totalElapsedMs)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AiStatCard(
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    @DrawableRes iconRes: Int? = null,
+    label: String,
+    value: String
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)
+        ),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            } else if (iconRes != null) {
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 private fun GlobalMessageSearchPage(
     query: String,
     onQueryChange: (String) -> Unit,
@@ -1475,16 +1886,28 @@ private fun GlobalSearchResultRow(
 @Composable
 private fun RikkaChatDrawer(
     selectedIndex: Int,
-    sessions: List<AiChatSessionSnapshot>,
+    historyGroups: List<DrawerHistoryGroup>,
+    historyLoaded: Boolean,
+    drawerOpen: Boolean,
     activeSessionId: String?,
     favoriteItems: List<DrawerFavoriteItem>,
     backgroundDrawable: Drawable?,
+    historyManageMode: Boolean,
+    selectedHistoryIds: Set<String>,
     onSelect: (Int) -> Unit,
     onSessionSelect: (AiChatSessionSnapshot) -> Unit,
     onPinSession: (AiChatSessionSnapshot) -> Unit,
     onDeleteSession: (AiChatSessionSnapshot) -> Unit,
+    onPinHistoryGroup: (DrawerHistoryGroup) -> Unit,
+    onDeleteHistoryGroup: (DrawerHistoryGroup) -> Unit,
+    onToggleHistoryManage: () -> Unit,
+    onToggleHistorySelection: (AiChatSessionSnapshot) -> Unit,
+    onSelectAllHistory: () -> Unit,
+    onDeleteSelectedHistory: () -> Unit,
     onPinFavorite: (DrawerFavoriteItem) -> Unit,
     onDeleteFavorite: (DrawerFavoriteItem) -> Unit,
+    onOpenStats: () -> Unit,
+    onOpenSettings: () -> Unit,
     onNewChat: () -> Unit
 ) {
     val drawerWidth = LocalConfiguration.current.screenWidthDp.dp * 0.65f
@@ -1537,23 +1960,98 @@ private fun RikkaChatDrawer(
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                 )
-                when (selectedIndex) {
-                    3 -> DrawerFavoriteContent(
-                        favoriteItems = favoriteItems,
-                        onSessionSelect = onSessionSelect,
-                        onPinFavorite = onPinFavorite,
-                        onDeleteFavorite = onDeleteFavorite
-                    )
+                Box(modifier = Modifier.weight(1f)) {
+                    when (selectedIndex) {
+                        3 -> DrawerFavoriteContent(
+                            favoriteItems = favoriteItems,
+                            onSessionSelect = onSessionSelect,
+                            onPinFavorite = onPinFavorite,
+                            onDeleteFavorite = onDeleteFavorite
+                        )
 
-                    else -> DrawerHistoryContent(
-                        sessions = sessions,
-                        activeSessionId = activeSessionId,
-                        onSessionSelect = onSessionSelect,
-                        onPinSession = onPinSession,
-                        onDeleteSession = onDeleteSession,
-                        onNewChat = onNewChat
-                    )
+                        else -> DrawerHistoryContent(
+                            groups = historyGroups,
+                            historyLoaded = historyLoaded,
+                            drawerOpen = drawerOpen,
+                            activeSessionId = activeSessionId,
+                            manageMode = historyManageMode,
+                            selectedIds = selectedHistoryIds,
+                            onSessionSelect = onSessionSelect,
+                            onPinSession = onPinSession,
+                            onDeleteSession = onDeleteSession,
+                            onPinGroup = onPinHistoryGroup,
+                            onDeleteGroup = onDeleteHistoryGroup,
+                            onToggleManage = onToggleHistoryManage,
+                            onToggleSelection = onToggleHistorySelection,
+                            onSelectAll = onSelectAllHistory,
+                            onDeleteSelected = onDeleteSelectedHistory,
+                            onNewChat = onNewChat
+                        )
+                    }
                 }
+                DrawerBottomActions(
+                    onOpenStats = onOpenStats,
+                    onOpenSettings = onOpenSettings
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DrawerBottomActions(
+    onOpenStats: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        DrawerBottomActionButton(
+            iconRes = R.drawable.ic_solar_chart_bold,
+            contentDescription = "统计",
+            onClick = onOpenStats
+        )
+        Spacer(Modifier.width(14.dp))
+        DrawerBottomActionButton(
+            imageVector = Icons.Rounded.Settings,
+            contentDescription = "设置",
+            onClick = onOpenSettings
+        )
+    }
+}
+
+@Composable
+private fun DrawerBottomActionButton(
+    contentDescription: String,
+    onClick: () -> Unit,
+    @DrawableRes iconRes: Int? = null,
+    imageVector: ImageVector? = null
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f),
+        modifier = Modifier.size(48.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (imageVector != null) {
+                Icon(
+                    imageVector = imageVector,
+                    contentDescription = contentDescription,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            } else if (iconRes != null) {
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = contentDescription,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }
@@ -1561,36 +2059,211 @@ private fun RikkaChatDrawer(
 
 @Composable
 private fun DrawerHistoryContent(
-    sessions: List<AiChatSessionSnapshot>,
+    groups: List<DrawerHistoryGroup>,
+    historyLoaded: Boolean,
+    drawerOpen: Boolean,
     activeSessionId: String?,
+    manageMode: Boolean,
+    selectedIds: Set<String>,
     onSessionSelect: (AiChatSessionSnapshot) -> Unit,
     onPinSession: (AiChatSessionSnapshot) -> Unit,
     onDeleteSession: (AiChatSessionSnapshot) -> Unit,
+    onPinGroup: (DrawerHistoryGroup) -> Unit,
+    onDeleteGroup: (DrawerHistoryGroup) -> Unit,
+    onToggleManage: () -> Unit,
+    onToggleSelection: (AiChatSessionSnapshot) -> Unit,
+    onSelectAll: () -> Unit,
+    onDeleteSelected: () -> Unit,
     onNewChat: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
+    val collapsedGroups = remember { mutableStateListOf<String>() }
+    val totalCount = groups.sumOf { it.items.size }
+    LaunchedEffect(drawerOpen, groups.map { it.title }) {
+        if (drawerOpen) {
+            collapsedGroups.clear()
+            collapsedGroups.addAll(groups.map { it.title })
+        }
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        DrawerSectionTitle("聊天历史")
-        if (sessions.isEmpty()) {
-            DrawerConversationRow(
-                label = "新聊天",
-                selected = true,
-                onClick = onNewChat
-            )
-        } else {
-            sessions.forEach { session ->
-                DrawerConversationRow(
-                    label = session.title,
-                    selected = session.id == activeSessionId,
-                    onClick = { onSessionSelect(session) },
-                    onPin = { onPinSession(session) },
-                    onDelete = { onDeleteSession(session) }
+        item(key = "history_header") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    DrawerSectionTitle(
+                        text = if (manageMode) "聊天历史 · 已选 ${selectedIds.size}" else "聊天历史",
+                        modifier = Modifier.weight(1f)
+                    )
+                    DrawerPlainTextButton(
+                        text = if (manageMode) "取消" else "管理",
+                        enabled = totalCount > 0,
+                        onClick = onToggleManage
+                    )
+                }
+                if (manageMode) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 2.dp, end = 2.dp, bottom = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        DrawerPlainTextButton(
+                            text = "全选",
+                            enabled = totalCount > 0,
+                            onClick = onSelectAll
+                        )
+                        DrawerPlainTextButton(
+                            text = "删除",
+                            enabled = selectedIds.isNotEmpty(),
+                            onClick = onDeleteSelected
+                        )
+                    }
+                }
+            }
+        }
+        if (!historyLoaded) {
+            item(key = "history_loading") {
+                Text(
+                    text = "正在加载聊天历史",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                 )
+            }
+        } else if (totalCount == 0) {
+            item(key = "new_chat") {
+                DrawerConversationRow(
+                    label = "新聊天",
+                    subtitle = "开始一次新的 AI 助理对话",
+                    selected = true,
+                    onClick = onNewChat
+                )
+            }
+        } else {
+            groups.forEach { group ->
+                item(key = "group_${group.title}") {
+                    val expanded = group.title !in collapsedGroups
+                    DrawerHistoryGroupHeader(
+                        group = group,
+                        expanded = expanded,
+                        onToggle = {
+                            if (expanded) {
+                                collapsedGroups.add(group.title)
+                            } else {
+                                collapsedGroups.remove(group.title)
+                            }
+                        },
+                        onPinGroup = { onPinGroup(group) },
+                        onDeleteGroup = { onDeleteGroup(group) }
+                    )
+                }
+                if (group.title !in collapsedGroups) {
+                    items(group.items, key = { it.session.id }) { item ->
+                        val session = item.session
+                        DrawerConversationRow(
+                            label = item.title,
+                            subtitle = item.subtitle,
+                            selected = session.id == activeSessionId,
+                            checked = session.id in selectedIds,
+                            manageMode = manageMode,
+                            onClick = {
+                                if (manageMode) {
+                                    onToggleSelection(session)
+                                } else {
+                                    onSessionSelect(session)
+                                }
+                            },
+                            onPin = { onPinSession(session) },
+                            onDelete = { onDeleteSession(session) }
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun DrawerHistoryGroupHeader(
+    group: DrawerHistoryGroup,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onPinGroup: () -> Unit,
+    onDeleteGroup: () -> Unit
+) {
+    Surface(
+        onClick = onToggle,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 8.dp, top = 5.dp, end = 2.dp, bottom = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (expanded) {
+                    Icons.Rounded.KeyboardArrowDown
+                } else {
+                    Icons.AutoMirrored.Rounded.KeyboardArrowRight
+                },
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = group.title,
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = group.items.size.toString(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+            DrawerGroupMoreMenu(
+                onPinGroup = onPinGroup,
+                onDeleteGroup = onDeleteGroup
+            )
+        }
+    }
+}
+
+@Composable
+private fun DrawerPlainTextButton(
+    text: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        color = if (enabled) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+        },
+        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.bodySmall,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable
@@ -1600,20 +2273,25 @@ private fun DrawerFavoriteContent(
     onPinFavorite: (DrawerFavoriteItem) -> Unit,
     onDeleteFavorite: (DrawerFavoriteItem) -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        DrawerSectionTitle("收藏内容")
+        item(key = "favorite_header") {
+            DrawerSectionTitle("收藏内容")
+        }
         if (favoriteItems.isEmpty()) {
-            Text(
-                text = "暂无收藏内容",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-            )
+            item(key = "favorite_empty") {
+                Text(
+                    text = "暂无收藏内容",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
         } else {
-            favoriteItems.forEach { item ->
+            items(favoriteItems, key = { "${it.session?.id.orEmpty()}:${it.messageId}" }) { item ->
                 Surface(
                     onClick = { item.session?.let(onSessionSelect) },
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.38f),
@@ -1655,13 +2333,16 @@ private fun DrawerFavoriteContent(
 }
 
 @Composable
-private fun DrawerSectionTitle(text: String) {
+private fun DrawerSectionTitle(
+    text: String,
+    modifier: Modifier = Modifier
+) {
     Text(
         text = text,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold,
         style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+        modifier = modifier.padding(horizontal = 6.dp, vertical = 3.dp)
     )
 }
 
@@ -1697,29 +2378,58 @@ private fun DrawerActionRow(
 @Composable
 private fun DrawerConversationRow(
     label: String,
+    subtitle: String?,
     selected: Boolean,
     onClick: () -> Unit,
+    checked: Boolean = false,
+    manageMode: Boolean = false,
     onPin: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null
 ) {
     Surface(
         onClick = onClick,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f) else Color.Transparent,
+        color = when {
+            checked -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
+            selected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+            else -> Color.Transparent
+        },
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(start = 12.dp, top = 5.dp, end = 4.dp, bottom = 5.dp),
+            modifier = Modifier.padding(start = 8.dp, top = 6.dp, end = 4.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = label,
+            if (manageMode) {
+                Checkbox(
+                    checked = checked,
+                    onCheckedChange = { onClick() },
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .size(32.dp)
+                )
+            }
+            Column(
                 modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (onPin != null && onDelete != null) {
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            if (!manageMode && onPin != null && onDelete != null) {
                 DrawerMoreMenu(
                     onPin = onPin,
                     onDelete = onDelete
@@ -1766,6 +2476,50 @@ private fun DrawerMoreMenu(
                     onClick = {
                         expanded = false
                         onDelete()
+                    }
+                )
+            )
+        )
+    }
+}
+
+@Composable
+private fun DrawerGroupMoreMenu(
+    onPinGroup: () -> Unit,
+    onDeleteGroup: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.size(30.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.MoreHoriz,
+                contentDescription = "分组操作",
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        NgFunctionMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            actions = listOf(
+                NgFunctionMenuAction(
+                    icon = Icons.Rounded.PushPin,
+                    text = "置顶分组",
+                    onClick = {
+                        expanded = false
+                        onPinGroup()
+                    }
+                ),
+                NgFunctionMenuAction(
+                    icon = Icons.Rounded.Delete,
+                    text = "清空分组",
+                    danger = true,
+                    dividerBefore = true,
+                    onClick = {
+                        expanded = false
+                        onDeleteGroup()
                     }
                 )
             )
@@ -4425,13 +5179,181 @@ private fun List<ChatUiMessage>.deriveChatTitle(): String? {
         ?.takeIf { it.isNotBlank() }
 }
 
+private fun buildDrawerHistoryGroups(
+    sessions: List<AiChatSessionSnapshot>
+): List<DrawerHistoryGroup> {
+    val groupOrder = listOf("置顶", "书籍相关", "书架管理", "书源 / 调试", "普通聊天")
+    val items = sessions.map { session ->
+        val identity = session.drawerIdentity()
+        DrawerHistoryItem(
+            session = session,
+            groupTitle = if (session.isPinned) "置顶" else identity.groupTitle,
+            title = identity.title,
+            subtitle = identity.subtitle
+        )
+    }
+    val grouped = items.groupBy { item ->
+        item.groupTitle
+    }
+    val orderedGroups = groupOrder.mapNotNull { title ->
+        grouped[title]
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { DrawerHistoryGroup(title, it) }
+    }
+    val orderedTitles = groupOrder.toSet()
+    val extraGroups = grouped
+        .filterKeys { it !in orderedTitles }
+        .map { (title, items) -> DrawerHistoryGroup(title, items) }
+    return orderedGroups + extraGroups
+}
+
+private fun AiChatSessionSnapshot.drawerIdentity(): DrawerConversationIdentity {
+    val corpus = drawerCorpus()
+    val subject = extractChatSubject(corpus)
+    val skillText = loadedSkillIds.joinToString("|").lowercase(Locale.ROOT)
+    val compactTitle = title.toCompactDrawerText()
+    val scene = when {
+        skillText.contains("character") || corpus.contains("角色卡") -> DrawerScene(
+            groupTitle = "书籍相关",
+            title = "角色卡"
+        )
+
+        skillText.contains("bookshelf") ||
+            corpus.contains("整理书架") ||
+            corpus.contains("书架分组") ||
+            corpus.contains("阅读偏好") ||
+            corpus.contains("长期未读") -> DrawerScene(
+                groupTitle = "书架管理",
+                title = when {
+                    corpus.contains("阅读偏好") -> "阅读偏好"
+                    corpus.contains("长期未读") -> "长期未读"
+                    else -> "书架整理"
+                }
+            )
+
+        corpus.contains("书源") || corpus.contains("调试日志") || corpus.contains("网络日志") -> DrawerScene(
+            groupTitle = "书源 / 调试",
+            title = when {
+                corpus.contains("网络日志") -> "网络日志分析"
+                corpus.contains("调试日志") -> "调试日志分析"
+                corpus.contains("书源") -> "书源分析"
+                else -> "调试分析"
+            }
+        )
+
+        subject != null -> DrawerScene(
+            groupTitle = "书籍相关",
+            title = compactTitle.takeUnless { it.isGenericChatTitle() } ?: "书籍讨论"
+        )
+
+        else -> DrawerScene(
+            groupTitle = "普通聊天",
+            title = compactTitle.ifBlank { "普通聊天" }
+        )
+    }
+    val titleText = if (subject != null && scene.title !in subject) {
+        "${scene.title} · $subject"
+    } else {
+        scene.title
+    }.toCompactDrawerText(maxLength = 32)
+    val preview = messages
+        .asReversed()
+        .firstOrNull { it.content.isNotBlank() }
+        ?.drawerPreview()
+        .orEmpty()
+        .takeUnless { it == title || it == titleText }
+    val subtitle = listOfNotNull(
+        formatDrawerHistoryTime(updatedAt),
+        preview
+    ).joinToString(" · ")
+    return DrawerConversationIdentity(
+        groupTitle = scene.groupTitle,
+        title = titleText.ifBlank { "普通聊天" },
+        subtitle = subtitle
+    )
+}
+
+private fun AiChatSessionSnapshot.drawerCorpus(): String {
+    val firstUser = messages.firstOrNull { it.role == AiChatMessageSnapshot.ROLE_USER }?.content.orEmpty()
+    val lastText = messages.asReversed().firstOrNull { it.content.isNotBlank() }?.content.orEmpty()
+    val uploadText = uploadMessages
+        .asSequence()
+        .mapNotNull { message ->
+            runCatching {
+                message.get("content")?.toString().orEmpty()
+            }.getOrNull()
+        }
+        .firstOrNull { it.isNotBlank() }
+        .orEmpty()
+    return listOf(title, firstUser, lastText, uploadText, loadedSkillIds.joinToString("|"))
+        .joinToString("\n")
+        .replace("\\n", "\n")
+        .take(4000)
+}
+
+private fun extractChatSubject(text: String): String? {
+    val patterns = listOf(
+        Regex("《([^》]{1,40})》"),
+        Regex("(?:书名|作品|当前书)[:：]\\s*([^\\n，。；|]{1,40})"),
+        Regex("(?:name|book_name|bookName)[:=]\\s*([^\\n，。；|]{1,40})", RegexOption.IGNORE_CASE)
+    )
+    return patterns
+        .asSequence()
+        .mapNotNull { pattern -> pattern.find(text)?.groupValues?.getOrNull(1) }
+        .map { it.cleanDrawerSubject() }
+        .firstOrNull { it.isNotBlank() }
+}
+
+private fun String.cleanDrawerSubject(): String {
+    return replace(Regex("[\"'`{}\\[\\]]"), "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .trim('：', ':', '-', '，', ',', '。')
+        .take(24)
+}
+
+private fun String.toCompactDrawerText(maxLength: Int = 24): String {
+    return lineSequence()
+        .firstOrNull { it.isNotBlank() }
+        ?.replace(Regex("\\s+"), " ")
+        ?.trim()
+        ?.take(maxLength)
+        .orEmpty()
+}
+
+private fun String.isGenericChatTitle(): Boolean {
+    return isBlank() ||
+        contains("当前书") ||
+        contains("生成角色卡") ||
+        contains("整理书架")
+}
+
+private fun formatDrawerHistoryTime(timeMillis: Long): String {
+    if (timeMillis <= 0L) {
+        return "未知时间"
+    }
+    val now = System.currentTimeMillis()
+    val diff = (now - timeMillis).coerceAtLeast(0L)
+    return when {
+        diff < 24L * 60L * 60L * 1000L -> {
+            "今天 " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timeMillis))
+        }
+
+        diff < 7L * 24L * 60L * 60L * 1000L -> "${diff / (24L * 60L * 60L * 1000L)}天前"
+        else -> SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(timeMillis))
+    }
+}
+
 private fun buildDrawerFavoriteItems(
     sessions: List<AiChatSessionSnapshot>,
     activeSessionId: String?,
     messages: List<ChatUiMessage>
 ): List<DrawerFavoriteItem> {
     val activeSession = sessions.firstOrNull { it.id == activeSessionId }
-    val activeTitle = activeSession?.title ?: messages.deriveChatTitle() ?: "当前聊天"
+    val titleCache = sessions.associate { session ->
+        session.id to session.drawerIdentity().title
+    }
+    val activeTitle = activeSession?.let { titleCache[it.id] } ?: messages.deriveChatTitle() ?: "当前聊天"
     val activeItems = messages
         .filter { it.favorite && !it.loading }
         .map { message ->
@@ -4450,7 +5372,7 @@ private fun buildDrawerFavoriteItems(
                 .map { message ->
                     DrawerFavoriteItem(
                         messageId = message.id,
-                        title = session.title,
+                        title = titleCache[session.id] ?: session.title,
                         preview = message.drawerPreview(),
                         session = session
                     )
@@ -4459,6 +5381,158 @@ private fun buildDrawerFavoriteItems(
     return (activeItems + historyItems)
         .distinctBy { "${it.session?.id.orEmpty()}:${it.messageId}" }
         .take(50)
+}
+
+private fun buildTokenActivityBars(
+    tokenActivityPerDay: Map<LocalDate, Long>,
+    mode: TokenActivityMode
+): List<TokenActivityBar> {
+    val today = LocalDate.now()
+    return when (mode) {
+        TokenActivityMode.DAILY -> {
+            val firstDay = today.withDayOfMonth(1)
+            val daysInMonth = today.lengthOfMonth()
+            (1..daysInMonth).map { day ->
+                val date = firstDay.withDayOfMonth(day)
+                TokenActivityBar(
+                    axisLabel = day.toString(),
+                    rangeLabel = "${date.monthValue}月${date.dayOfMonth}日",
+                    value = tokenActivityPerDay[date] ?: 0L,
+                    defaultSelected = date == today
+                )
+            }
+        }
+
+        TokenActivityMode.MONTHLY -> {
+            val year = today.year
+            (1..12).map { month ->
+                val value = tokenActivityPerDay
+                    .filterKeys { date -> date.year == year && date.monthValue == month }
+                    .values
+                    .sum()
+                TokenActivityBar(
+                    axisLabel = "${month}月",
+                    rangeLabel = "${year}年${month}月",
+                    value = value,
+                    defaultSelected = month == today.monthValue
+                )
+            }
+        }
+    }
+}
+
+private fun buildAiChatStats(
+    sessions: List<AiChatSessionSnapshot>,
+    activeSessionId: String?,
+    currentMessages: List<ChatUiMessage>
+): AiChatStats {
+    val activeSnapshot = activeSessionId?.takeIf { currentMessages.isNotEmpty() }?.let { sessionId ->
+        AiChatSessionSnapshot(
+            id = sessionId,
+            title = currentMessages.deriveChatTitle() ?: "当前聊天",
+            createdAt = sessions.firstOrNull { it.id == sessionId }?.createdAt ?: System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis(),
+            messages = currentMessages.filterNot { it.loading }.map { it.toSnapshot() }
+        )
+    }
+    val statSessions = buildList {
+        addAll(sessions.filterNot { it.id == activeSessionId })
+        if (activeSnapshot != null) {
+            add(activeSnapshot)
+        } else {
+            addAll(sessions.filter { it.id == activeSessionId })
+        }
+    }
+    val zoneId = ZoneId.systemDefault()
+    val conversationsPerDay = statSessions
+        .filter { it.messages.isNotEmpty() }
+        .groupingBy { session ->
+            Instant.ofEpochMilli(session.updatedAt.takeIf { it > 0L } ?: session.createdAt)
+                .atZone(zoneId)
+                .toLocalDate()
+        }
+        .eachCount()
+    val tokenStats = statSessions
+        .asSequence()
+        .flatMap { it.messages.asSequence() }
+        .fold(AiTokenStats()) { acc, message ->
+            val tokens = message.meta.parseAiTokenStats()
+            acc.copy(
+                promptTokens = acc.promptTokens + tokens.promptTokens,
+                completionTokens = acc.completionTokens + tokens.completionTokens,
+                elapsedMs = acc.elapsedMs + (message.elapsedMs ?: 0L)
+            )
+        }
+    val tokenActivityPerDay = statSessions
+        .filter { it.messages.isNotEmpty() }
+        .groupBy { session ->
+            Instant.ofEpochMilli(session.updatedAt.takeIf { it > 0L } ?: session.createdAt)
+                .atZone(zoneId)
+                .toLocalDate()
+        }
+        .mapValues { (_, daySessions) ->
+            daySessions.sumOf { session ->
+                session.messages.sumOf { message ->
+                    val tokens = message.meta.parseAiTokenStats()
+                    tokens.promptTokens + tokens.completionTokens
+                }
+            }
+        }
+    return AiChatStats(
+        totalConversations = statSessions.count { it.messages.isNotEmpty() },
+        totalMessages = statSessions.sumOf { it.messages.size },
+        totalPromptTokens = tokenStats.promptTokens,
+        totalCompletionTokens = tokenStats.completionTokens,
+        totalElapsedMs = tokenStats.elapsedMs,
+        conversationsPerDay = conversationsPerDay,
+        tokenActivityPerDay = tokenActivityPerDay
+    )
+}
+
+private fun String?.parseAiTokenStats(): AiTokenStats {
+    if (isNullOrBlank()) {
+        return AiTokenStats()
+    }
+    val promptTokens = Regex("↑\\s*([\\d,]+)\\s*tokens")
+        .find(this)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.replace(",", "")
+        ?.toLongOrNull()
+        ?: 0L
+    val completionTokens = Regex("↓\\s*([\\d,]+)\\s*tokens")
+        .find(this)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.replace(",", "")
+        ?.toLongOrNull()
+        ?: 0L
+    return AiTokenStats(
+        promptTokens = promptTokens,
+        completionTokens = completionTokens
+    )
+}
+
+private fun formatAiStatCount(count: Long): String = when {
+    count >= 1_000_000 -> "%.1fM".format(count / 1_000_000.0)
+    count >= 1_000 -> "%.1fK".format(count / 1_000.0)
+    else -> count.toString()
+}
+
+private fun formatAiStatTokens(count: Long): String = when {
+    count >= 1_000_000_000 -> "%.2fB".format(count / 1_000_000_000.0)
+    count >= 1_000_000 -> "%.2fM".format(count / 1_000_000.0)
+    count >= 1_000 -> "%.1fK".format(count / 1_000.0)
+    else -> count.toString()
+}
+
+private fun formatAiStatDuration(elapsedMs: Long): String {
+    val seconds = elapsedMs / 1000
+    return when {
+        seconds >= 3600 -> "${seconds / 3600}小时${seconds % 3600 / 60}分"
+        seconds >= 60 -> "${seconds / 60}分${seconds % 60}秒"
+        else -> "${seconds}秒"
+    }
 }
 
 private fun ChatUiMessage.drawerPreview(): String {
@@ -4532,6 +5606,57 @@ private data class DrawerFavoriteItem(
     val title: String,
     val preview: String,
     val session: AiChatSessionSnapshot?
+)
+
+private data class DrawerHistoryGroup(
+    val title: String,
+    val items: List<DrawerHistoryItem>
+)
+
+private data class DrawerHistoryItem(
+    val session: AiChatSessionSnapshot,
+    val groupTitle: String,
+    val title: String,
+    val subtitle: String
+)
+
+private data class DrawerConversationIdentity(
+    val groupTitle: String,
+    val title: String,
+    val subtitle: String
+)
+
+private data class DrawerScene(
+    val groupTitle: String,
+    val title: String
+)
+
+private data class AiChatStats(
+    val totalConversations: Int,
+    val totalMessages: Int,
+    val totalPromptTokens: Long,
+    val totalCompletionTokens: Long,
+    val totalElapsedMs: Long,
+    val conversationsPerDay: Map<LocalDate, Int>,
+    val tokenActivityPerDay: Map<LocalDate, Long>
+)
+
+private data class AiTokenStats(
+    val promptTokens: Long = 0L,
+    val completionTokens: Long = 0L,
+    val elapsedMs: Long = 0L
+)
+
+private enum class TokenActivityMode(val title: String) {
+    DAILY("每日"),
+    MONTHLY("每月")
+}
+
+private data class TokenActivityBar(
+    val axisLabel: String,
+    val rangeLabel: String,
+    val value: Long,
+    val defaultSelected: Boolean
 )
 
 private data class GlobalMessageSearchResult(
